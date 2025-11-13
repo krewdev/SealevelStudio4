@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 12px;
+  background-color: #111827; /* bg-gray-900 */
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #374151; /* bg-gray-700 */
+  border-radius: 10px;
+  border: 2px solid #111827;
+}

@@ -1,0 +1,416 @@
+
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sealevel Studio - Open the Solana Black Box</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Simple scrollbar for dark mode */
+        ::-webkit-scrollbar {
+            width: 12px;
+            background-color: #111827;
+            /* bg-gray-900 */
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: #374151;
+            /* bg-gray-700 */
+            border-radius: 10px;
+            border: 2px solid #111827;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 antialiased">
+
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700/50">
+        <nav class="container mx-auto max-w-7xl px-6 py-4 flex justify-between items-center">
+            <div class="text-xl font-bold tracking-tighter">
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
+                    Sealevel Studio
+                </span>
+            </div>
+            <a href="#contact"
+                class="px-5 py-2 text-sm font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all">
+                Get in Touch
+            </a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <main class="pt-24">
+        <section class="relative container mx-auto max-w-7xl px-6 py-20 md:py-32 text-center">
+            <div
+                class="absolute inset-0 max-w-4xl mx-auto h-3/4 -translate-y-1/4 bg-purple-900/40 blur-3xl rounded-full -z-10">
+            </div>
+            <h1
+                class="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-100 to-gray-400 mb-6">
+                Open the Solana Black Box
+            </h1>
+            <p class="max-w-3xl mx-auto text-lg md:text-xl text-gray-300 mb-10">
+                Stop "chewing glass." Sealevel Studio is the "Postman for Solana"—a visual tool to assemble, simulate, debug, and export transactions.
+            </p>
+            <a href="#contact"
+                class="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30">
+                Request Early Access
+            </a>
+        </section>
+
+        <!-- Problem Section -->
+        <section class="py-20 bg-gray-950/50">
+            <div class="container mx-auto max-w-7xl px-6">
+                <h2 class="text-center text-3xl md:text-4xl font-bold tracking-tighter mb-4">
+                    The "Glass-Chewing" Experience is Real
+                </h2>
+                <p class="text-center text-lg text-gray-400 mb-16 max-w-2xl mx-auto">
+                    Every Solana dev wastes hours on the same painful, opaque problems.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Problem 1 -->
+                    <div class="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-purple-400 mb-4">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                            <path d="m12 9 1.8 3.24"></path>
+                            <path d="m17 21 1.8-3.24"></path>
+                            <path d="m7 21-1.8-3.24"></path>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Manual Account Lists</h3>
+                        <p class="text-gray-400">
+                            Guessing which accounts are `mut`, `signer`, or required for a CPI.
+                        </p>
+                    </div>
+                    <!-- Problem 2 -->
+                    <div class="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-purple-400 mb-4">
+                            <path d="m18 10-4.5 4.5a.5.5 0 0 1-.71 0L10 11.71a.5.5 0 0 0-.71 0L6 15"></path>
+                            <path d="m22 19-5-5"></path>
+                            <path d="M2 13h6"></path>
+                            <path d="M3 10v4"></path>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Cryptic Error Codes</h3>
+                        <p class="text-gray-400">
+                            Debugging `0x1` or `ConstraintHasOne` by "guess-and-check" for hours.
+                        </p>
+                    </div>
+                    <!-- Problem 3 -->
+                    <div class="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-8 h-8 text-purple-400 mb-4">
+                            <path d="M10 10v.2A3 3 0 0 1 7 13v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-5a3 3 0 0 1-3-2.8V10a3 3 0 0 0-3-3v0a3 3 0 0 0-3 3Zm0 0v-1a3 3 0 0 0-3-3m0 0v-1"></path>
+                            <path d="m10 10-2 1.8"></path>
+                            <path d="m14 10 2 1.8"></path>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Opaque State Changes</h3>
+                        <p class="text-gray-400">
+                            No simple way to answer "What did my transaction *actually* do?"
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features / "The Diff" Section -->
+        <section class="py-20 md:py-32">
+            <div class="container mx-auto max-w-7xl px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold tracking-tighter mb-4">
+                        Meet the "Glass Box"
+                    </h2>
+                    <p class="text-center text-lg text-gray-400 max-w-2xl mx-auto">
+                        Assemble, simulate, and *see* the result. Instantly.
+                    </p>
+                </div>
+
+                <!-- Mockup UI -->
+                <div
+                    class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden max-w-5xl mx-auto">
+                    <!-- Toolbar -->
+                    <div class="h-10 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        </div>
+                        <div
+                            class="text-gray-400 text-sm bg-gray-700 px-3 py-1 rounded-md hidden sm:block font-mono tracking-tight">
+                            Simulation: `spl_token::transfer`
+                        </div>
+                        <div class="w-16"></div>
+                    </div>
+
+                    <!-- Diff View -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-700">
+                        <!-- Before -->
+                        <div class="bg-gray-800 p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-semibold text-gray-200">Before Simulation</h4>
+                                <span
+                                    class="text-xs font-medium bg-gray-700 text-gray-300 px-3 py-1 rounded-full">STATE</span>
+                            </div>
+                            <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                                <p class="text-gray-400">// TokenAccount: `Alice.ATA`</p>
+                                <pre><code class="language-json text-gray-200">{
+  "mint": "EPj...Nwg",
+  "owner": "ALi...c3p",
+  <span class="text-red-400">- "amount": "100000000"</span>
+}</code></pre>
+                                <p class="text-gray-400 mt-4">// TokenAccount: `Bob.ATA`</p>
+                                <pre><code class="language-json text-gray-200">{
+  "mint": "EPj...Nwg",
+  "owner": "Bob...b3A",
+  <span class="text-red-400">- "amount": "0"</span>
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- After -->
+                        <div class="bg-gray-800 p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-lg font-semibold text-green-400">After Simulation</h4>
+                                <span
+                                    class="text-xs font-medium bg-green-900 text-green-300 px-3 py-1 rounded-full">SUCCESS</span>
+                            </div>
+                            <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                                <p class="text-gray-400">// TokenAccount: `Alice.ATA`</p>
+                                <pre><code class="language-json text-gray-200">{
+  "mint": "EPj...Nwg",
+  "owner": "ALi...c3p",
+  <span class="text-green-400">+ "amount": "75000000"</span>
+}</code></pre>
+                                <p class="text-gray-400 mt-4">// TokenAccount: `Bob.ATA`</p>
+                                <pre><code class="language-json text-gray-200">{
+  "mint": "EPj...Nwg",
+  "owner": "Bob...b3A",
+  <span class="text-green-400">+ "amount": "25000000"</span>
+}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logs -->
+                    <div class="bg-gray-800 border-t border-gray-700 p-4 font-mono text-xs">
+                        <p class="text-gray-400 mb-2">> Logs (CU: 1,450)</p>
+                        <p class="text-gray-300">> Program `Tokenkeg...1111` invoke [1]</p>
+                        <p class="text-gray-300">> Program log: Instruction: Transfer</p>
+                        <p class="text-gray-300">> Program `Tokenkeg...1111` consumed 1450 of 200000 compute units</p>
+                        <p class="text-green-400">> Program `Tokenkeg...1111` success</p>
+                    </div>
+                </div>
+
+                <!-- Feature Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-20 max-w-6xl mx-auto">
+                    <div class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-10 h-10 mx-auto mb-4 text-purple-400">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Assemble</h3>
+                        <p class="text-gray-400">Visually build transactions and CPIs with IDL-aware validation.</p>
+                    </div>
+                    <div class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-10 h-10 mx-auto mb-4 text-purple-400">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Simulate</h3>
+                        <p class="text-gray-400">Get an instant "before & after" state diff to see *exactly* what changed.</p>
+                    </div>
+                    <div class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-10 h-10 mx-auto mb-4 text-purple-400">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Debug</h3>
+                        <p class="text-gray-400">Read human-friendly console logs and monitor compute unit usage.</p>
+                    </div>
+                    <div class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="w-10 h-10 mx-auto mb-4 text-purple-400">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        <h3 class="text-xl font-semibold mb-2">Export</h3>
+                        <p class="text-gray-400">Generate copy-paste client code (TS/JS, Rust) in one click.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Proposal Section -->
+        <section class="py-20 md:py-32 bg-gray-950/50">
+            <div class="container mx-auto max-w-4xl px-6">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold tracking-tighter mb-4">
+                        Investment & Partnership Proposal
+                    </h2>
+                    <p class="text-center text-lg text-gray-400 max-w-2xl mx-auto">
+                        Detailed plan for building Sealevel Studio and transforming Solana developer experience
+                    </p>
+                </div>
+
+                <div class="prose prose-lg prose-invert max-w-none">
+                    <div class="bg-gray-800/50 p-8 rounded-xl border border-gray-700/50 mb-8">
+                        <h3 class="text-2xl font-bold mb-4 text-purple-400">Project: Sealevel Studio</h3>
+                        <p class="text-gray-300 mb-2"><strong>Vision:</strong> The Interactive Transaction Simulator & Assembler for Solana.</p>
+                        <p class="text-gray-300"><strong>Contact:</strong> James Young <a href="mailto:300jayblackout@gmail.com" class="text-purple-400 hover:text-purple-300">300jayblackout@gmail.com</a></p>
+                    </div>
+
+                    <div class="space-y-8">
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-purple-400">1. Executive Summary</h3>
+                            <p class="text-gray-300 leading-relaxed">
+                                Sealevel Studio is a web-based developer tool that solves the single biggest problem hindering Solana's developer adoption: the "black box" of transaction and instruction building. We are building the "Postman for Solana"—an interactive GUI that allows developers to visually assemble, simulate, debug, and export complex Solana transactions in real-time. This "glass box" approach will dramatically reduce the "glass-chewing" experience, accelerate developer onboarding, and reduce critical-error rates for protocols. We are seeking $150,000 in pre-seed/grant funding and strategic partnerships with key ecosystem players to build and launch our MVP.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-purple-400">2. The Problem: The "Glass-Chewing" Black Box</h3>
+                            <p class="text-gray-300 leading-relaxed mb-4">
+                                Solana's high-performance Sealevel runtime is a paradigm shift, but its stateless, account-based model creates a brutal developer experience (DevEx) for those coming from stateful models (like EVM or Web2).
+                            </p>
+                            <p class="text-gray-300 leading-relaxed mb-4">
+                                Every Solana developer, from novice to expert, burns countless hours struggling with:
+                            </p>
+                            <ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+                                <li><strong>Manual Account Composition:</strong> "What accounts do I actually need for this instruction? In what order? Which ones are mut? Which are signer?"</li>
+                                <li><strong>Complex CPIs:</strong> Building transactions that call other programs (like the Token Program or Metaplex) is a process of blind trial and error.</li>
+                                <li><strong>Opaque Debugging:</strong> Transactions fail with cryptic errors like 0x1 (InvalidAccountData) or ConstraintHasOne, leaving developers to "guess-and-check."</li>
+                                <li><strong>State Verification:</strong> There is no simple way to answer: "What did my transaction actually do to the state on-chain?"</li>
+                            </ul>
+                            <p class="text-gray-300 leading-relaxed mt-4">
+                                This friction is not just an inconvenience; it's a direct barrier to ecosystem growth, a source of security vulnerabilities, and a major cost in developer hours.
+                            </p>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-purple-400">3. The Solution: "Sealevel Studio"</h3>
+                            <p class="text-gray-300 leading-relaxed mb-4">
+                                Sealevel Studio is the "glass box" that makes the black box transparent. It's a WYSIWYG (What You See Is What You Get) editor for Solana's core building block: the transaction.
+                            </p>
+                            <p class="text-gray-300 leading-relaxed mb-4">
+                                It's a web-based tool with four core features:
+                            </p>
+                            <ul class="list-disc list-inside text-gray-300 space-y-3 ml-4">
+                                <li><strong>The Account Inspector:</strong> A UI to paste any on-chain account address. Sealevel Studio fetches, deserializes, and displays its data in a human-readable format, leveraging program IDLs (Anchor, Metaplex, etc.) to understand the structure.</li>
+                                <li><strong>The Instruction Assembler:</strong> A powerful builder where developers can select a program, choose an instruction (e.g., token_program::transfer), and visually fill in the required accounts. The tool validates inputs and constraints before sending.</li>
+                                <li><strong>The Simulation Engine (The "Gold" Feature):</strong> The "Simulate" button. Sealevel Studio forks the chain, runs the assembled transaction via a simulation RPC, and displays a clear "before-and-after" state diff. Developers instantly see exactly how their transaction mutated every account. It also displays compute units (CU) used and any console logs.</li>
+                                <li><strong>The Code Exporter:</strong> Once the transaction is perfect, the "Export" button generates the precise, copy-paste-ready client-side code (TypeScript, Rust) to execute that transaction in their dApp or integration tests.</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-purple-400">4. Market & Ecosystem Impact</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="text-lg font-semibold mb-2 text-purple-300">Target Market:</h4>
+                                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li><strong>New Solana Developers:</strong> Drastically flattens the learning curve. This tool teaches the account model visually.</li>
+                                        <li><strong>Protocol & dApp Teams:</strong> Rapidly prototype, debug, and test new instructions and CPIs, saving hundreds of engineering hours.</li>
+                                        <li><strong>Security Auditors:</strong> A power tool for modeling and verifying transaction behavior and state changes.</li>
+                                        <li><strong>Solana Educators & Hackathons:</strong> The ultimate "learn-by-doing" environment.</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-semibold mb-2 text-purple-300">Impact:</h4>
+                                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li><strong>Accelerated Onboarding:</strong> Makes Solana as approachable as EVM from day one.</li>
+                                        <li><strong>More Secure Protocols:</strong> Catches state-related bugs and errors before they hit production.</li>
+                                        <li><strong>Increased Developer Velocity:</strong> Unblocks teams by solving the most common, time-consuming development loop.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-purple-400">5. The Ask: Funding & Partnerships</h3>
+                            <p class="text-gray-300 leading-relaxed mb-4">
+                                To build and launch the Sealevel Studio MVP, we are seeking:
+                            </p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="bg-gray-800/30 p-4 rounded-lg border border-gray-700/30">
+                                    <h4 class="text-lg font-semibold mb-2 text-green-400">A. Funding: $150,000 Pre-Seed / Grant</h4>
+                                    <p class="text-gray-300 text-sm mb-2">This 6-month runway will be allocated to:</p>
+                                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li><strong>Core Team (2 Engineers):</strong> To build the frontend, simulation backend, and deserialization engine.</li>
+                                        <li><strong>Design (1 Part-Time):</strong> To ensure a world-class, intuitive UX.</li>
+                                        <li><strong>Infrastructure Costs:</strong> For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.</li>
+                                    </ul>
+                                </div>
+
+                                <div class="bg-gray-800/30 p-4 rounded-lg border border-gray-700/30">
+                                    <h4 class="text-lg font-semibold mb-2 text-blue-400">B. Strategic Partnerships</h4>
+                                    <p class="text-gray-300 text-sm mb-2">We are seeking partnerships, not just capital. Our ideal partners are:</p>
+                                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                                        <li><strong>L1 Foundations (Solana Foundation):</strong> For grant funding, ecosystem promotion, and inclusion in official developer documentation and bootcamps.</li>
+                                        <li><strong>Infrastructure Providers (Helius, Triton, QuickNode):</strong> For access to high-fidelity simulation RPCs and co-marketing to developer audiences.</li>
+                                        <li><strong>Core Tooling Teams (Anchor, Metaplex):</strong> To ensure first-class, "out-of-the-box" support for the most-used IDLs and program standards.</li>
+                                        <li><strong>Security & Audit Firms (Ottersec, Neodyme):</strong> As a "design partner" power-user group to provide critical feedback and ensure the tool meets security-critical standards.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA / Partnership Section -->
+        <section id="contact" class="py-20 md:py-32 bg-gray-950/50">
+            <div class="container mx-auto max-w-4xl px-6 text-center">
+                <h2 class="text-3xl md:text-4xl font-bold tracking-tighter mb-4">
+                    Build the Future of Solana DevEx
+                </h2>
+                <p class="text-lg text-gray-400 mb-10 max-w-2xl mx-auto">
+                    We're seeking a **$150k pre-seed/grant** and **strategic partners** in infrastructure, tooling, and security to make Sealevel Studio the standard for all Solana developers.
+                </p>
+                <div class="bg-gray-800 rounded-xl p-8 border border-gray-700/50 max-w-2xl mx-auto">
+                    <h3 class="text-2xl font-semibold mb-4">Get in Touch</h3>
+                    <p class="text-gray-400 mb-6">
+                        Interested in partnering, investing, or joining our early access list?
+                        Reach out and let's build.
+                    </p>
+                    <a href="mailto:contact@sealevel.studio"
+                        class="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30">
+                        contact@sealevel.studio
+                    </a>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-700/50">
+        <div class="container mx-auto max-w-7xl px-6 py-8 text-center text-gray-500">
+            <p>&copy; 2025 Sealevel Studio. All rights reserved.</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>
