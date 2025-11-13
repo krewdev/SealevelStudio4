@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
-import { InstructionAssembler } from './components/InstructionAssembler';
+import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
 import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
 import { useNetwork } from './contexts/NetworkContext';
@@ -643,7 +643,7 @@ function Header({
 function Sidebar({ activeView, setActiveView }) {
   const navItems = [
     { id: 'inspector', label: 'Account Inspector', icon: <Search className="h-4 w-4" /> },
-    { id: 'assembler', label: 'Instruction Assembler', icon: <Wrench className="h-4 w-4" /> },
+    { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" /> },
     { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" /> },
     { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" /> },
   ];
@@ -696,165 +696,9 @@ function MainContent({ activeView, connection, network, publicKey }) {
     setTransactionPreview(null);
   };
 
-  // For assembler view, use split layout
-  if (activeView === 'assembler') {
-  return (
-      <>
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Instruction Assembler */}
-    <main className="flex-1 overflow-y-auto p-6 md:p-8">
-            <InstructionAssembler onTransactionBuilt={handleTransactionBuilt} />
-    </main>
-
-          {/* Sidebar with Wallet and Transaction Clipboard */}
-          <aside className="w-80 border-l border-gray-700 bg-gray-900/50 overflow-y-auto">
-            <div className="p-6 space-y-6">
-              {/* Wallet Section */}
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Wallet className="h-5 w-5 mr-2 text-purple-400" />
-                  Wallet
-                </h3>
-                
-                <div className="space-y-3">
-                  <div className="text-sm">
-                    <span className="text-gray-400">Network:</span>
-                    <span className="ml-2 text-white font-medium">{network.toUpperCase()}</span>
-                  </div>
-                  
-                  <div className="text-sm">
-                    <span className="text-gray-400">Address:</span>
-                    <div className="mt-1">
-                      {publicKey ? (
-                        <div className="flex items-center space-x-2">
-                      
-                        <code className="text-xs bg-gray-900 px-2 py-1 rounded text-gray-200 font-mono break-all flex-1">
-                            {publicKey.toString()}
-                          </code>
-                          <button
-                            onClick={() => navigator.clipboard.writeText(publicKey.toString())}
-                            className="p-1 hover:bg-gray-700 rounded"
-                            title="Copy address"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-red-400">Not connected</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <WalletButton />
-                  </div>
-                </div>
-              </div>
-
-              {/* Transaction Clipboard */}
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Code className="h-5 w-5 mr-2 text-blue-400" />
-                  Transaction Clipboard
-                </h3>
-                
-                <div className="space-y-3">
-                  {transactionPreview ? (
-                    <div className="space-y-3">
-                      <div className="text-sm">
-                        <span className="text-gray-400">Instructions:</span>
-                        <span className="ml-2 text-white font-medium">
-                          {transactionPreview.transaction?.instructions?.length || 0}
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm">
-                        <span className="text-gray-400">Estimated Cost:</span>
-                        <span className="ml-2 text-green-400 font-medium">
-                          {transactionPreview.cost ? `${(transactionPreview.cost / 1e9).toFixed(6)} SOL` : 'Calculating...'}
-                        </span>
-                      </div>
-
-                      <div className="flex space-x-2 pt-2">
-                        <button
-                          onClick={handleTransactionExecute}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
-                        >
-                          Execute Transaction
-                        </button>
-        <button
-                          onClick={() => {
-                            const txData = JSON.stringify(transactionPreview.transaction, null, 2);
-                            navigator.clipboard.writeText(txData);
-                          }}
-                          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm font-medium transition-colors"
-                          title="Copy transaction JSON"
-                        >
-                          <Copy className="h-4 w-4" />
-        </button>
-      </div>
-
-                      <button
-                        onClick={handlePreviewClose}
-                        className="w-full bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Code className="h-12 w-12 text-gray-600 mx-auto mb-2" />
-                      <p className="text-gray-400 text-sm">
-                        Build a transaction to see details here
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Recent Transactions or Quick Actions could go here */}
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/50">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-                  <Zap className="h-5 w-5 mr-2 text-yellow-400" />
-                  Quick Actions
-                </h3>
-                
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      // Reset transaction draft
-                      setTransactionPreview(null);
-                    }}
-                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm font-medium transition-colors text-left"
-                  >
-                    New Transaction
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      // Could implement save/load functionality
-                      console.log('Save transaction template');
-                    }}
-                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm font-medium transition-colors text-left"
-                  >
-                    Save Template
-                  </button>
-        </div>
-      </div>
-    </div>
-          </aside>
-        </div>
-
-        {transactionPreview && (
-          <TransactionPreview
-            transaction={transactionPreview.transaction}
-            cost={transactionPreview.cost}
-            onExecute={handleTransactionExecute}
-            onClose={handlePreviewClose}
-          />
-        )}
-      </>
-    );
+  // Transaction Builder has its own full-screen layout
+  if (activeView === 'builder') {
+    return <UnifiedTransactionBuilder onTransactionBuilt={handleTransactionBuilt} />;
   }
 
   // Default single-column layout for other views
@@ -964,19 +808,25 @@ export default function App() {
   }
 
   // Main app interface
+  const isBuilderView = activeView === 'builder';
+  
   return (
     <ClientOnly>
       <div className="h-screen flex flex-col bg-gray-900">
-        <Header 
-          network={network} 
-          setNetwork={setNetwork} 
-          networks={NETWORKS} 
-          wallet={<WalletButton />}
-          onBackToLanding={handleBackToLanding}
-        />
+        {!isBuilderView && (
+          <Header 
+            network={network} 
+            setNetwork={setNetwork} 
+            networks={NETWORKS} 
+            wallet={<WalletButton />}
+            onBackToLanding={handleBackToLanding}
+          />
+        )}
         
         <div className="flex-1 flex overflow-hidden">
-          <Sidebar activeView={activeView} setActiveView={setActiveView} />
+          {!isBuilderView && (
+            <Sidebar activeView={activeView} setActiveView={setActiveView} />
+          )}
           <MainContent 
             activeView={activeView} 
             connection={connection} 
