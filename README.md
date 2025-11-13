@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 
-=======
 Sealevel Studio: Investment & Partnership Proposal
 
 Project: Sealevel Studio
@@ -36,7 +34,7 @@ It's a web-based tool with four core features:
 The Account Inspector: A UI to paste any on-chain account address. Sealevel Studio fetches, deserializes, and displays its data in a human-readable format, leveraging program IDLs (Anchor, Metaplex, etc.) to understand the structure.
 
 The Instruction Assembler: A powerful builder where developers can select a program, choose an instruction (e.g., token_program::transfer), and visually fill in the required accounts. The tool validates inputs and constraints before sending.
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+
 
 The Simulation Engine (The "Gold" Feature): The "Simulate" button. Sealevel Studio forks the chain, runs the assembled transaction via a simulation RPC, and displays a clear "before-and-after" state diff. Developers instantly see exactly how their transaction mutated every account. It also displays compute units (CU) used and any console logs.
 
@@ -48,13 +46,13 @@ Target Market:
 
 New Solana Developers: Drastically flattens the learning curve. This tool teaches the account model visually.
 
-<<<<<<< HEAD
+
 Sealevel Studio is the "Postman for Solana" — an interactive GUI that allows developers to visually assemble, simulate, debug, and export complex Solana transactions in real-time. Now powered by **Verisol-attested smart contracts** delivered as compressed NFTs (cNFTs), developers can drag-and-drop formally verified contracts onto the console for trustless transaction building.
 
 This "glass box" approach dramatically reduces the "glass-chewing" experience, accelerates developer onboarding, and reduces critical-error rates for protocols by leveraging zero-knowledge proofs for smart contract verification.
 =======
 Protocol & dApp Teams: Rapidly prototype, debug, and test new instructions and CPIs, saving hundreds of engineering hours.
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+
 
 Security Auditors: A power tool for modeling and verifying transaction behavior and state changes.
 
@@ -68,13 +66,13 @@ Solana Educators & Hackathons: The ultimate "learn-by-doing" environment.
 - **Contract Trust**: How can I be sure the smart contracts I'm using are secure?
 =======
 Impact:
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+
 
 Accelerated Onboarding: Makes Solana as approachable as EVM from day one.
 
 More Secure Protocols: Catches state-related bugs and errors before they hit production.
 
-<<<<<<< HEAD
+
 ### 🔧 Build a Tx (Powered by Verisol)
 - **Drag-and-Drop cNFT Interface**: Drop Verisol-attested smart contracts directly onto the console
 - **ZK-Verified Contracts**: Only formally verified contracts can be used, with zero-knowledge proofs
@@ -108,7 +106,7 @@ This 6-month runway will be allocated to:
 
 Core Team (2 Engineers): To build the frontend, simulation backend, and deserialization engine.
 
-<<<<<<< HEAD
+
 **Solana Integration:**
 - @solana/web3.js - Core Solana library
 - @solana/spl-token - Token program utilities
@@ -166,13 +164,13 @@ Design (1 Part-Time): To ensure a world-class, intuitive UX.
 Infrastructure Costs: For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.
 
 B. Strategic Partnerships
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+>>>
 
 We are seeking partnerships, not just capital. Our ideal partners are:
 
 L1 Foundations (Solana Foundation): For grant funding, ecosystem promotion, and inclusion in official developer documentation and bootcamps.
 
-<<<<<<< HEAD
+<<<
 - [ ] Project setup with Next.js + TypeScript
 - [ ] Basic UI framework (Tailwind + shadcn/ui)
 - [ ] Solana connection and basic account fetching
