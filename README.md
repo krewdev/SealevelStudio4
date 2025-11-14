@@ -50,7 +50,7 @@ New Solana Developers: Drastically flattens the learning curve. This tool teache
 Sealevel Studio is the "Postman for Solana" — an interactive GUI that allows developers to visually assemble, simulate, debug, and export complex Solana transactions in real-time. Now powered by **Verisol-attested smart contracts** delivered as compressed NFTs (cNFTs), developers can drag-and-drop formally verified contracts onto the console for trustless transaction building.
 
 This "glass box" approach dramatically reduces the "glass-chewing" experience, accelerates developer onboarding, and reduces critical-error rates for protocols by leveraging zero-knowledge proofs for smart contract verification.
-=======
+
 Protocol & dApp Teams: Rapidly prototype, debug, and test new instructions and CPIs, saving hundreds of engineering hours.
 
 
@@ -58,13 +58,13 @@ Security Auditors: A power tool for modeling and verifying transaction behavior 
 
 Solana Educators & Hackathons: The ultimate "learn-by-doing" environment.
 
-<<<<<<< HEAD
+
 - **Manual Account Composition**: "What accounts do I actually need? In what order?"
 - **Complex CPIs**: Building transactions with other programs is blind trial and error
 - **Opaque Debugging**: Cryptic errors like `0x1 (InvalidAccountData)` or `ConstraintHasOne`
 - **State Verification**: No simple way to see "What did my transaction actually do?"
 - **Contract Trust**: How can I be sure the smart contracts I'm using are secure?
-=======
+
 Impact:
 
 
@@ -92,13 +92,13 @@ More Secure Protocols: Catches state-related bugs and errors before they hit pro
 - Integration-ready for dApps and tests
 - Multiple export formats and frameworks
 - **Include Verification Proofs**: Export with embedded ZK proofs for audit trails
-=======
+
 Increased Developer Velocity: Unblocks teams by solving the most common, time-consuming development loop.
 
 5. The Ask: Funding & Partnerships
 
 To build and launch the Sealevel Studio MVP, we are seeking:
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+
 
 A. Funding: $150,000 Pre-Seed / Grant
 
@@ -342,4 +342,4 @@ Infrastructure Providers (Helius, Triton, QuickNode): For access to high-fidelit
 Core Tooling Teams (Anchor, Metaplex): To ensure first-class, "out-of-the-box" support for the most-used IDLs and program standards.
 
 Security & Audit Firms (Ottersec, Neodyme): As a "design partner" power-user group to provide critical feedback and ensure the tool meets security-critical standards.
->>>>>>> a0be7c8aea2d2e6ace103d97db4d28a37d457018
+
