@@ -26,7 +26,8 @@ import {
   ToggleRight,
   ArrowLeft,
   Clipboard,
-  ClipboardCheck
+  ClipboardCheck,
+  Info
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { TransactionBuilder } from '../lib/transaction-builder';
@@ -83,6 +84,294 @@ interface Log {
 }
 
 type ViewMode = 'simple' | 'advanced';
+
+// Template Tooltip Component (for advanced mode)
+function TemplateTooltip({ 
+  template, 
+  children 
+}: { 
+  template: InstructionTemplate;
+  children: React.ReactElement;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const getRules = () => {
+    const rules: string[] = [];
+    
+    template.args.forEach(arg => {
+      if (arg.validation) {
+        if (arg.validation.min !== undefined) {
+          rules.push(`${arg.name}: minimum ${arg.validation.min}`);
+        }
+        if (arg.validation.max !== undefined) {
+          rules.push(`${arg.name}: maximum ${arg.validation.max}`);
+        }
+        if (arg.validation.pattern) {
+          rules.push(`${arg.name}: must match pattern`);
+        }
+      }
+      if (arg.isOptional) {
+        rules.push(`${arg.name}: optional`);
+      }
+    });
+
+    template.accounts.forEach(acc => {
+      if (acc.isOptional) {
+        rules.push(`${acc.name}: optional account`);
+      }
+      if (acc.type === 'signer') {
+        rules.push(`${acc.name}: must be a signer`);
+      }
+    });
+
+    return rules;
+  };
+
+  return (
+    <div 
+      className="relative"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {children}
+      {showTooltip && (
+        <div
+          className="absolute z-50 w-80 p-4 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl pointer-events-none"
+          style={{
+            left: 'calc(100% + 12px)',
+            top: '50%',
+            transform: 'translateY(-50%)'
+          }}
+        >
+          {/* Context/Description */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={14} className="text-purple-400" />
+              <h4 className="text-sm font-semibold text-white">{template.name}</h4>
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">{template.description}</p>
+          </div>
+
+          {/* Parameters Needed */}
+          <div className="mb-3">
+            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Parameters</h5>
+            <div className="space-y-1.5">
+              {template.args.length > 0 ? (
+                template.args.map((arg, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="text-purple-400 font-mono">{arg.name}</span>
+                    <span className="text-gray-500 mx-1">({arg.type})</span>
+                    <span className="text-gray-400">: {arg.description}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-gray-500">No parameters required</div>
+              )}
+            </div>
+          </div>
+
+          {/* Accounts Needed */}
+          {template.accounts.length > 0 && (
+            <div className="mb-3">
+              <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Accounts</h5>
+              <div className="space-y-1.5">
+                {template.accounts.map((acc, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="text-blue-400 font-mono">{acc.name}</span>
+                    <span className={`mx-1 text-xs ${
+                      acc.type === 'signer' ? 'text-yellow-400' : 
+                      acc.type === 'writable' ? 'text-green-400' : 
+                      'text-gray-500'
+                    }`}>
+                      ({acc.type})
+                    </span>
+                    <span className="text-gray-400">: {acc.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rules */}
+          {getRules().length > 0 && (
+            <div className="pt-3 border-t border-gray-700">
+              <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Rules</h5>
+              <div className="space-y-1">
+                {getRules().map((rule, idx) => (
+                  <div key={idx} className="text-xs text-amber-400 flex items-start gap-1.5">
+                    <span className="mt-0.5">•</span>
+                    <span>{rule}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Arrow */}
+          <div 
+            className="absolute left-0 top-1/2 -translate-x-full -translate-y-1/2"
+            style={{
+              borderRight: '6px solid rgb(31 41 55)',
+              borderTop: '6px solid transparent',
+              borderBottom: '6px solid transparent'
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Block Tooltip Component
+function BlockTooltip({ 
+  block, 
+  template, 
+  children 
+}: { 
+  block: SimpleBlock; 
+  template?: InstructionTemplate | null;
+  children: React.ReactElement;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
+  // Get template info if available
+  const templateId = BLOCK_TO_TEMPLATE[block.id];
+  const blockTemplate = template || (templateId ? getTemplateById(templateId) : null);
+
+  // Get rules/validation info
+  const getRules = () => {
+    if (!blockTemplate) return [];
+    const rules: string[] = [];
+    
+    blockTemplate.args.forEach(arg => {
+      if (arg.validation) {
+        if (arg.validation.min !== undefined) {
+          rules.push(`${arg.name}: minimum ${arg.validation.min}`);
+        }
+        if (arg.validation.max !== undefined) {
+          rules.push(`${arg.name}: maximum ${arg.validation.max}`);
+        }
+        if (arg.validation.pattern) {
+          rules.push(`${arg.name}: must match pattern`);
+        }
+      }
+      if (arg.isOptional) {
+        rules.push(`${arg.name}: optional`);
+      }
+    });
+
+    blockTemplate.accounts.forEach(acc => {
+      if (acc.isOptional) {
+        rules.push(`${acc.name}: optional account`);
+      }
+      if (acc.type === 'signer') {
+        rules.push(`${acc.name}: must be a signer`);
+      }
+    });
+
+    return rules;
+  };
+
+  if (!blockTemplate) {
+    return children;
+  }
+
+  return (
+    <div 
+      className="relative"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {children}
+      {showTooltip && (
+        <div
+          ref={tooltipRef}
+          className="absolute z-50 w-80 p-4 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl pointer-events-none"
+          style={{
+            left: 'calc(100% + 12px)',
+            top: '50%',
+            transform: 'translateY(-50%)'
+          }}
+        >
+          {/* Context/Description */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={14} className="text-purple-400" />
+              <h4 className="text-sm font-semibold text-white">{blockTemplate.name}</h4>
+            </div>
+            <p className="text-xs text-gray-300 leading-relaxed">{blockTemplate.description}</p>
+          </div>
+
+          {/* Parameters Needed */}
+          <div className="mb-3">
+            <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Parameters</h5>
+            <div className="space-y-1.5">
+              {blockTemplate.args.length > 0 ? (
+                blockTemplate.args.map((arg, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="text-purple-400 font-mono">{arg.name}</span>
+                    <span className="text-gray-500 mx-1">({arg.type})</span>
+                    <span className="text-gray-400">: {arg.description}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-gray-500">No parameters required</div>
+              )}
+            </div>
+          </div>
+
+          {/* Accounts Needed */}
+          {blockTemplate.accounts.length > 0 && (
+            <div className="mb-3">
+              <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Accounts</h5>
+              <div className="space-y-1.5">
+                {blockTemplate.accounts.map((acc, idx) => (
+                  <div key={idx} className="text-xs">
+                    <span className="text-blue-400 font-mono">{acc.name}</span>
+                    <span className={`mx-1 text-xs ${
+                      acc.type === 'signer' ? 'text-yellow-400' : 
+                      acc.type === 'writable' ? 'text-green-400' : 
+                      'text-gray-500'
+                    }`}>
+                      ({acc.type})
+                    </span>
+                    <span className="text-gray-400">: {acc.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rules */}
+          {getRules().length > 0 && (
+            <div className="pt-3 border-t border-gray-700">
+              <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Rules</h5>
+              <div className="space-y-1">
+                {getRules().map((rule, idx) => (
+                  <div key={idx} className="text-xs text-amber-400 flex items-start gap-1.5">
+                    <span className="mt-0.5">•</span>
+                    <span>{rule}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Arrow */}
+          <div 
+            className="absolute left-0 top-1/2 -translate-x-full -translate-y-1/2"
+            style={{
+              borderRight: '6px solid rgb(31 41 55)',
+              borderTop: '6px solid transparent',
+              borderBottom: '6px solid transparent'
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface UnifiedTransactionBuilderProps {
   onTransactionBuilt?: (transaction: any, cost: any) => void;
@@ -480,25 +769,26 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {SIMPLE_BLOCK_CATEGORIES[activeCategory].map(block => (
-              <div 
-                key={block.id}
-                onClick={() => addSimpleBlock(block)}
-                className="group relative bg-slate-800 border border-slate-700 hover:border-teal-500/50 hover:bg-slate-800/80 p-3 rounded-lg cursor-pointer transition-all duration-200 active:scale-95"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded flex items-center justify-center text-white shadow-lg ${block.color}`}>
-                      {renderIcon(block.icon, "w-4 h-4")}
+              <BlockTooltip key={block.id} block={block}>
+                <div 
+                  onClick={() => addSimpleBlock(block)}
+                  className="group relative bg-slate-800 border border-slate-700 hover:border-teal-500/50 hover:bg-slate-800/80 p-3 rounded-lg cursor-pointer transition-all duration-200 active:scale-95"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded flex items-center justify-center text-white shadow-lg ${block.color}`}>
+                        {renderIcon(block.icon, "w-4 h-4")}
+                      </div>
+                      <span className="text-sm font-medium">{block.name}</span>
                     </div>
-                    <span className="text-sm font-medium">{block.name}</span>
+                    {block.verified && (
+                      <span title="VeriSoL Audited">
+                        <ShieldCheck size={14} className="text-teal-500" />
+                      </span>
+                    )}
                   </div>
-                  {block.verified && (
-                    <span title="VeriSoL Audited">
-                      <ShieldCheck size={14} className="text-teal-500" />
-                    </span>
-                  )}
                 </div>
-              </div>
+              </BlockTooltip>
             ))}
           </div>
         </aside>
@@ -561,19 +851,20 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
               </div>
             ) : (
               simpleWorkflow.map((block, index) => (
-                <div key={block.instanceId} className="w-full max-w-md relative group">
-                  {index > 0 && (
-                    <div className="h-4 w-0.5 bg-slate-700 mx-auto absolute -top-4 left-0 right-0" />
-                  )}
-                  
-                  <div 
-                    onClick={() => setSelectedBlock(block)}
-                    className={`relative bg-slate-900 border ${
-                      selectedBlock?.instanceId === block.instanceId 
-                      ? 'border-teal-500 ring-1 ring-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.2)]' 
-                      : 'border-slate-700 hover:border-slate-500'
-                    } p-4 rounded-xl transition-all cursor-pointer select-none`}
-                  >
+                <BlockTooltip key={block.instanceId} block={block}>
+                  <div className="w-full max-w-md relative group">
+                    {index > 0 && (
+                      <div className="h-4 w-0.5 bg-slate-700 mx-auto absolute -top-4 left-0 right-0" />
+                    )}
+                    
+                    <div 
+                      onClick={() => setSelectedBlock(block)}
+                      className={`relative bg-slate-900 border ${
+                        selectedBlock?.instanceId === block.instanceId 
+                        ? 'border-teal-500 ring-1 ring-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.2)]' 
+                        : 'border-slate-700 hover:border-slate-500'
+                      } p-4 rounded-xl transition-all cursor-pointer select-none`}
+                    >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded flex items-center justify-center text-white shadow-sm ${block.color}`}>
@@ -604,8 +895,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                     >
                       <X size={12} />
                     </button>
+                    </div>
                   </div>
-                </div>
+                </BlockTooltip>
               ))
             )}
           </div>
@@ -839,15 +1131,14 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       {/* Mode Toggle Header */}
       <div className="border-b border-gray-700 bg-gray-800/50 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-              title="Go back"
-            >
-              <ArrowLeft size={18} />
-            </button>
-          )}
+          <button
+            onClick={onBack || (() => {})}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            title="Go back to Account Inspector"
+          >
+            <ArrowLeft size={18} />
+            <span className="text-sm">Back</span>
+          </button>
           <h1 className="text-xl font-bold text-white">Transaction Builder</h1>
           <div className="flex items-center gap-2 bg-gray-900 rounded-lg p-1">
             <button
@@ -1230,22 +1521,23 @@ function TemplateSelectorModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
             {templates.map(template => (
-              <button
-                key={template.id}
-                onClick={() => onSelectTemplate(template)}
-                className="p-4 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 hover:border-purple-500/50 rounded-lg text-left transition-colors group"
-              >
-                <h3 className="font-semibold text-white group-hover:text-purple-300 transition-colors">
-                  {template.name}
-                </h3>
-                <p className="text-sm text-gray-400 mt-1 line-clamp-2">
-                  {template.description}
-                </p>
-                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                  <span>{template.accounts.length} accounts</span>
-                  <span>{template.args.length} args</span>
-                </div>
-              </button>
+              <TemplateTooltip key={template.id} template={template}>
+                <button
+                  onClick={() => onSelectTemplate(template)}
+                  className="p-4 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 hover:border-purple-500/50 rounded-lg text-left transition-colors group w-full"
+                >
+                  <h3 className="font-semibold text-white group-hover:text-purple-300 transition-colors">
+                    {template.name}
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-1 line-clamp-2">
+                    {template.description}
+                  </p>
+                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                    <span>{template.accounts.length} accounts</span>
+                    <span>{template.args.length} args</span>
+                  </div>
+                </button>
+              </TemplateTooltip>
             ))}
           </div>
         </div>
