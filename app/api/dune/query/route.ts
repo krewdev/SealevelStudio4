@@ -1,10 +1,14 @@
 // Next.js API route to proxy Dune Analytics queries
 
 import { NextRequest, NextResponse } from 'next/server';
+import { validateNumeric, validateUUID, validateAction, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
 export const dynamic = 'force-dynamic';
 
-const DUNE_API_BASE = 'https://api.dune.com/api/v1';
+const DUNE_API_BASE = `${ALLOWED_API_BASES.DUNE}/api/v1`;
+
+// Allowed actions (whitelist)
+const ALLOWED_ACTIONS = ['results', 'execute', 'status'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,16 +24,14 @@ export async function GET(request: NextRequest) {
     }
 
     const queryId = searchParams.get('queryId');
-    const action = searchParams.get('action') || 'results'; // results, execute, status
+    const action = searchParams.get('action') || 'results';
 
-    // Validate queryId: must be strictly numeric or valid UUID (no extra characters)
-    function isValidQueryId(qid: string | null): boolean {
-      if (!qid) return false;
-      // strictly numeric (disallow leading zeros if desired)
-      const isNumericId = /^[0-9]+$/.test(qid);
-      // strictly UUID v4, case-insensitive but exactly formatted
-      const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(qid);
-      return isNumericId || isUUID;
+    // Validate action (prevent path traversal)
+    if (!validateAction(action, ALLOWED_ACTIONS)) {
+      return NextResponse.json(
+        { error: 'Invalid action. Must be one of: results, execute, status' },
+        { status: 400 }
+      );
     }
 
     if ((action === 'results') && !queryId) {
@@ -39,28 +41,47 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!isValidQueryId(queryId)) {
-      return NextResponse.json(
-    // By this point, queryId is guaranteed safe for interpolation.
-        { error: 'Invalid query ID format.' },
-        { status: 400 }
-      );
+    // Validate queryId - must be strictly numeric or valid UUID (prevents SSRF)
+    if (queryId) {
+      const numericValidation = validateNumeric(queryId, 1);
+      const uuidValidation = validateUUID(queryId);
+      
+      if (!numericValidation.valid && !uuidValidation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid query ID format. Must be numeric or UUID' },
+          { status: 400 }
+        );
+      }
+
+      // Ensure queryId doesn't contain path traversal characters
+      if (queryId.includes('..') || queryId.includes('/') || queryId.includes('\\')) {
+        return NextResponse.json(
+          { error: 'Invalid query ID format' },
+          { status: 400 }
+        );
+      }
     }
 
+    // Build URL safely - use validated queryId directly in path (already validated)
+    // No need to encode as it's already validated as numeric or UUID
     let url = '';
+    const safeQueryId = queryId || '';
     
     switch (action) {
       case 'results':
-        url = `${DUNE_API_BASE}/query/${queryId}/results`;
+        url = `${DUNE_API_BASE}/query/${safeQueryId}/results`;
         break;
       case 'execute':
-        url = `${DUNE_API_BASE}/query/${queryId}/execute`;
+        url = `${DUNE_API_BASE}/query/${safeQueryId}/execute`;
         break;
       case 'status':
-        url = `${DUNE_API_BASE}/execution/${queryId}/status`;
+        url = `${DUNE_API_BASE}/execution/${safeQueryId}/status`;
         break;
       default:
-        url = `${DUNE_API_BASE}/query/${queryId}/results`;
+        return NextResponse.json(
+          { error: 'Invalid action' },
+          { status: 400 }
+        );
     }
 
     const response = await fetch(url, {

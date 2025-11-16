@@ -121,11 +121,11 @@ export function ArbitragePanel({ onSelectOpportunity, onClose }: ArbitragePanelP
                     )}
                   </div>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${
-                    opp.confidence === 'high' ? 'bg-green-900/50 text-green-400' :
-                    opp.confidence === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                    opp.confidence >= 0.7 ? 'bg-green-900/50 text-green-400' :
+                    opp.confidence >= 0.4 ? 'bg-yellow-900/50 text-yellow-400' :
                     'bg-red-900/50 text-red-400'
                   }`}>
-                    {opp.confidence}
+                    {(opp.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

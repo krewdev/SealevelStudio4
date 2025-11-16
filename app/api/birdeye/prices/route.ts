@@ -1,10 +1,14 @@
 // Next.js API route to proxy Birdeye price data requests
 
 import { NextRequest, NextResponse } from 'next/server';
+import { validateSolanaAddress, validateEndpoint, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
 export const dynamic = 'force-dynamic';
 
-const BIRDEYE_API_BASE = 'https://public-api.birdeye.so';
+const BIRDEYE_API_BASE = ALLOWED_API_BASES.BIRDEYE;
+
+// Allowed types (whitelist)
+const ALLOWED_TYPES = ['price', 'volume', 'pairs'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +24,16 @@ export async function GET(request: NextRequest) {
     }
 
     const address = searchParams.get('address');
-    const type = searchParams.get('type') || 'price'; // price, volume, marketcap, etc.
+    const type = searchParams.get('type') || 'price';
+
+    // Validate type (prevent path traversal)
+    const typeValidation = validateEndpoint(type, ALLOWED_TYPES);
+    if (!typeValidation.valid) {
+      return NextResponse.json(
+        { error: typeValidation.error || 'Invalid type' },
+        { status: 400 }
+      );
+    }
 
     if (!address && type === 'price') {
       return NextResponse.json(
@@ -29,20 +42,36 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Validate Solana address if provided (prevents SSRF)
+    if (address) {
+      const addressValidation = validateSolanaAddress(address);
+      if (!addressValidation.valid) {
+        return NextResponse.json(
+          { error: addressValidation.error || 'Invalid address format' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Build URL safely with validated and encoded parameters
+    const encodedAddress = address ? safeEncodeParam(address) : '';
     let url = '';
     
     switch (type) {
       case 'price':
-        url = `${BIRDEYE_API_BASE}/defi/price?address=${address}`;
+        url = `${BIRDEYE_API_BASE}/defi/price?address=${encodedAddress}`;
         break;
       case 'volume':
-        url = `${BIRDEYE_API_BASE}/defi/token_overview?address=${address}`;
+        url = `${BIRDEYE_API_BASE}/defi/token_overview?address=${encodedAddress}`;
         break;
       case 'pairs':
-        url = `${BIRDEYE_API_BASE}/defi/pairs?address=${address}`;
+        url = `${BIRDEYE_API_BASE}/defi/pairs?address=${encodedAddress}`;
         break;
       default:
-        url = `${BIRDEYE_API_BASE}/defi/price?address=${address}`;
+        return NextResponse.json(
+          { error: 'Invalid type' },
+          { status: 400 }
+        );
     }
 
     const response = await fetch(url, {

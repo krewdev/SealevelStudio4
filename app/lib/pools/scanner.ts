@@ -11,6 +11,7 @@ import { LifinityFetcher } from './fetchers/lifinity';
 import { HeliusFetcher } from './fetchers/helius';
 import { BirdeyeFetcher } from './fetchers/birdeye';
 import { AISearcher } from './ai-searcher';
+import { poolWebSocketManager, PoolUpdate } from './websocket';
 
 export class PoolScanner {
   private fetchers: Map<DEXProtocol, PoolFetcher>;
