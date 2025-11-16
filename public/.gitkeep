@@ -1,0 +1,8 @@
+# Place logo-video.mp4 or logo-video.webm here
+# The video should be optimized for web:
+# - Format: MP4 (H.264) or WebM
+# - Size: Under 2MB recommended
+# - Dimensions: 200-400px width, maintain aspect ratio
+# - Duration: 3-10 seconds for looping
+# - Autoplay, loop, muted attributes handled in component
+

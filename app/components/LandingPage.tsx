@@ -23,8 +23,25 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700/50">
         <nav className="container mx-auto max-w-7xl px-6 py-4 flex justify-between items-center">
-          <div className="text-xl font-bold tracking-tighter">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
+          <div className="flex items-center gap-3">
+            {/* Logo Video */}
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-10 w-auto"
+              style={{ maxHeight: '40px' }}
+              onError={(e) => {
+                // Hide video if it fails to load, show fallback
+                e.currentTarget.style.display = 'none';
+              }}
+            >
+              <source src="/logo-video.mp4" type="video/mp4" />
+              <source src="/logo-video.webm" type="video/webm" />
+              {/* Fallback text if video doesn't load */}
+            </video>
+            <span className="text-xl font-bold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
               Sealevel Studio
             </span>
           </div>
@@ -41,6 +58,26 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
       <main className="pt-24">
         <section className="relative container mx-auto max-w-7xl px-6 py-20 md:py-32 text-center">
           <div className="absolute inset-0 max-w-4xl mx-auto h-3/4 -translate-y-1/4 bg-purple-900/40 blur-3xl rounded-full -z-10"></div>
+          
+          {/* Logo Video - Centered in Hero */}
+          <div className="mb-8 flex justify-center">
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="h-24 md:h-32 w-auto"
+              style={{ maxHeight: '128px' }}
+              onError={(e) => {
+                // Hide video if it fails to load
+                e.currentTarget.style.display = 'none';
+              }}
+            >
+              <source src="/logo-video.mp4" type="video/mp4" />
+              <source src="/logo-video.webm" type="video/webm" />
+            </video>
+          </div>
+          
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-100 to-gray-400 mb-6">
             Open the Solana Black Box
           </h1>
