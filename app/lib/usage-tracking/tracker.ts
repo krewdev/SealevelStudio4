@@ -76,6 +76,18 @@ export function getOrCreateFreeTrial(userId: string): FreeTrialStatus {
       ai_query: 0,
       code_export: 0,
       advanced_transaction: 0,
+      // Premium services (not in free trial, but must be initialized)
+      bundler_multi_send: 0,
+      bundler_recipient: 0,
+      market_maker_setup: 0,
+      market_maker_monthly: 0,
+      market_maker_trade: 0,
+      telegram_bot_setup: 0,
+      telegram_bot_monthly: 0,
+      telegram_bot_post: 0,
+      twitter_bot_setup: 0,
+      twitter_bot_monthly: 0,
+      twitter_bot_tweet: 0,
     },
     totalUsage: 0,
   };
