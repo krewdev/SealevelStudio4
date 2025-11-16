@@ -22,19 +22,26 @@ export async function GET(request: NextRequest) {
     const queryId = searchParams.get('queryId');
     const action = searchParams.get('action') || 'results'; // results, execute, status
 
-    // Validate queryId - must be strictly numeric or valid UUID, else reject
-    const isNumericId = /^[0-9]+$/.test(queryId || '');
-    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(queryId || '');
+    // Validate queryId: must be strictly numeric or valid UUID (no extra characters)
+    function isValidQueryId(qid: string | null): boolean {
+      if (!qid) return false;
+      // strictly numeric (disallow leading zeros if desired)
+      const isNumericId = /^[0-9]+$/.test(qid);
+      // strictly UUID v4, case-insensitive but exactly formatted
+      const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(qid);
+      return isNumericId || isUUID;
+    }
 
-    if (!queryId && action === 'results') {
+    if ((action === 'results') && !queryId) {
       return NextResponse.json(
         { error: 'Query ID required for results' },
         { status: 400 }
       );
     }
 
-    if (!isNumericId && !isUUID) {
+    if (!isValidQueryId(queryId)) {
       return NextResponse.json(
+    // By this point, queryId is guaranteed safe for interpolation.
         { error: 'Invalid query ID format.' },
         { status: 400 }
       );
