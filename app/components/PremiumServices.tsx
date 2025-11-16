@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Layers, TrendingUp, MessageSquare, Wallet, Zap, ArrowRight, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { Layers, TrendingUp, MessageSquare, Wallet, Zap, ArrowRight, ArrowLeft, Clock } from 'lucide-react';
 
 interface ServiceCardProps {
   title: string;
@@ -11,9 +10,32 @@ interface ServiceCardProps {
   cost: string;
   link: string;
   features: string[];
+  available?: boolean;
 }
 
-function ServiceCard({ title, description, icon, cost, link, features }: ServiceCardProps) {
+interface ServiceCardProps {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  cost: string;
+  link: string;
+  features: string[];
+  available?: boolean;
+  onNavigate?: () => void;
+}
+
+function ServiceCard({ title, description, icon, cost, link, features, available = false, onNavigate }: ServiceCardProps) {
+  const handleClick = () => {
+    if (available && onNavigate) {
+      onNavigate();
+    } else if (available) {
+      // TODO: Navigate to service page when implemented
+      console.log(`Navigate to ${link}`);
+    } else {
+      alert(`${title} is coming soon! This feature will be available in a future update.`);
+    }
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-purple-500 transition-all hover:shadow-lg hover:shadow-purple-500/20">
       <div className="flex items-start justify-between mb-4">
@@ -26,6 +48,11 @@ function ServiceCard({ title, description, icon, cost, link, features }: Service
             <p className="text-gray-400 text-sm">{description}</p>
           </div>
         </div>
+        {!available && (
+          <span className="text-xs bg-yellow-900/50 text-yellow-400 px-2 py-1 rounded">
+            Coming Soon
+          </span>
+        )}
       </div>
       
       <div className="mb-4">
@@ -40,22 +67,37 @@ function ServiceCard({ title, description, icon, cost, link, features }: Service
         </ul>
       </div>
 
-      <Link
-        href={link}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+      <button
+        onClick={handleClick}
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+          available
+            ? 'bg-purple-600 hover:bg-purple-700'
+            : 'bg-gray-700 hover:bg-gray-600 cursor-not-allowed opacity-75'
+        }`}
+        disabled={!available}
       >
-        Get Started
-        <ArrowRight size={16} />
-      </Link>
+        {available ? (
+          <>
+            Get Started
+            <ArrowRight size={16} />
+          </>
+        ) : (
+          <>
+            <Clock size={16} />
+            Coming Soon
+          </>
+        )}
+      </button>
     </div>
   );
 }
 
 interface PremiumServicesProps {
   onBack?: () => void;
+  onNavigateToWalletManager?: () => void;
 }
 
-export function PremiumServices({ onBack }: PremiumServicesProps) {
+export function PremiumServices({ onBack, onNavigateToWalletManager, onNavigateToBundler, onNavigateToAdvertising }: PremiumServicesProps) {
   const services = [
     {
       title: 'Transaction Bundler',
@@ -63,6 +105,7 @@ export function PremiumServices({ onBack }: PremiumServicesProps) {
       icon: <Layers size={24} />,
       cost: '500 SEAL',
       link: '/premium/bundler',
+      available: true, // Available
       features: [
         'Send to up to 50 wallets',
         'Auto-create new accounts',
@@ -76,6 +119,7 @@ export function PremiumServices({ onBack }: PremiumServicesProps) {
       icon: <TrendingUp size={24} />,
       cost: '2,000 SEAL setup',
       link: '/premium/market-maker',
+      available: false, // Coming soon
       features: [
         'Grid trading strategies',
         'TWAP execution',
@@ -89,6 +133,7 @@ export function PremiumServices({ onBack }: PremiumServicesProps) {
       icon: <MessageSquare size={24} />,
       cost: '1,000-1,500 SEAL',
       link: '/premium/advertising',
+      available: true, // Available
       features: [
         'Telegram channel posting',
         'Twitter/X automation',
@@ -102,6 +147,7 @@ export function PremiumServices({ onBack }: PremiumServicesProps) {
       icon: <Wallet size={24} />,
       cost: 'Free',
       link: '/premium/wallets',
+      available: true, // Available - can navigate to wallet manager
       features: [
         'View all created wallets',
         'Import/export wallets',
@@ -133,7 +179,16 @@ export function PremiumServices({ onBack }: PremiumServicesProps) {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
           {services.map((service) => (
-            <ServiceCard key={service.title} {...service} />
+            <ServiceCard 
+              key={service.title} 
+              {...service}
+              onNavigate={
+                service.title === 'Wallet Manager' ? onNavigateToWalletManager :
+                service.title === 'Transaction Bundler' ? onNavigateToBundler :
+                service.title === 'Advertising Bots' ? onNavigateToAdvertising :
+                undefined
+              }
+            />
           ))}
         </div>
       </div>

@@ -5,38 +5,91 @@
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { MarketMakerAnalytics } from './types';
+import { BirdeyeFetcher } from '@/app/lib/pools/fetchers/birdeye';
 
 /**
- * Generate analytics for token
+ * Generate analytics for token (optimized with Birdeye)
  */
 export async function generateAnalytics(
   connection: Connection,
   tokenMint: string,
-  windowMinutes: number = 60
+  windowMinutes: number = 60,
+  birdeyeFetcher?: BirdeyeFetcher
 ): Promise<MarketMakerAnalytics> {
   const priceHistory: Array<{ price: number; timestamp: Date }> = [];
   const now = Date.now();
-  const windowStart = now - (windowMinutes * 60 * 1000);
+  const windowStart = Math.floor((now - (windowMinutes * 60 * 1000)) / 1000);
   
-  // Fetch price history from Jupiter or DEX
-  // This is a simplified version - in production, would fetch from DEX APIs
-  try {
-    // Get recent prices (simplified - would use actual DEX data)
-    for (let i = 0; i < 20; i++) {
-      const timestamp = new Date(windowStart + (i * (windowMinutes * 60 * 1000) / 20));
-      const price = await getTokenPrice(connection, tokenMint);
-      if (price > 0) {
-        priceHistory.push({ price, timestamp });
+  // Use Birdeye for accurate price history if available
+  if (birdeyeFetcher) {
+    try {
+      // Fetch OHLCV data for price history (use SOL as quote)
+      const SOL_MINT = 'So11111111111111111111111111111111111111112';
+      const ohlcv = await birdeyeFetcher.fetchOHLCVBaseQuote(
+        tokenMint,
+        SOL_MINT,
+        '1m', // 1-minute candles
+        'raw',
+        windowStart
+      );
+      
+      if (ohlcv && ohlcv.items) {
+        // Convert OHLCV to price history
+        for (const candle of ohlcv.items) {
+          if (candle.close && candle.unixTime) {
+            priceHistory.push({
+              price: candle.close,
+              timestamp: new Date(candle.unixTime * 1000),
+            });
+          }
+        }
       }
+      
+      // If no OHLCV, try price history endpoint
+      if (priceHistory.length === 0) {
+        const history = await birdeyeFetcher.fetchPriceHistory(
+          tokenMint,
+          '1D',
+          windowStart
+        );
+        
+        if (history && history.items) {
+          for (const item of history.items) {
+            if (item.value && item.unixTime) {
+              priceHistory.push({
+                price: item.value,
+                timestamp: new Date(item.unixTime * 1000),
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch Birdeye price history:', error);
     }
-  } catch (error) {
-    console.error('Failed to fetch price history:', error);
+  }
+  
+  // Fallback to Jupiter if Birdeye unavailable or no data
+  if (priceHistory.length === 0) {
+    try {
+      const windowStartMs = now - (windowMinutes * 60 * 1000);
+      // Get recent prices (simplified - would use actual DEX data)
+      for (let i = 0; i < 20; i++) {
+        const timestamp = new Date(windowStartMs + (i * (windowMinutes * 60 * 1000) / 20));
+        const price = await getTokenPrice(connection, tokenMint);
+        if (price > 0) {
+          priceHistory.push({ price, timestamp });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch price history:', error);
+    }
   }
   
   // Calculate metrics
   const prices = priceHistory.map(p => p.price);
   const currentPrice = prices[prices.length - 1] || 0;
-  const volume24h = calculateVolume24h(priceHistory);
+  const volume24h = await calculateVolume24h(priceHistory, tokenMint, birdeyeFetcher);
   const volatility = calculateVolatility(prices);
   const trend = determineTrend(prices);
   const rsi = calculateRSI(prices);
@@ -70,7 +123,7 @@ export async function generateAnalytics(
 async function getTokenPrice(connection: Connection, tokenMint: string): Promise<number> {
   try {
     const response = await fetch(
-      `https://quote-api.jup.ag/v6/quote?` +
+      `https://lite-api.jup.ag/v6/quote?` +
       `inputMint=So11111111111111111111111111111111111111112&` +
       `outputMint=${tokenMint}&` +
       `amount=1000000000&` +
@@ -89,10 +142,26 @@ async function getTokenPrice(connection: Connection, tokenMint: string): Promise
 }
 
 /**
- * Calculate 24h volume (simplified)
+ * Calculate 24h volume (uses Birdeye if available)
  */
-function calculateVolume24h(priceHistory: Array<{ price: number; timestamp: Date }>): number {
-  // Simplified calculation - would use actual DEX volume data
+async function calculateVolume24h(
+  priceHistory: Array<{ price: number; timestamp: Date }>,
+  tokenMint: string,
+  birdeyeFetcher?: BirdeyeFetcher
+): Promise<number> {
+  // Use Birdeye for accurate volume if available
+  if (birdeyeFetcher) {
+    try {
+      const priceData = await birdeyeFetcher.fetchPrice(tokenMint);
+      if (priceData && priceData.volume24h) {
+        return priceData.volume24h;
+      }
+    } catch (error) {
+      console.error('Failed to fetch Birdeye volume:', error);
+    }
+  }
+  
+  // Fallback: Simplified calculation
   return priceHistory.length * 1000; // Estimate
 }
 

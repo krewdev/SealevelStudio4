@@ -24,7 +24,11 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { walletRegistry, ManagedWallet, WalletGroup } from '../lib/wallet-manager';
 
-export function WalletManager() {
+interface WalletManagerProps {
+  onBack?: () => void;
+}
+
+export function WalletManager({ onBack }: WalletManagerProps) {
   const { connection } = useConnection();
   const [wallets, setWallets] = useState<ManagedWallet[]>([]);
   const [groups, setGroups] = useState<WalletGroup[]>([]);
@@ -155,12 +159,24 @@ export function WalletManager() {
       {/* Header */}
       <div className="border-b border-gray-700 p-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Wallet size={28} />
-              Wallet Manager
-            </h1>
-            <p className="text-gray-400 mt-1">Manage wallets created via transaction bundler</p>
+          <div className="flex items-center gap-4">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                title="Go back"
+              >
+                <ArrowLeft size={18} />
+                <span className="text-sm">Back</span>
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Wallet size={28} />
+                Wallet Manager
+              </h1>
+              <p className="text-gray-400 mt-1">Manage wallets created via transaction bundler</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <button

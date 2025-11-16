@@ -993,7 +993,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   // Render Simple Mode
   const renderSimpleMode = () => (
     <div className="flex flex-col h-full bg-slate-950 text-slate-200 font-mono overflow-hidden">
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Left Sidebar: Block Palette */}
         <aside className="w-64 border-r border-slate-800 bg-slate-900/30 flex flex-col">
           <div className="p-3 border-b border-slate-800">
@@ -1041,7 +1041,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         </aside>
 
         {/* Center: Canvas */}
-        <main className="flex-1 flex flex-col relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950">
+        <main className="flex-1 flex flex-col relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950 min-h-0 overflow-hidden">
           <div className="absolute top-4 left-4 right-4 h-12 pointer-events-none flex justify-between items-start z-10">
             <div className="pointer-events-auto flex gap-2">
               <button 
@@ -1090,11 +1090,22 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4">
+          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0">
             {simpleWorkflow.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50">
-                <Layers size={48} className="text-slate-700" />
-                <p>Drag & drop blocks here to build your transaction</p>
+              <div 
+                className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50 relative w-full"
+                style={{
+                  backgroundImage: 'url(/logo-2.png)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  opacity: 0.1
+                }}
+              >
+                <div className="relative z-10 flex flex-col items-center gap-4">
+                  <Layers size={48} className="text-slate-700" />
+                  <p>Drag & drop blocks here to build your transaction</p>
+                </div>
               </div>
             ) : (
               simpleWorkflow.map((block, index) => (
@@ -1184,13 +1195,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
 
         {/* Right Sidebar: Block Config */}
         {selectedBlock ? (
-          <aside className="w-72 border-l border-slate-800 bg-slate-900 flex flex-col">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+          <aside className="w-72 border-l border-slate-800 bg-slate-900 flex flex-col min-h-0">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
               <h2 className="font-bold text-slate-200">Block Config</h2>
               <button onClick={() => setSelectedBlock(null)} className="text-slate-500 hover:text-white"><X size={16} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
               <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
                 <div className={`w-10 h-10 rounded flex items-center justify-center text-white shadow-sm ${selectedBlock.color}`}>
                   {renderIcon(selectedBlock.icon, "w-5 h-5")}

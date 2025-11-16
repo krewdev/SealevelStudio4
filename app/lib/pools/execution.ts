@@ -176,8 +176,8 @@ async function addSimpleArbitrageInstructions(
     // For now, use Jupiter swap API to get swap instructions
     // In production, you'd call Jupiter's swap API with the route
     try {
-      const jupiterSwapUrl = `https://quote-api.jup.ag/v6/swap`;
-      const swapResponse = await fetch(jupiterSwapUrl, {
+      // Use API route to handle API key securely
+      const swapResponse = await fetch('/api/jupiter/swap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

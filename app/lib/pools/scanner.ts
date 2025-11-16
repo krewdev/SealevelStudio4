@@ -79,14 +79,33 @@ export class PoolScanner {
 
       await Promise.allSettled(fetchPromises);
 
-      // Enrich pool data with Birdeye if available
+      // Enrich pool data with Birdeye if available (optimized batch processing)
       if (this.fetchers.has('birdeye')) {
         const birdeyeFetcher = this.fetchers.get('birdeye') as BirdeyeFetcher;
-        const enrichmentPromises = allPools.map(pool => 
-          birdeyeFetcher.enrichPoolData(pool).catch(() => pool)
-        );
-        const enrichedPools = await Promise.all(enrichmentPromises);
-        allPools.splice(0, allPools.length, ...enrichedPools);
+        
+        // Use optimized batch enrichment to minimize API calls
+        try {
+          const { BirdeyeOptimizer } = await import('./birdeye-optimizer');
+          const optimizer = new BirdeyeOptimizer(birdeyeFetcher);
+          
+          // Filter to active pools first (saves API calls)
+          const activePools = await optimizer.getActivePools(allPools, 1000);
+          
+          // Batch enrich only active pools
+          const enrichedPools = await optimizer.enrichPools(activePools);
+          
+          // Merge enriched pools back (keep non-active pools but mark them)
+          const enrichedMap = new Map(enrichedPools.map(p => [p.id, p]));
+          allPools = allPools.map(pool => enrichedMap.get(pool.id) || pool);
+        } catch (error) {
+          console.error('Error using Birdeye optimizer, falling back to standard enrichment:', error);
+          // Fallback to standard enrichment
+          const enrichmentPromises = allPools.map(pool => 
+            birdeyeFetcher.enrichPoolData(pool).catch(() => pool)
+          );
+          const enrichedPools = await Promise.all(enrichmentPromises);
+          allPools.splice(0, allPools.length, ...enrichedPools);
+        }
       }
 
       // Update state
@@ -165,7 +184,8 @@ export class PoolScanner {
       return [];
     }
 
-    const aiSearcher = new AISearcher(connection, this.state.pools);
+    const birdeyeFetcher = this.fetchers.get('birdeye') as BirdeyeFetcher | undefined;
+    const aiSearcher = new AISearcher(connection, this.state.pools, birdeyeFetcher);
     return await aiSearcher.findUnconventionalOpportunities(this.state.config.minProfitThreshold);
   }
 

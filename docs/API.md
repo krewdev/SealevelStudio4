@@ -29,6 +29,63 @@ Get a swap quote from Jupiter aggregator.
 - `amount` (required): Amount in lamports
 - `slippageBps` (optional): Slippage in basis points (default: 50)
 
+**Note:** Optional API key support. Set `JUPITER_API_KEY` environment variable for authenticated requests with higher rate limits.
+
+### POST `/api/jupiter/swap`
+
+Get swap transaction from Jupiter (requires quote first).
+
+**Request Body:**
+```json
+{
+  "quoteResponse": { ... },
+  "userPublicKey": "wallet_address",
+  "wrapAndUnwrapSol": true,
+  "slippageBps": 50
+}
+```
+
+### POST `/api/jupiter/ultra`
+
+Execute a swap using Jupiter Ultra API (quote + execute in one call). Simplified API that handles the entire swap process.
+
+**Request Body:**
+```json
+{
+  "inputMint": "So11111111111111111111111111111111111111112",
+  "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "amount": "1000000000",
+  "taker": "wallet_public_key",
+  "slippageBps": 50,
+  "priorityFee": 10000,
+  "wrapAndUnwrapSol": true
+}
+```
+
+**Response:**
+```json
+{
+  "status": "Success",
+  "signature": "transaction_signature"
+}
+```
+
+**Benefits of Ultra API:**
+- Simplified execution (quote + execute in one call)
+- No need to manage RPC endpoints
+- Direct transaction execution
+- Better for automated trading and market making
+
+### GET `/api/jupiter/ultra`
+
+Get quote using Ultra API (alternative to `/quote` endpoint).
+
+**Query Parameters:**
+- `inputMint` (required): Input token mint address
+- `outputMint` (required): Output token mint address
+- `amount` (required): Amount in lamports
+- `slippageBps` (optional): Slippage in basis points (default: 50)
+
 **Example:**
 ```
 GET /api/jupiter/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=1000000000&slippageBps=50
@@ -91,11 +148,12 @@ Get token price data from Birdeye.
 
 **Query Parameters:**
 - `address` (required): Token mint address
-- `type` (required): Data type - `price` or `pairs`
+- `type` (required): Data type - `price`, `volume`, or `pairs`
+- `ui_amount_mode` (optional): `raw` (lamports) or `ui` (human-readable, default: `raw`)
 
 **Example:**
 ```
-GET /api/birdeye/prices?address=So11111111111111111111111111111111111111112&type=price
+GET /api/birdeye/prices?address=So11111111111111111111111111111111111111112&type=price&ui_amount_mode=raw
 ```
 
 **Response:**
@@ -106,6 +164,280 @@ GET /api/birdeye/prices?address=So11111111111111111111111111111111111111112&type
   "volume24h": 1000000,
   "marketCap": 50000000
 }
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/ohlcv`
+
+Get OHLCV (Open, High, Low, Close, Volume) data for a trading pair.
+
+**Query Parameters:**
+- `address` (required): Pair address (pool address)
+- `type` (optional): Time interval - `15s`, `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M` (default: `15m`)
+- `mode` (optional): `range` or `last` (default: `range`)
+- `time_from` (required for range mode): Start timestamp (Unix seconds)
+- `time_to` (required for range mode): End timestamp (Unix seconds)
+- `padding` (optional): `true` or `false` (default: `false`)
+- `outlier` (optional): `true` or `false` (default: `true`)
+- `inversion` (optional): `true` or `false` (default: `false`)
+
+**Example:**
+```
+GET /api/birdeye/ohlcv?address=4DoNfFBfF7UokCC2FQzriy7yHK6DY6NVdYpuekQ5pRgg&type=15s&time_from=1726700000&time_to=1726704000&mode=range&padding=false&outlier=true&inversion=false
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "unixTime": 1726700000,
+        "open": 150.25,
+        "high": 151.50,
+        "low": 149.80,
+        "close": 150.90,
+        "volume": 1000000
+      }
+    ]
+  }
+}
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### POST `/api/birdeye/multi-price`
+
+Get prices for multiple tokens in a single request.
+
+**Request Body:**
+```json
+{
+  "list_address": "So11111111111111111111111111111111111111112,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+  "ui_amount_mode": "raw"
+}
+```
+
+**Query Parameters (GET method also supported):**
+- `list_address` (optional for GET): Comma-separated list of token mint addresses (can be in query params for GET or body for POST)
+- `ui_amount_mode` (optional): `raw` (lamports) or `ui` (human-readable, default: `raw`)
+
+**GET Example:**
+```
+GET /api/birdeye/multi-price?list_address=So11111111111111111111111111111111111111112,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263&ui_amount_mode=raw
+```
+
+**Example:**
+```
+POST /api/birdeye/multi-price
+Content-Type: application/json
+
+{
+  "list_address": "So11111111111111111111111111111111111111112,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+  "ui_amount_mode": "raw"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "So11111111111111111111111111111111111111112": {
+      "value": 150.25,
+      "updateUnixTime": 1726700000,
+      "updateHumanTime": "2024-09-18T12:00:00Z"
+    },
+    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {
+      "value": 0.0000125,
+      "updateUnixTime": 1726700000,
+      "updateHumanTime": "2024-09-18T12:00:00Z"
+    }
+  }
+}
+```
+
+**Note:** 
+- Requires `BIRDEYE_API_KEY` environment variable
+- Maximum 100 addresses per request
+- All addresses are validated for security
+
+### GET `/api/birdeye/txs/token/seek_by_time`
+
+Get token transactions sorted by time.
+
+**Query Parameters:**
+- `address` (required): Token mint address
+- `offset` (optional): Pagination offset (default: 0)
+- `limit` (optional): Number of transactions to return (default: 100, max: 1000)
+- `tx_type` (optional): Transaction type - `swap`, `transfer`, or `all` (default: `all`)
+- `ui_amount_mode` (optional): `raw`, `ui`, or `scaled` (default: `scaled`)
+- `time_from` (optional): Start timestamp (Unix seconds)
+- `time_to` (optional): End timestamp (Unix seconds)
+
+**Example:**
+```
+GET /api/birdeye/txs/token/seek_by_time?address=So11111111111111111111111111111111111111112&offset=0&limit=100&tx_type=swap&ui_amount_mode=scaled
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "signature": "transaction_signature",
+        "blockTime": 1726700000,
+        "txType": "swap",
+        "from": "wallet_address",
+        "to": "wallet_address",
+        "amountIn": "1000000000",
+        "amountOut": "150000000",
+        "tokenIn": "So11111111111111111111111111111111111111112",
+        "tokenOut": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    ],
+    "total": 1000
+  }
+}
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/txs/pair/seek_by_time`
+
+Get pair (pool) transactions sorted by time.
+
+**Query Parameters:**
+- `address` (required): Pair/pool address
+- `offset` (optional): Pagination offset (default: 0)
+- `limit` (optional): Number of transactions to return (default: 100, max: 1000)
+- `tx_type` (optional): Transaction type - `swap`, `transfer`, or `all` (default: `all`)
+- `ui_amount_mode` (optional): `raw`, `ui`, or `scaled` (default: `scaled`)
+- `time_from` (optional): Start timestamp (Unix seconds)
+- `time_to` (optional): End timestamp (Unix seconds)
+
+**Example:**
+```
+GET /api/birdeye/txs/pair/seek_by_time?address=4DoNfFBfF7UokCC2FQzriy7yHK6DY6NVdYpuekQ5pRgg&offset=0&limit=100&tx_type=swap&ui_amount_mode=scaled
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "signature": "transaction_signature",
+        "blockTime": 1726700000,
+        "txType": "swap",
+        "amountIn": "1000000000",
+        "amountOut": "150000000"
+      }
+    ],
+    "total": 500
+  }
+}
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/ohlcv/base_quote`
+
+Get OHLCV data for base/quote token pairs.
+
+**Query Parameters:**
+- `base` (required): Base token mint address
+- `quote` (required): Quote token mint address
+- `type` (optional): Time interval - `15s`, `1m`, `3m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `12h`, `1d`, `3d`, `1w`, `1M` (default: `1m`)
+- `ui_amount_mode` (optional): `raw`, `ui`, or `scaled` (default: `raw`)
+- `time_from` (optional): Start timestamp (Unix seconds)
+- `time_to` (optional): End timestamp (Unix seconds)
+
+**Example:**
+```
+GET /api/birdeye/ohlcv/base_quote?base=So11111111111111111111111111111111111111112&quote=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&type=1m&ui_amount_mode=raw
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/token-list`
+
+Get list of tokens with trading activity.
+
+**Query Parameters:**
+- `offset` (optional): Pagination offset (default: 0)
+- `limit` (optional): Number of tokens to return (default: 50, max: 100)
+- `sort_by` (optional): Sort field (default: `v24hUSD`)
+- `sort_type` (optional): `asc` or `desc` (default: `desc`)
+
+**Example:**
+```
+GET /api/birdeye/token-list?offset=0&limit=50&sort_by=v24hUSD&sort_type=desc
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/search`
+
+Search for tokens and markets by pattern or address.
+
+**Query Parameters:**
+- `query` (required): Search query (token symbol, name, or address)
+- `limit` (optional): Number of results (default: 10, max: 50)
+
+**Example:**
+```
+GET /api/birdeye/search?query=SOL&limit=10
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/token-overview`
+
+Get detailed overview information about a specific token.
+
+**Query Parameters:**
+- `address` (required): Token mint address
+
+**Example:**
+```
+GET /api/birdeye/token-overview?address=So11111111111111111111111111111111111111112
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/token-security`
+
+Get security-related information about a token.
+
+**Query Parameters:**
+- `address` (required): Token mint address
+
+**Example:**
+```
+GET /api/birdeye/token-security?address=So11111111111111111111111111111111111111112
+```
+
+**Note:** Requires `BIRDEYE_API_KEY` environment variable.
+
+### GET `/api/birdeye/price-history`
+
+Get historical price data for a token.
+
+**Query Parameters:**
+- `address` (required): Token mint address
+- `type` (optional): Time period type (default: `1D`)
+- `time_from` (optional): Start timestamp (Unix seconds)
+- `time_to` (optional): End timestamp (Unix seconds)
+
+**Example:**
+```
+GET /api/birdeye/price-history?address=So11111111111111111111111111111111111111112&type=1D
 ```
 
 **Note:** Requires `BIRDEYE_API_KEY` environment variable.

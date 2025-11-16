@@ -17,11 +17,13 @@ export class AISearcher {
   private connection: Connection;
   private pools: PoolData[];
   private historicalData: Map<string, number[]>; // Token -> price history
+  private birdeyeFetcher?: any; // BirdeyeFetcher instance
 
-  constructor(connection: Connection, pools: PoolData[]) {
+  constructor(connection: Connection, pools: PoolData[], birdeyeFetcher?: any) {
     this.connection = connection;
     this.pools = pools;
     this.historicalData = new Map();
+    this.birdeyeFetcher = birdeyeFetcher;
   }
 
   /**
@@ -239,7 +241,7 @@ export class AISearcher {
   }
 
   /**
-   * Analyze market anomalies using AI/ML techniques
+   * Analyze market anomalies using AI/ML techniques (enhanced with Birdeye)
    */
   async analyzeAnomalies(): Promise<{
     anomalies: Array<{
@@ -251,6 +253,35 @@ export class AISearcher {
   }> {
     const anomalies: any[] = [];
 
+    // Use Birdeye to fetch price history for all tokens in pools
+    if (this.birdeyeFetcher) {
+      const uniqueTokens = new Set<string>();
+      this.pools.forEach(pool => {
+        uniqueTokens.add(pool.tokenA.mint);
+        uniqueTokens.add(pool.tokenB.mint);
+      });
+
+      // Fetch price history for all tokens in parallel (batched)
+      const historyPromises = Array.from(uniqueTokens).slice(0, 20).map(async (token) => {
+        try {
+          const now = Math.floor(Date.now() / 1000);
+          const timeFrom = now - (24 * 60 * 60); // Last 24 hours
+          const history = await this.birdeyeFetcher.fetchPriceHistory(token, '1h', timeFrom);
+          
+          if (history && history.items) {
+            const prices = history.items.map((item: any) => item.value || 0).filter((p: number) => p > 0);
+            if (prices.length > 0) {
+              this.historicalData.set(token, prices);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching price history for ${token}:`, error);
+        }
+      });
+
+      await Promise.allSettled(historyPromises);
+    }
+
     // Analyze price history for anomalies
     for (const [token, prices] of Array.from(this.historicalData.entries())) {
       if (prices.length < 10) continue;
@@ -259,7 +290,7 @@ export class AISearcher {
       const recentPrices = prices.slice(-5);
       const avgRecent = recentPrices.reduce((a, b) => a + b, 0) / recentPrices.length;
       const avgHistorical = prices.reduce((a, b) => a + b, 0) / prices.length;
-      const spikePercent = ((avgRecent - avgHistorical) / avgHistorical) * 100;
+      const spikePercent = avgHistorical > 0 ? ((avgRecent - avgHistorical) / avgHistorical) * 100 : 0;
 
       if (spikePercent > 20) {
         anomalies.push({
@@ -268,6 +299,27 @@ export class AISearcher {
           severity: spikePercent > 50 ? 'high' : 'medium',
           description: `Price spike detected: ${spikePercent.toFixed(2)}% increase`,
         });
+      }
+
+      // Detect volume surges using Birdeye if available
+      if (this.birdeyeFetcher) {
+        try {
+          const priceData = await this.birdeyeFetcher.fetchPrice(token);
+          if (priceData && priceData.volume24h) {
+            // Compare with historical average (simplified)
+            const avgVolume = prices.length * 1000; // Estimate
+            if (priceData.volume24h > avgVolume * 3) {
+              anomalies.push({
+                token,
+                type: 'volume-surge',
+                severity: priceData.volume24h > avgVolume * 5 ? 'high' : 'medium',
+                description: `Volume surge: ${priceData.volume24h.toLocaleString()} (${((priceData.volume24h / avgVolume) * 100).toFixed(0)}% above average)`,
+              });
+            }
+          }
+        } catch (error) {
+          // Ignore errors for volume checks
+        }
       }
     }
 

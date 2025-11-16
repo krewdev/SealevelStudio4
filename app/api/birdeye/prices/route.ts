@@ -25,12 +25,22 @@ export async function GET(request: NextRequest) {
 
     const address = searchParams.get('address');
     const type = searchParams.get('type') || 'price';
+    const uiAmountMode = searchParams.get('ui_amount_mode') || 'raw';
 
     // Validate type (prevent path traversal)
     const typeValidation = validateEndpoint(type, ALLOWED_TYPES);
     if (!typeValidation.valid) {
       return NextResponse.json(
         { error: typeValidation.error || 'Invalid type' },
+        { status: 400 }
+      );
+    }
+
+    // Validate ui_amount_mode
+    const allowedModes = ['raw', 'ui'];
+    if (!allowedModes.includes(uiAmountMode)) {
+      return NextResponse.json(
+        { error: `Invalid ui_amount_mode. Must be one of: ${allowedModes.join(', ')}` },
         { status: 400 }
       );
     }
@@ -59,7 +69,7 @@ export async function GET(request: NextRequest) {
     
     switch (type) {
       case 'price':
-        url = `${BIRDEYE_API_BASE}/defi/price?address=${encodedAddress}`;
+        url = `${BIRDEYE_API_BASE}/defi/price?address=${encodedAddress}&ui_amount_mode=${safeEncodeParam(uiAmountMode)}`;
         break;
       case 'volume':
         url = `${BIRDEYE_API_BASE}/defi/token_overview?address=${encodedAddress}`;
@@ -78,6 +88,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'X-API-KEY': apiKey,
         'Accept': 'application/json',
+        'x-chain': 'solana',
       },
     });
 

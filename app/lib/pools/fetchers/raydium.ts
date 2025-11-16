@@ -3,6 +3,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { BasePoolFetcher } from './base';
 import { PoolData, FetcherResult, DEXProtocol } from '../types';
+import { fetchAllProgramAccountsV2 } from './pagination';
 
 // Raydium AMM program ID
 const RAYDIUM_AMM_PROGRAM_ID = '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8';
@@ -20,26 +21,61 @@ export class RaydiumFetcher extends BasePoolFetcher {
     const errors: string[] = [];
 
     try {
-      // Fetch program accounts for Raydium AMM
-      const programId = new PublicKey(RAYDIUM_AMM_PROGRAM_ID);
+      // Fetch program accounts for Raydium AMM using getProgramAccountsV2 with pagination
+      const programId = RAYDIUM_AMM_PROGRAM_ID;
       
-      // Get all accounts owned by Raydium AMM program
-      // Note: This is a simplified approach. In production, you'd want to use
-      // a more efficient method like indexing or using a service like Helius
-      const accounts = await connection.getProgramAccounts(programId, {
-        filters: [
+      // Use Helius RPC if available, otherwise fall back to standard RPC
+      const rpcUrl = connection.rpcEndpoint;
+      const useHelius = rpcUrl.includes('helius') || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+      
+      let accounts;
+      
+      if (useHelius && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+        // Use Helius API with getProgramAccountsV2 pagination
+        const heliusRpcUrl = rpcUrl.includes('helius') 
+          ? rpcUrl 
+          : `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+        
+        accounts = await fetchAllProgramAccountsV2(
+          heliusRpcUrl,
+          programId,
           {
-            dataSize: 752, // Raydium AMM pool account size
+            limit: 1000, // Fetch in batches of 1000
+            encoding: 'jsonParsed',
+            filters: [
+              {
+                dataSize: 752, // Raydium AMM pool account size
+              },
+            ],
+            dataSlice: {
+              offset: 0,
+              length: 752,
+            },
+          }
+        );
+      } else {
+        // Fallback to standard getProgramAccounts (limited)
+        const programPubkey = new PublicKey(programId);
+        const standardAccounts = await connection.getProgramAccounts(programPubkey, {
+          filters: [{ dataSize: 752 }],
+          dataSlice: { offset: 0, length: 752 },
+        });
+        
+        // Transform to match pagination format
+        accounts = standardAccounts.map(acc => ({
+          pubkey: acc.pubkey.toString(),
+          account: {
+            data: acc.account.data,
+            executable: acc.account.executable,
+            owner: acc.account.owner.toString(),
+            lamports: acc.account.lamports,
+            rentEpoch: acc.account.rentEpoch,
           },
-        ],
-        dataSlice: {
-          offset: 0,
-          length: 752,
-        },
-      });
+        }));
+      }
 
-      // Process accounts (limited to first 50 for performance)
-      const accountsToProcess = accounts.slice(0, 50);
+      // Process all accounts (no longer limited to 50)
+      const accountsToProcess = accounts;
       
       for (const account of accountsToProcess) {
         try {

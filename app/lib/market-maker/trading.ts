@@ -8,11 +8,13 @@ import { MarketMakerTrade } from './types';
 
 /**
  * Execute a trade (buy or sell)
+ * @param useUltraAPI - If true, uses Jupiter Ultra API for simplified execution
  */
 export async function executeTrade(
   connection: Connection,
   agentKeypair: Keypair,
-  trade: MarketMakerTrade
+  trade: MarketMakerTrade,
+  useUltraAPI: boolean = false
 ): Promise<string> {
   try {
     // Get quote from Jupiter
@@ -25,10 +27,46 @@ export async function executeTrade(
     
     const amount = trade.amount * 1e9; // Convert to lamports
     const slippageBps = trade.slippage * 100;
+
+    // Use Ultra API for simplified execution (quote + execute in one call)
+    if (useUltraAPI) {
+      const ultraResponse = await fetch('/api/jupiter/ultra', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inputMint,
+          outputMint,
+          amount: amount.toString(),
+          taker: agentKeypair.publicKey.toString(),
+          slippageBps,
+          priorityFee: trade.priorityFee,
+          wrapAndUnwrapSol: true,
+        }),
+      });
+
+      if (!ultraResponse.ok) {
+        const errorData = await ultraResponse.json();
+        throw new Error(`Jupiter Ultra API error: ${errorData.error || ultraResponse.statusText}`);
+      }
+
+      const ultraData = await ultraResponse.json();
+      
+      // Ultra API returns the transaction signature directly if successful
+      if (ultraData.status === 'Success' && ultraData.signature) {
+        // Wait for confirmation
+        await connection.confirmTransaction(ultraData.signature, 'confirmed');
+        return ultraData.signature;
+      } else if (ultraData.status === 'Failed') {
+        throw new Error(`Swap failed: ${ultraData.error || ultraData.code || 'Unknown error'}`);
+      } else {
+        throw new Error('Unexpected response from Ultra API');
+      }
+    }
     
-    // Get quote
+    // Standard flow: Get quote, then swap transaction
+    // Get quote (using lite API for better performance)
     const quoteResponse = await fetch(
-      `https://quote-api.jup.ag/v6/quote?` +
+      `https://lite-api.jup.ag/v6/quote?` +
       `inputMint=${inputMint}&` +
       `outputMint=${outputMint}&` +
       `amount=${amount}&` +
@@ -41,8 +79,8 @@ export async function executeTrade(
     
     const quote = await quoteResponse.json();
     
-    // Get swap transaction
-    const swapResponse = await fetch('https://quote-api.jup.ag/v6/swap', {
+    // Get swap transaction (using API route to handle API key securely)
+    const swapResponse = await fetch('/api/jupiter/swap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

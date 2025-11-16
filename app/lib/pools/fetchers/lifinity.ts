@@ -3,6 +3,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { BasePoolFetcher } from './base';
 import { PoolData, FetcherResult, DEXProtocol } from '../types';
+import { fetchAllProgramAccountsV2 } from './pagination';
 
 // Lifinity program ID
 const LIFINITY_PROGRAM_ID = 'EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S';
@@ -15,23 +16,52 @@ export class LifinityFetcher extends BasePoolFetcher {
     const errors: string[] = [];
 
     try {
-      const programId = new PublicKey(LIFINITY_PROGRAM_ID);
+      const programId = LIFINITY_PROGRAM_ID;
       
-      // Get Lifinity pool accounts
-      const accounts = await connection.getProgramAccounts(programId, {
-        filters: [
+      // Use Helius RPC if available, otherwise fall back to standard RPC
+      const rpcUrl = connection.rpcEndpoint;
+      const useHelius = rpcUrl.includes('helius') || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+      
+      let accounts;
+      
+      if (useHelius && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+        // Use Helius API with getProgramAccountsV2 pagination
+        const heliusRpcUrl = rpcUrl.includes('helius') 
+          ? rpcUrl 
+          : `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+        
+        accounts = await fetchAllProgramAccountsV2(
+          heliusRpcUrl,
+          programId,
           {
-            dataSize: 512, // Lifinity pool account size (approximate)
+            limit: 1000,
+            encoding: 'jsonParsed',
+            filters: [{ dataSize: 512 }],
+            dataSlice: { offset: 0, length: 512 },
+          }
+        );
+      } else {
+        // Fallback to standard getProgramAccounts
+        const programPubkey = new PublicKey(programId);
+        const standardAccounts = await connection.getProgramAccounts(programPubkey, {
+          filters: [{ dataSize: 512 }],
+          dataSlice: { offset: 0, length: 512 },
+        });
+        
+        accounts = standardAccounts.map(acc => ({
+          pubkey: acc.pubkey.toString(),
+          account: {
+            data: acc.account.data,
+            executable: acc.account.executable,
+            owner: acc.account.owner.toString(),
+            lamports: acc.account.lamports,
+            rentEpoch: acc.account.rentEpoch,
           },
-        ],
-        dataSlice: {
-          offset: 0,
-          length: 512,
-        },
-      });
+        }));
+      }
 
-      // Process accounts (limited to first 50 for performance)
-      const accountsToProcess = accounts.slice(0, 50);
+      // Process all accounts
+      const accountsToProcess = accounts;
       
       for (const account of accountsToProcess) {
         try {

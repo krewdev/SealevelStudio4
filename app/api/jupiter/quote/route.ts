@@ -5,9 +5,14 @@ import { validateSolanaAddress, validateNumeric, safeEncodeParam, ALLOWED_API_BA
 
 const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/v6`;
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+    // Security: API keys should only come from environment variables, never from query parameters
+    const apiKey = process.env.JUPITER_API_KEY;
+    
     const inputMint = searchParams.get('inputMint');
     const outputMint = searchParams.get('outputMint');
     const amount = searchParams.get('amount');
@@ -58,11 +63,21 @@ export async function GET(request: NextRequest) {
     // Build Jupiter API URL safely with encoded parameters
     const url = `${JUPITER_API_BASE}/quote?inputMint=${safeEncodeParam(inputMint)}&outputMint=${safeEncodeParam(outputMint)}&amount=${safeEncodeParam(amount)}&slippageBps=${safeEncodeParam(slippageBps)}`;
     
+    // Prepare headers with API key if available
+    const headers: HeadersInit = {
+      'Accept': 'application/json',
+    };
+    
+    // Add API key to headers if configured (Jupiter API key is typically passed as a header)
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      // Some Jupiter endpoints may use a different header format, adjust if needed
+      // headers['X-API-Key'] = apiKey;
+    }
+    
     // Fetch from Jupiter API
     const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
     });
 
     if (!response.ok) {

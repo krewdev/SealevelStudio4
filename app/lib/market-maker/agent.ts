@@ -93,7 +93,7 @@ export class MarketMakerAgent {
     // Update initial state
     await this.updateState();
     
-    // Start analytics monitoring
+    // Start analytics monitoring (with Birdeye optimization)
     if (this.config.useAnalytics) {
       this.monitoringInterval = setInterval(async () => {
         await this.updateAnalytics();
@@ -176,9 +176,9 @@ export class MarketMakerAgent {
    */
   private async updatePrice() {
     try {
-      // Use Jupiter API to get price
+      // Use Jupiter Lite API to get price (optimized for performance)
       const response = await fetch(
-        `https://quote-api.jup.ag/v6/quote?` +
+        `https://lite-api.jup.ag/v6/quote?` +
         `inputMint=So11111111111111111111111111111111111111112&` +
         `outputMint=${this.config.tokenMint}&` +
         `amount=1000000000&` +
@@ -201,10 +201,22 @@ export class MarketMakerAgent {
     if (!this.config.useAnalytics) return;
     
     try {
+      // Initialize Birdeye fetcher if available
+      let birdeyeFetcher: any = undefined;
+      if (process.env.NEXT_PUBLIC_BIRDEYE_API_KEY) {
+        try {
+          const { BirdeyeFetcher } = await import('@/app/lib/pools/fetchers/birdeye');
+          birdeyeFetcher = new BirdeyeFetcher();
+        } catch (error) {
+          console.error('Error initializing Birdeye fetcher:', error);
+        }
+      }
+      
       const analytics = await generateAnalytics(
         this.connection,
         this.config.tokenMint,
-        this.config.analyticsWindow || 60
+        this.config.analyticsWindow || 60,
+        birdeyeFetcher
       );
       
       this.state.analytics = analytics;

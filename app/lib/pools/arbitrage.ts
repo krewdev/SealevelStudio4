@@ -23,16 +23,40 @@ export class ArbitrageDetector {
   private pools: PoolData[];
   private config: ScannerConfig;
   private connection: Connection;
+  private birdeyeOptimizer?: any; // BirdeyeOptimizer instance
 
-  constructor(pools: PoolData[], config: ScannerConfig, connection: Connection) {
+  constructor(pools: PoolData[], config: ScannerConfig, connection: Connection, birdeyeOptimizer?: any) {
     this.pools = pools;
     this.config = config;
     this.connection = connection;
+    this.birdeyeOptimizer = birdeyeOptimizer;
   }
 
-  detectOpportunities(): ArbitrageOpportunity[] {
+  async detectOpportunities(): Promise<ArbitrageOpportunity[]> {
     const opportunities: ArbitrageOpportunity[] = [];
 
+    // Use Birdeye optimizer for enhanced detection if available
+    if (this.birdeyeOptimizer) {
+      try {
+        // Find opportunities using Birdeye's optimized price data
+        const birdeyeOpportunities = await this.birdeyeOptimizer.findArbitrageOpportunities(
+          this.pools,
+          this.config.minProfitPercent
+        );
+        
+        // Convert Birdeye opportunities to standard format
+        for (const opp of birdeyeOpportunities) {
+          const opportunity = this.calculateSimpleArbitrage(opp.poolA, opp.poolB);
+          if (opportunity) {
+            opportunities.push(opportunity);
+          }
+        }
+      } catch (error) {
+        console.error('Error using Birdeye optimizer for arbitrage detection:', error);
+      }
+    }
+
+    // Fallback to standard detection methods
     // 1. Simple 2-pool arbitrage
     opportunities.push(...this.detectSimpleArbitrage());
 
@@ -42,12 +66,23 @@ export class ArbitrageDetector {
     // 3. Wrapping/unwrapping arbitrage
     opportunities.push(...this.detectWrapUnwrapArbitrage());
 
-    // Filter by minimum thresholds
-    return opportunities.filter(
+    // Remove duplicates and filter by minimum thresholds
+    const uniqueOpportunities = this.deduplicateOpportunities(opportunities);
+    return uniqueOpportunities.filter(
       opp =>
         opp.netProfit >= this.config.minProfitThreshold &&
         opp.profitPercent >= this.config.minProfitPercent
     );
+  }
+
+  private deduplicateOpportunities(opportunities: ArbitrageOpportunity[]): ArbitrageOpportunity[] {
+    const seen = new Set<string>();
+    return opportunities.filter(opp => {
+      const key = `${opp.path.steps[0]?.pool.id}-${opp.path.steps[opp.path.steps.length - 1]?.pool.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   private detectSimpleArbitrage(): ArbitrageOpportunity[] {

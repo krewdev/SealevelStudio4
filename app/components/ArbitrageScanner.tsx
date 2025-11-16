@@ -102,10 +102,22 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       setLastScanTime(state.lastScanTime);
       setErrors(state.errors || []);
 
-      // Detect arbitrage opportunities
+      // Detect arbitrage opportunities (with Birdeye optimization if available)
       if (state.pools.length > 0) {
-        const detector = new ArbitrageDetector(state.pools, config, connection);
-        const detected = detector.detectOpportunities();
+        // Initialize Birdeye optimizer if available
+        let birdeyeOptimizer: any = undefined;
+        try {
+          const birdeyeFetcher = scanner.getFetcher('birdeye');
+          if (birdeyeFetcher) {
+            const { BirdeyeOptimizer } = await import('@/app/lib/pools/birdeye-optimizer');
+            birdeyeOptimizer = new BirdeyeOptimizer(birdeyeFetcher);
+          }
+        } catch (error) {
+          console.error('Error initializing Birdeye optimizer:', error);
+        }
+        
+        const detector = new ArbitrageDetector(state.pools, config, connection, birdeyeOptimizer);
+        const detected = await detector.detectOpportunities();
         
         // Also find unconventional opportunities via AI searcher
         try {

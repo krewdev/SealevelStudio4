@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -19,6 +19,15 @@ import { VeriSolAttestation } from './components/VeriSolAttestation';
 import { LandingPage } from './components/LandingPage';
 import { PremiumServices } from './components/PremiumServices';
 import { Web2Tools } from './components/Web2Tools';
+import { WalletManager } from './components/WalletManager';
+import { AdvancedR&DConsole } from './components/AdvancedR&DConsole';
+import { CybersecurityFinder } from './components/CybersecurityFinder';
+import { SecurityAI } from './components/SecurityAI';
+import { CybersecurityDashboard } from './components/CybersecurityDashboard';
+import { DocsView } from './components/DocsView';
+import { TransactionBundler } from './components/TransactionBundler';
+import { AdvertisingBots } from './components/AdvertisingBots';
+import { SocialFeatures } from './components/SocialFeatures';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -672,6 +681,10 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
     { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" /> },
     { id: 'premium', label: 'Premium Services', icon: <Zap className="h-4 w-4" /> },
     { id: 'web2', label: 'Web2 Tools', icon: <Terminal className="h-4 w-4" /> },
+    { id: 'wallets', label: 'Wallet Manager', icon: <Wallet className="h-4 w-4" /> },
+    { id: 'rd-console', label: 'R&D Console', icon: <Lock className="h-4 w-4" /> },
+    { id: 'cybersecurity', label: 'Cybersecurity Dashboard', icon: <Shield className="h-4 w-4" /> },
+    { id: 'docs', label: 'Documentation', icon: <Book className="h-4 w-4" /> },
   ];
 
   return (
@@ -758,12 +771,53 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   // Premium Services has its own full-screen layout
   if (activeView === 'premium') {
-    return <PremiumServices onBack={() => setActiveView('inspector')} />;
+    return <PremiumServices 
+      onBack={() => setActiveView('inspector')} 
+      onNavigateToWalletManager={() => setActiveView('wallets')}
+      onNavigateToBundler={() => setActiveView('bundler')}
+      onNavigateToAdvertising={() => setActiveView('advertising')}
+    />;
+  }
+
+  // Transaction Bundler has its own full-screen layout
+  if (activeView === 'bundler') {
+    return <TransactionBundler onBack={() => setActiveView('premium')} />;
+  }
+
+  // Advertising Bots has its own full-screen layout
+  if (activeView === 'advertising') {
+    return <AdvertisingBots onBack={() => setActiveView('premium')} />;
   }
 
   // Web2 Tools has its own full-screen layout
   if (activeView === 'web2') {
-    return <Web2Tools onBack={() => setActiveView('inspector')} />;
+    return <Web2Tools 
+      onBack={() => setActiveView('inspector')}
+      onNavigateToSocial={() => setActiveView('social')}
+    />;
+  }
+
+  // Social Features has its own full-screen layout
+  if (activeView === 'social') {
+    return <SocialFeatures onBack={() => setActiveView('web2')} />;
+  }
+
+  // Wallet Manager has its own full-screen layout
+  if (activeView === 'wallets') {
+    return <WalletManager onBack={() => setActiveView('inspector')} />;
+  }
+
+  // R&D Console is a floating component, always available
+  // Navigation item is for reference - console can be opened from anywhere
+
+  // Cybersecurity Dashboard has its own full-screen layout
+  if (activeView === 'cybersecurity') {
+    return <CybersecurityDashboard onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Documentation has its own full-screen layout
+  if (activeView === 'docs') {
+    return <DocsView onBack={() => setActiveView('inspector')} />;
   }
 
   // Default single-column layout for other views
@@ -861,7 +915,15 @@ export default function App() {
   }
 
   // Main app interface
-  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2';
+  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social';
+  const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
+  
+  // Open console when nav item is clicked
+  useEffect(() => {
+    if (activeView === 'rd-console') {
+      setRdConsoleMinimized(false);
+    }
+  }, [activeView]);
   
   return (
     <ClientOnly>
@@ -892,6 +954,12 @@ export default function App() {
       
       {/* Unified AI Agents */}
       <UnifiedAIAgents />
+      
+      {/* R&D Console - Floating (always available) */}
+      <AdvancedR&DConsole 
+        initialMinimized={rdConsoleMinimized}
+        onToggle={setRdConsoleMinimized}
+      />
     </ClientOnly>
   );
 }

@@ -4,8 +4,8 @@ import { Connection } from '@solana/web3.js';
 import { BasePoolFetcher } from './base';
 import { PoolData, FetcherResult, DEXProtocol, TokenInfo, WSOL_MINT } from '../types';
 
-// Jupiter API endpoints
-const JUPITER_API_BASE = 'https://quote-api.jup.ag/v6';
+// Jupiter API endpoints (using lite API for better performance)
+const JUPITER_API_BASE = 'https://lite-api.jup.ag/v6';
 const JUPITER_PRICE_API = 'https://price.jup.ag/v4';
 
 export class JupiterFetcher extends BasePoolFetcher {

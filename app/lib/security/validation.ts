@@ -8,7 +8,8 @@ import { PublicKey } from '@solana/web3.js';
 export const ALLOWED_API_BASES = {
   DUNE: 'https://api.dune.com',
   SOLSCAN: 'https://api.solscan.io',
-  JUPITER: 'https://quote-api.jup.ag',
+  JUPITER: 'https://lite-api.jup.ag',
+  JUPITER_ULTRA: 'https://api.jup.ag',
   HELIUS: 'https://api.helius.xyz',
   BIRDEYE: 'https://public-api.birdeye.so',
 } as const;
