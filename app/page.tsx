@@ -171,6 +171,19 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
+  // Validate if the entered string is a possible Solana address
+  function isValidSolanaAddress(address: string): boolean {
+    try {
+      // Solana addresses are base58 and 32 bytes (44 chars)
+      // new PublicKey will throw if invalid
+      if (!address || address.length < 32 || address.length > 44) return false;
+      new PublicKey(address);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Show rebate info for mainnet
   const showRebateInfo = network === 'mainnet';
 
@@ -503,14 +516,16 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
                 >
                   <Copy className="h-3 w-3" />
                 </button>
-                <a
-                  href={`https://solscan.io/account/${accountId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1 hover:bg-gray-700 rounded"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+                {isValidSolanaAddress(accountId) && (
+                  <a
+                    href={`https://solscan.io/account/${accountId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-gray-700 rounded"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
               </div>
             </div>
 
