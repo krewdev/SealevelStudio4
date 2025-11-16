@@ -32,7 +32,7 @@ import {
   DEFAULT_SCANNER_CONFIG,
   DEXProtocol,
 } from '../lib/pools/types';
-import { ScannerAgent } from './ScannerAgent';
+import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { executeArbitrage, validateOpportunity, calculateSafeSlippage, ExecutionConfig } from '../lib/pools/execution';
 import { getUserMessage } from '../lib/error-handling';
@@ -252,7 +252,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
 
   return (
     <>
-      <ScannerAgent
+      <UnifiedAIAgents
         opportunities={opportunities}
         pools={pools}
         selectedOpportunity={selectedOpportunity}

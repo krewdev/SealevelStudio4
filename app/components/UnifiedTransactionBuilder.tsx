@@ -35,8 +35,7 @@ import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
 import { PublicKey } from '@solana/web3.js';
-import { TransactionAgent } from './TransactionAgent';
-import { SimulatorAgent } from './SimulatorAgent';
+import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
 
@@ -1652,15 +1651,11 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         )}
       </div>
 
-      {/* AI Agents */}
-      <SimulatorAgent
-        transaction={builtTransaction}
-        workflow={viewMode === 'simple' ? simpleWorkflow : []}
-        transactionDraft={viewMode === 'advanced' ? transactionDraft : undefined}
-      />
-      <TransactionAgent
+      {/* Unified AI Agents */}
+      <UnifiedAIAgents
         simpleWorkflow={viewMode === 'simple' ? simpleWorkflow : []}
         transactionDraft={viewMode === 'advanced' ? transactionDraft : undefined}
+        transaction={builtTransaction}
         onAddBlock={viewMode === 'simple' ? addSimpleBlock : undefined}
         onUpdateBlock={viewMode === 'simple' ? (blockId, params) => {
           const block = simpleWorkflow.find(b => b.instanceId === blockId);
@@ -1683,7 +1678,6 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         }}
         onOptimize={() => {
           addLog('Analyzing transaction for optimizations...', 'info');
-          // Add optimization logic here
         }}
       />
     </div>

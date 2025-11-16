@@ -11,8 +11,7 @@ import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
 import { ArbitrageScanner } from './components/ArbitrageScanner';
 import { FreeTrialBanner } from './components/FreeTrialBanner';
-import { AccountSecurityAgent } from './components/AccountSecurityAgent';
-import { GlobalScannerAgent } from './components/GlobalScannerAgent';
+import { UnifiedAIAgents } from './components/UnifiedAIAgents';
 import { useNetwork } from './contexts/NetworkContext';
 import { useTutorial } from './contexts/TutorialContext';
 import { TutorialFlow } from './components/TutorialFlow';
@@ -891,9 +890,8 @@ export default function App() {
         </div>
       </div>
       
-      {/* AI Agents */}
-      <AccountSecurityAgent />
-      <GlobalScannerAgent />
+      {/* Unified AI Agents */}
+      <UnifiedAIAgents />
     </ClientOnly>
   );
 }
