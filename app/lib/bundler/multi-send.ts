@@ -202,7 +202,12 @@ export async function buildMultiSendTransaction(
     transaction.add(memoInstruction);
   }
 
-  return { transaction, signers, estimate, createdWallets };
+  return { 
+    transaction, 
+    signers, 
+    estimate, 
+    createdWallets 
+  } as { transaction: Transaction; signers: Keypair[]; estimate: MultiSendEstimate; createdWallets: Array<{ keypair: Keypair; label?: string }> };
 }
 
 /**
