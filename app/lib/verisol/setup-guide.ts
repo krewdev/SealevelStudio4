@@ -4,7 +4,6 @@
  */
 
 import { Connection, PublicKey } from '@solana/web3.js';
-import { BUBBLEGUM_PROGRAM_ID } from '@metaplex-foundation/mpl-bubblegum';
 import {
   getBetaTesterMerkleTree,
   getBetaTesterCollectionId,
