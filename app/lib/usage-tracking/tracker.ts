@@ -275,13 +275,25 @@ export function getUsageStats(
   );
   
   // Count features
-  const features = {
+  const features: UsageStats['features'] = {
     scanner_scan: 0,
     scanner_auto_refresh: 0,
     simulation: 0,
     ai_query: 0,
     code_export: 0,
     advanced_transaction: 0,
+    // Premium services
+    bundler_multi_send: 0,
+    bundler_recipient: 0,
+    market_maker_setup: 0,
+    market_maker_monthly: 0,
+    market_maker_trade: 0,
+    telegram_bot_setup: 0,
+    telegram_bot_monthly: 0,
+    telegram_bot_post: 0,
+    twitter_bot_setup: 0,
+    twitter_bot_monthly: 0,
+    twitter_bot_tweet: 0,
   };
   
   let totalCost = 0;

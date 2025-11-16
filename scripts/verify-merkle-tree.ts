@@ -7,7 +7,8 @@
  */
 
 import { Connection } from '@solana/web3.js';
-import { checkVeriSolSetup, getBetaTesterMerkleTree, getTreeAuthority } from '../app/lib/verisol/config';
+import { getBetaTesterMerkleTree, getTreeAuthority } from '../app/lib/verisol/config';
+import { checkVeriSolSetup } from '../app/lib/verisol/mint';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -43,8 +44,11 @@ async function main() {
       } else {
         console.log('   Status: Not found on-chain ⚠️');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.log('   Status: Error checking on-chain ⚠️');
+      if (error instanceof Error) {
+        console.log(`   Error: ${error.message}`);
+      }
     }
   } else {
     console.log('❌ Beta Tester Merkle Tree: Not configured');
