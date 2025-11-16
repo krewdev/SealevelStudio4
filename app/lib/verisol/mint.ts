@@ -85,9 +85,25 @@ export async function mintVeriSolAttestation(
       })
       .rpc();
 
-    return txSignature;
-  } catch (mintError: any) {
-    console.error('Compressed NFT minting failed:', mintError);
+      // Airdrop SEAL tokens to beta tester if eligible
+      try {
+        const { airdropSealToBetaTester, checkAirdropEligibility } = await import('../seal-token/airdrop');
+        const eligibility = await checkAirdropEligibility(connection, wallet.publicKey);
+        
+        if (eligibility.eligible) {
+          // Note: In production, this would be done server-side with treasury wallet
+          // For now, log that airdrop should be processed
+          console.log('Beta tester eligible for SEAL airdrop. Processing...');
+          // await airdropSealToBetaTester(connection, treasuryWallet, wallet.publicKey);
+        }
+      } catch (airdropError) {
+        console.error('Airdrop processing failed (non-critical):', airdropError);
+        // Don't fail the mint if airdrop fails
+      }
+
+      return txSignature;
+    } catch (mintError: any) {
+      console.error('Compressed NFT minting failed:', mintError);
     
     // Fallback to proof-only verification if minting fails
     try {

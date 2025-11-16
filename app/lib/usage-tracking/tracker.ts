@@ -17,6 +17,10 @@ const FREE_TRIAL_FEATURES = {
   ai_query: 100, // 100 free AI queries
   code_export: 20, // 20 free exports
   advanced_transaction: 50, // 50 free advanced transactions
+  // Premium services are NOT included in free trial
+  // bundler_multi_send: 0,
+  // market_maker_setup: 0,
+  // etc.
 };
 
 /**
@@ -30,10 +34,27 @@ export function getOrCreateFreeTrial(userId: string): FreeTrialStatus {
     const remainingDays = Math.max(0, Math.ceil((existing.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
     
     // Update remaining days
+    // Ensure all premium service fields exist (for backward compatibility)
+    const updatedFeaturesUsed = {
+      ...existing.featuresUsed,
+      bundler_multi_send: existing.featuresUsed.bundler_multi_send || 0,
+      bundler_recipient: existing.featuresUsed.bundler_recipient || 0,
+      market_maker_setup: existing.featuresUsed.market_maker_setup || 0,
+      market_maker_monthly: existing.featuresUsed.market_maker_monthly || 0,
+      market_maker_trade: existing.featuresUsed.market_maker_trade || 0,
+      telegram_bot_setup: existing.featuresUsed.telegram_bot_setup || 0,
+      telegram_bot_monthly: existing.featuresUsed.telegram_bot_monthly || 0,
+      telegram_bot_post: existing.featuresUsed.telegram_bot_post || 0,
+      twitter_bot_setup: existing.featuresUsed.twitter_bot_setup || 0,
+      twitter_bot_monthly: existing.featuresUsed.twitter_bot_monthly || 0,
+      twitter_bot_tweet: existing.featuresUsed.twitter_bot_tweet || 0,
+    };
+    
     return {
       ...existing,
       remainingDays,
       isActive: remainingDays > 0,
+      featuresUsed: updatedFeaturesUsed,
     };
   }
   
@@ -127,10 +148,37 @@ export function trackUsage(
   const baseCost = SEAL_TOKEN_ECONOMICS.pricing[feature] || 0;
   const cost = isTrialActive ? 0 : baseCost;
   
-  // Check if usage is allowed
-  const canUse = canUseFeature(userId, feature);
-  if (!canUse.allowed && isTrialActive) {
-    throw new Error(canUse.reason || 'Feature usage not allowed');
+  // Premium services are NOT included in free trial
+  const premiumServices: FeatureType[] = [
+    'bundler_multi_send',
+    'bundler_recipient',
+    'market_maker_setup',
+    'market_maker_monthly',
+    'market_maker_trade',
+    'telegram_bot_setup',
+    'telegram_bot_monthly',
+    'telegram_bot_post',
+    'twitter_bot_setup',
+    'twitter_bot_monthly',
+    'twitter_bot_tweet',
+  ];
+  
+  const isPremiumService = premiumServices.includes(feature);
+  
+  // Premium services require payment (not in free trial)
+  if (isPremiumService && isTrialActive) {
+    throw new Error(
+      `${feature} is a premium service and not included in the free trial. ` +
+      `Payment required: ${baseCost} SEAL tokens.`
+    );
+  }
+  
+  // Check if usage is allowed (for non-premium features)
+  if (!isPremiumService) {
+    const canUse = canUseFeature(userId, feature);
+    if (!canUse.allowed && isTrialActive) {
+      throw new Error(canUse.reason || 'Feature usage not allowed');
+    }
   }
   
   // Create usage record

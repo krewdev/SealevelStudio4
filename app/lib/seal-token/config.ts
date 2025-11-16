@@ -79,12 +79,35 @@ export const SEAL_TOKEN_CONFIG = {
 export const SEAL_TOKEN_ECONOMICS = {
   // Feature Pricing (in SEAL tokens)
   pricing: {
+    // Existing features (freemium)
     scanner_scan: 10, // 10 SEAL per scan
-    scanner_auto_refresh: 50, // 50 SEAL per hour of auto-refresh
-    simulation: 5, // 5 SEAL per simulation
-    ai_query: 2, // 2 SEAL per AI query
-    code_export: 3, // 3 SEAL per code export
-    advanced_transaction: 1, // 1 SEAL per advanced transaction build
+    scanner_auto_refresh: 5, // 5 SEAL per hour of auto-refresh
+    simulation: 20, // 20 SEAL per simulation
+    ai_query: 5, // 5 SEAL per AI query
+    code_export: 50, // 50 SEAL per code export
+    advanced_transaction: 100, // 100 SEAL per advanced transaction build
+    
+    // New premium services (NOT in freemium)
+    bundler_multi_send: 500, // 500 SEAL per multi-send transaction
+    bundler_recipient: 10, // 10 SEAL per recipient (additional)
+    market_maker_setup: 2000, // 2000 SEAL to set up market maker agent
+    market_maker_monthly: 5000, // 5000 SEAL per month for market maker
+    market_maker_trade: 50, // 50 SEAL per trade executed
+    telegram_bot_setup: 1000, // 1000 SEAL to set up Telegram bot
+    telegram_bot_monthly: 2000, // 2000 SEAL per month
+    telegram_bot_post: 5, // 5 SEAL per post
+    twitter_bot_setup: 1500, // 1500 SEAL to set up Twitter bot
+    twitter_bot_monthly: 3000, // 3000 SEAL per month
+    twitter_bot_tweet: 10, // 10 SEAL per tweet
+  },
+  
+  // Beta tester perks
+  beta_tester: {
+    airdrop_amount: 10000, // 10,000 SEAL airdrop (reserved on mint, claimable with cNFT)
+    discount_percentage: 25, // 25% discount on all services
+    free_bundler_transactions: 5, // 5 free multi-send transactions
+    // Removed: free_market_maker_month (no longer offered)
+    free_bot_setup: true, // Free bot setup (one-time)
   },
   
   // Subscription Tiers

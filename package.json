@@ -10,7 +10,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "setup:merkle-tree": "ts-node scripts/setup-merkle-tree.ts",
+    "verify:merkle-tree": "ts-node scripts/verify-merkle-tree.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",

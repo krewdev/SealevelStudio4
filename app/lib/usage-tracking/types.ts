@@ -7,7 +7,19 @@ export type FeatureType =
   | 'simulation'
   | 'ai_query'
   | 'code_export'
-  | 'advanced_transaction';
+  | 'advanced_transaction'
+  // Premium services (not in freemium)
+  | 'bundler_multi_send'
+  | 'bundler_recipient'
+  | 'market_maker_setup'
+  | 'market_maker_monthly'
+  | 'market_maker_trade'
+  | 'telegram_bot_setup'
+  | 'telegram_bot_monthly'
+  | 'telegram_bot_post'
+  | 'twitter_bot_setup'
+  | 'twitter_bot_monthly'
+  | 'twitter_bot_tweet';
 
 export interface UsageRecord {
   id: string;
@@ -31,6 +43,18 @@ export interface UsageStats {
     ai_query: number;
     code_export: number;
     advanced_transaction: number;
+    // Premium services
+    bundler_multi_send: number;
+    bundler_recipient: number;
+    market_maker_setup: number;
+    market_maker_monthly: number;
+    market_maker_trade: number;
+    telegram_bot_setup: number;
+    telegram_bot_monthly: number;
+    telegram_bot_post: number;
+    twitter_bot_setup: number;
+    twitter_bot_monthly: number;
+    twitter_bot_tweet: number;
   };
   totalCost: number; // Total cost in SEAL (0 during free trial)
   totalPaid: number; // Total actually paid (0 during free trial)
@@ -49,6 +73,18 @@ export interface FreeTrialStatus {
     ai_query: number;
     code_export: number;
     advanced_transaction: number;
+    // Premium services (not in free trial)
+    bundler_multi_send: number;
+    bundler_recipient: number;
+    market_maker_setup: number;
+    market_maker_monthly: number;
+    market_maker_trade: number;
+    telegram_bot_setup: number;
+    telegram_bot_monthly: number;
+    telegram_bot_post: number;
+    twitter_bot_setup: number;
+    twitter_bot_monthly: number;
+    twitter_bot_tweet: number;
   };
   totalUsage: number;
 }
