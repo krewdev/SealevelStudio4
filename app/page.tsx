@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -16,6 +16,8 @@ import { GlobalScannerAgent } from './components/GlobalScannerAgent';
 import { useNetwork } from './contexts/NetworkContext';
 import { useTutorial } from './contexts/TutorialContext';
 import { TutorialFlow } from './components/TutorialFlow';
+import { VeriSolAttestation } from './components/VeriSolAttestation';
+import { LandingPage } from './components/LandingPage';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -666,6 +668,7 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" /> },
     { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" /> },
     { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" /> },
+    { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" /> },
   ];
 
   return (
@@ -691,6 +694,23 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
           </li>
         ))}
       </ul>
+      {/* Opaque Logo */}
+      <div className="mt-auto pt-8 pb-4 flex justify-center">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-16 w-auto opacity-10"
+          style={{ maxHeight: '64px' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        >
+          <source src="/logo-video.mp4" type="video/mp4" />
+          <source src="/logo-video.webm" type="video/webm" />
+        </video>
+      </div>
     </nav>
   );
 }
@@ -741,6 +761,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
         {activeView === 'inspector' && <AccountInspectorView connection={connection} network={network} publicKey={publicKey} />}
         {activeView === 'simulation' && <SimulationView transactionDraft={transactionPreview?.transaction} />}
         {activeView === 'exporter' && <ExporterView />}
+        {activeView === 'attestation' && <VeriSolAttestation connection={connection} />}
       </main>
 
       {transactionPreview && (
@@ -787,25 +808,7 @@ function ExporterView() {
   );
 }
 
-// Landing Page Component
-function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-gray-900">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-4">Welcome to Sealevel Studio</h1>
-        <p className="text-gray-400 mb-6">
-          A powerful tool for inspecting Solana accounts, building transactions, and exploring the blockchain.
-        </p>
-        <button
-          onClick={onGetStarted}
-          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg text-lg font-medium text-white transition-colors"
-        >
-          Get Started
-        </button>
-      </div>
-    </div>
-  );
-}
+// Landing Page Component is now imported from ./components/LandingPage
 
 // Main App Component
 export default function App() {

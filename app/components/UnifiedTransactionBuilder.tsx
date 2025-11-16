@@ -517,6 +517,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   const [copiedAddresses, setCopiedAddresses] = useState<string[]>([]);
   const [showClipboard, setShowClipboard] = useState(false);
   const [justCopied, setJustCopied] = useState<string | null>(null);
+  const [focusedInputField, setFocusedInputField] = useState<string | null>(null);
 
   // Arbitrage panel state
   const [showArbitragePanel, setShowArbitragePanel] = useState(false);
@@ -1264,6 +1265,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                           <input 
                             type="text" 
                             value={value} 
+                            onFocus={() => isAddressField && setFocusedInputField(`${selectedBlock.instanceId}-${key}`)}
+                            onBlur={() => setTimeout(() => setFocusedInputField(null), 200)}
                             onChange={(e) => {
                               let newValue = e.target.value;
                               // Auto-convert SOL to lamports for amount fields (hidden conversion)
@@ -1307,14 +1310,15 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                             )}
                           </button>
                         )}
-                        {!isBooleanField && isAddressField && copiedAddresses.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                        {!isBooleanField && isAddressField && copiedAddresses.length > 0 && focusedInputField === `${selectedBlock.instanceId}-${key}` && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                             {copiedAddresses.slice(0, 5).map((addr, idx) => (
                               <button
                                 key={idx}
                                 onClick={() => {
                                   updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: addr });
                                   copyAddress(addr);
+                                  setFocusedInputField(null);
                                 }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-b-0"
                               >
@@ -1434,6 +1438,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
               onCopyAddress={copyAddress}
               copiedAddresses={copiedAddresses}
               justCopied={justCopied}
+              focusedInputField={focusedInputField}
+              setFocusedInputField={setFocusedInputField}
             />
           ))}
         </div>
@@ -1694,7 +1700,9 @@ function AdvancedInstructionCard({
   validationErrors,
   onCopyAddress,
   copiedAddresses,
-  justCopied
+  justCopied,
+  focusedInputField,
+  setFocusedInputField
 }: {
   instruction: BuiltInstruction;
   index: number;
@@ -1705,6 +1713,8 @@ function AdvancedInstructionCard({
   onCopyAddress: (address: string) => void;
   copiedAddresses: string[];
   justCopied: string | null;
+  focusedInputField: string | null;
+  setFocusedInputField: (field: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -1776,6 +1786,8 @@ function AdvancedInstructionCard({
                         <input
                           type="text"
                           value={accountValue}
+                          onFocus={() => isAddress && setFocusedInputField(`advanced-${index}-${account.name}`)}
+                          onBlur={() => setTimeout(() => setFocusedInputField(null), 200)}
                           onChange={(e) => onUpdateAccount(account.name, e.target.value)}
                           placeholder={account.description}
                           className="w-full px-3 py-2 pr-10 bg-gray-900 border border-gray-700 rounded-md text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -1793,14 +1805,15 @@ function AdvancedInstructionCard({
                             )}
                           </button>
                         )}
-                        {isAddress && copiedAddresses.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                        {isAddress && copiedAddresses.length > 0 && focusedInputField === `advanced-${index}-${account.name}` && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                             {copiedAddresses.slice(0, 5).map((addr, idx) => (
                               <button
                                 key={idx}
                                 onClick={() => {
                                   onUpdateAccount(account.name, addr);
                                   onCopyAddress(addr);
+                                  setFocusedInputField(null);
                                 }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-gray-700 transition-colors border-b border-gray-700 last:border-b-0"
                               >

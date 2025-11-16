@@ -257,14 +257,14 @@ function analyzeOpportunities(opportunities: ArbitrageOpportunity[]): { content:
 
   const sorted = [...opportunities].sort((a, b) => b.netProfit - a.netProfit);
   const best = sorted[0];
-  const highConfidence = opportunities.filter(o => o.confidence === 'high');
+  const highConfidence = opportunities.filter(o => o.confidence >= 0.7);
   const avgProfit = opportunities.reduce((sum, o) => sum + o.netProfit, 0) / opportunities.length;
 
   const content = `📊 **Opportunity Analysis**\n\n` +
     `Found **${opportunities.length}** arbitrage opportunities:\n\n` +
     `🏆 **Best Opportunity**:\n` +
     `• Profit: ${best.netProfit.toFixed(6)} SOL (${best.profitPercent.toFixed(2)}%)\n` +
-    `• Confidence: ${best.confidence.toUpperCase()}\n` +
+    `• Confidence: ${(best.confidence * 100).toFixed(0)}%\n` +
     `• Hops: ${best.path.totalHops}\n` +
     `• Gas: ${(best.gasEstimate / 1e9).toFixed(6)} SOL\n\n` +
     `📈 **Statistics**:\n` +
@@ -272,7 +272,7 @@ function analyzeOpportunities(opportunities: ArbitrageOpportunity[]): { content:
     `• Average profit: ${avgProfit.toFixed(6)} SOL\n` +
     `• Total potential: ${opportunities.reduce((sum, o) => sum + o.netProfit, 0).toFixed(6)} SOL\n\n` +
     `💡 **Recommendations**:\n` +
-    `${best.confidence === 'high' ? '✅ This opportunity has high confidence - good for execution\n' : ''}` +
+    `${best.confidence >= 0.7 ? '✅ This opportunity has high confidence - good for execution\n' : ''}` +
     `${best.netProfit > 0.01 ? '✅ Profitable after gas costs\n' : '⚠️ Low profit margin - consider larger amounts\n'}` +
     `${best.path.totalHops <= 2 ? '✅ Simple path - lower risk\n' : '⚠️ Complex path - higher gas costs\n'}`;
 
@@ -308,7 +308,7 @@ function analyzeOpportunity(opportunity: ArbitrageOpportunity, pools: PoolData[]
     `• Input: ${(Number(opportunity.inputAmount) / 1e9).toFixed(4)} SOL\n\n` +
     `📊 **Risk Assessment**:\n` +
     `• Overall Risk: ${riskAssessment.level.toUpperCase()}\n` +
-    `• Confidence: ${opportunity.confidence.toUpperCase()}\n` +
+    `• Confidence: ${(opportunity.confidence * 100).toFixed(0)}%\n` +
     `• ${riskAssessment.factors.map(f => `• ${f}`).join('\n')}\n\n` +
     `🎯 **Entry/Exit Strategy**:\n` +
     `• ${entryExit.recommendation}\n\n` +
@@ -358,7 +358,7 @@ function assessRisk(opportunity: ArbitrageOpportunity, pools: PoolData[]): {
   }
 
   // Confidence risk
-  if (opportunity.confidence === 'low') {
+  if (opportunity.confidence < 0.4) {
     factors.push('Low confidence - opportunity may not be real');
     riskScore += 2;
   }
