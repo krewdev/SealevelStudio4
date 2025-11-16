@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!queryId && action === 'results') {
+    if ((action === 'results') && !queryId) {
       return NextResponse.json(
         { error: 'Query ID required for results' },
         { status: 400 }
