@@ -22,9 +22,20 @@ export async function GET(request: NextRequest) {
     const queryId = searchParams.get('queryId');
     const action = searchParams.get('action') || 'results'; // results, execute, status
 
+    // Validate queryId - must be strictly numeric or valid UUID, else reject
+    const isNumericId = /^[0-9]+$/.test(queryId || '');
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(queryId || '');
+
     if (!queryId && action === 'results') {
       return NextResponse.json(
         { error: 'Query ID required for results' },
+        { status: 400 }
+      );
+    }
+
+    if (!isNumericId && !isUUID) {
+      return NextResponse.json(
+        { error: 'Invalid query ID format.' },
         { status: 400 }
       );
     }
