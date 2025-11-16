@@ -1,8 +1,9 @@
 // Next.js API route to proxy Jupiter quote requests (fixes CORS issues)
 
 import { NextRequest, NextResponse } from 'next/server';
+import { validateSolanaAddress, validateNumeric, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
-const JUPITER_API_BASE = 'https://quote-api.jup.ag/v6';
+const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/v6`;
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,8 +20,43 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build Jupiter API URL
-    const url = `${JUPITER_API_BASE}/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippageBps}`;
+    // Validate Solana addresses (prevents SSRF)
+    const inputMintValidation = validateSolanaAddress(inputMint);
+    if (!inputMintValidation.valid) {
+      return NextResponse.json(
+        { error: `Invalid inputMint: ${inputMintValidation.error}` },
+        { status: 400 }
+      );
+    }
+
+    const outputMintValidation = validateSolanaAddress(outputMint);
+    if (!outputMintValidation.valid) {
+      return NextResponse.json(
+        { error: `Invalid outputMint: ${outputMintValidation.error}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate amount (must be numeric, positive)
+    const amountValidation = validateNumeric(amount, 1);
+    if (!amountValidation.valid) {
+      return NextResponse.json(
+        { error: `Invalid amount: ${amountValidation.error}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate slippage (0-10000 basis points, i.e., 0-100%)
+    const slippageValidation = validateNumeric(slippageBps, 0, 10000);
+    if (!slippageValidation.valid) {
+      return NextResponse.json(
+        { error: `Invalid slippageBps: ${slippageValidation.error}` },
+        { status: 400 }
+      );
+    }
+
+    // Build Jupiter API URL safely with encoded parameters
+    const url = `${JUPITER_API_BASE}/quote?inputMint=${safeEncodeParam(inputMint)}&outputMint=${safeEncodeParam(outputMint)}&amount=${safeEncodeParam(amount)}&slippageBps=${safeEncodeParam(slippageBps)}`;
     
     // Fetch from Jupiter API
     const response = await fetch(url, {
