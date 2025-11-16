@@ -60,14 +60,14 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <div className="absolute inset-0 max-w-4xl mx-auto h-3/4 -translate-y-1/4 bg-purple-900/40 blur-3xl rounded-full -z-10"></div>
           
           {/* Logo Video - Centered in Hero */}
-          <div className="mb-8 flex justify-center">
+          <div className="mb-12 flex justify-center">
             <video
               autoPlay
               loop
               muted
               playsInline
-              className="h-24 md:h-32 w-auto"
-              style={{ maxHeight: '128px' }}
+              className="h-40 md:h-56 lg:h-64 w-auto"
+              style={{ maxHeight: '256px' }}
               onError={(e) => {
                 // Hide video if it fails to load
                 e.currentTarget.style.display = 'none';
@@ -79,10 +79,13 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           </div>
           
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-100 to-gray-400 mb-6">
-            Open the Solana Black Box
+            Build Solana Transactions Like a Pro
           </h1>
-          <p className="max-w-3xl mx-auto text-lg md:text-xl text-gray-300 mb-10">
-            Stop "chewing glass." Sealevel Studio is the "Postman for Solana"—a visual tool to assemble, simulate, debug, and export transactions.
+          <p className="max-w-3xl mx-auto text-lg md:text-xl text-gray-300 mb-4">
+            The most powerful developer toolkit for Solana. Build, simulate, debug, and execute transactions with AI-powered assistance—no more guessing, no more errors.
+          </p>
+          <p className="max-w-3xl mx-auto text-base md:text-lg text-gray-400 mb-10">
+            Visual transaction builder • Real-time simulation • Arbitrage scanner • AI agents • Code export
           </p>
           <button 
             onClick={onGetStarted}
@@ -96,10 +99,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
         <section className="py-20 bg-gray-950/50">
           <div className="container mx-auto max-w-7xl px-6">
             <h2 className="text-center text-3xl md:text-4xl font-bold tracking-tighter mb-4">
-              The "Glass-Chewing" Experience is Real
+              Stop Wasting Time on Solana's Hidden Complexity
             </h2>
             <p className="text-center text-lg text-gray-400 mb-16 max-w-2xl mx-auto">
-              Every Solana dev wastes hours on the same painful, opaque problems.
+              Every Solana developer faces the same challenges: cryptic errors, manual account management, and zero visibility into what your transactions actually do.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Problem 1 */}
@@ -157,10 +160,10 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
           <div className="container mx-auto max-w-7xl px-6">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold tracking-tighter mb-4">
-                Meet the "Glass Box"
+                Everything You Need to Build on Solana
               </h2>
               <p className="text-center text-lg text-gray-400 max-w-2xl mx-auto">
-                Assemble, simulate, and *see* the result. Instantly.
+                From simple transfers to complex DeFi strategies—build, test, and deploy with confidence.
               </p>
             </div>
 
@@ -274,16 +277,16 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
         <section id="contact" className="py-20 md:py-32 bg-gray-950/50">
           <div className="container mx-auto max-w-4xl px-6 text-center">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tighter mb-4">
-              Build the Future of Solana DevEx
+              Ready to Build Faster?
             </h2>
             <p className="text-lg text-gray-400 mb-10 max-w-2xl mx-auto">
-              Ready to stop "chewing glass"? Let's open the Solana black box together.
+              Join developers who are shipping Solana applications faster with AI-powered tools and real-time simulation.
             </p>
             <button
               onClick={onGetStarted}
               className="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30"
             >
-              Start Building
+              Start Building Free
             </button>
           </div>
         </section>
@@ -291,8 +294,29 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
 
       {/* Footer */}
       <footer className="border-t border-gray-700/50">
-        <div className="container mx-auto max-w-7xl px-6 py-8 text-center text-gray-500">
-          <p>&copy; 2025 Sealevel Studio. All rights reserved.</p>
+        <div className="container mx-auto max-w-7xl px-6 py-8">
+          <div className="text-center text-gray-500 mb-4">
+            <p>&copy; 2025 Sealevel Studio. All rights reserved.</p>
+          </div>
+          
+          {/* Disclaimer */}
+          <div className="max-w-4xl mx-auto mt-6 p-4 bg-gray-800/50 border border-gray-700/50 rounded-lg">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              <strong className="text-gray-300">Disclaimer:</strong> Sealevel Studio provides developer tools and educational resources for building on the Solana blockchain. 
+              By using this platform, you acknowledge that:
+            </p>
+            <ul className="text-xs text-gray-400 mt-2 space-y-1 list-disc list-inside ml-2">
+              <li>All transactions and operations are executed at your own risk</li>
+              <li>We are not liable for any financial losses, damages, or consequences resulting from the use of these tools</li>
+              <li>You are solely responsible for verifying transaction details, security practices, and compliance with applicable laws</li>
+              <li>These tools are provided "as-is" without warranties of any kind</li>
+              <li>Cryptocurrency transactions are irreversible—always test thoroughly before executing on mainnet</li>
+            </ul>
+            <p className="text-xs text-gray-500 mt-3 italic">
+              Use these tools responsibly. Always review and understand transactions before signing. 
+              We recommend testing on devnet/testnet first.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
