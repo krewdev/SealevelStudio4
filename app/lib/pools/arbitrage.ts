@@ -219,6 +219,7 @@ export class ArbitrageDetector {
     return {
       id: `arb-${Date.now()}-${Math.random()}`,
       path,
+      type: 'simple',
       profit,
       profitPercent,
       inputAmount,
@@ -291,7 +292,7 @@ export class ArbitrageDetector {
     }
 
     const arbitragePath: ArbitragePath = {
-      type: path.length > 3 ? 'cross-protocol' : 'multihop',
+      type: path.length > 3 ? 'cross-protocol' : 'multi_hop' as ArbitragePathType,
       steps,
       startToken,
       endToken: startToken,
@@ -301,6 +302,7 @@ export class ArbitrageDetector {
     return {
       id: `arb-mh-${Date.now()}-${Math.random()}`,
       path: arbitragePath,
+      type: path.length > 3 ? 'cross_protocol' : 'multi_hop',
       profit,
       profitPercent,
       inputAmount,
@@ -514,10 +516,23 @@ export class ArbitrageDetector {
     return null;
   }
 
-  private calculateConfidence(profitPercent: number, hops: number): 'high' | 'medium' | 'low' {
-    if (profitPercent > 1 && hops <= 2) return 'high';
-    if (profitPercent > 0.5 && hops <= 3) return 'medium';
-    return 'low';
+  private calculateConfidence(profitPercent: number, hops: number): number {
+    // Returns confidence as a number between 0 and 1
+    // Higher profit and fewer hops = higher confidence
+    let confidence = 0.5; // Base confidence
+    
+    // Adjust based on profit percentage
+    if (profitPercent > 1) confidence += 0.3;
+    else if (profitPercent > 0.5) confidence += 0.2;
+    else if (profitPercent > 0.1) confidence += 0.1;
+    
+    // Adjust based on number of hops (fewer hops = higher confidence)
+    if (hops <= 2) confidence += 0.2;
+    else if (hops <= 3) confidence += 0.1;
+    else confidence -= 0.1;
+    
+    // Clamp between 0 and 1
+    return Math.max(0, Math.min(1, confidence));
   }
 }
 

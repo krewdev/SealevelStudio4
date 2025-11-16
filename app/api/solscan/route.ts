@@ -1,10 +1,15 @@
 // Next.js API route to proxy Solscan API requests
 
 import { NextRequest, NextResponse } from 'next/server';
+import { validateSolanaAddress, validateEndpoint, validateAction, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
 export const dynamic = 'force-dynamic';
 
-const SOLSCAN_API_BASE = 'https://api.solscan.io';
+const SOLSCAN_API_BASE = ALLOWED_API_BASES.SOLSCAN;
+
+// Allowed endpoints (whitelist)
+const ALLOWED_ENDPOINTS = ['account', 'token', 'market'];
+const ALLOWED_ACTIONS = ['info', 'tokens', 'transactions'];
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,41 +19,75 @@ export async function GET(request: NextRequest) {
     
     const endpoint = searchParams.get('endpoint') || 'account';
     const address = searchParams.get('address');
-    const action = searchParams.get('action') || 'info'; // info, tokens, transactions, etc.
+    const action = searchParams.get('action') || 'info';
 
-    if (!address && endpoint === 'account') {
+    // Validate endpoint (prevent path traversal)
+    const endpointValidation = validateEndpoint(endpoint, ALLOWED_ENDPOINTS);
+    if (!endpointValidation.valid) {
       return NextResponse.json(
-        { error: 'Address required for account lookup' },
+        { error: endpointValidation.error || 'Invalid endpoint' },
         { status: 400 }
       );
     }
 
+    // Validate action (prevent path traversal)
+    if (!validateAction(action, ALLOWED_ACTIONS)) {
+      return NextResponse.json(
+        { error: 'Invalid action' },
+        { status: 400 }
+      );
+    }
+
+    // Validate address if required
+    if (endpoint === 'account' || endpoint === 'token' || endpoint === 'market') {
+      if (!address) {
+        return NextResponse.json(
+          { error: 'Address required' },
+          { status: 400 }
+        );
+      }
+
+      // Validate Solana address format (prevents SSRF)
+      const addressValidation = validateSolanaAddress(address);
+      if (!addressValidation.valid) {
+        return NextResponse.json(
+          { error: addressValidation.error || 'Invalid address format' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Build URL safely with validated parameters
     let url = '';
+    const encodedAddress = address ? safeEncodeParam(address) : '';
     
     switch (endpoint) {
       case 'account':
         switch (action) {
           case 'info':
-            url = `${SOLSCAN_API_BASE}/account?address=${address}`;
+            url = `${SOLSCAN_API_BASE}/account?address=${encodedAddress}`;
             break;
           case 'tokens':
-            url = `${SOLSCAN_API_BASE}/account/tokens?address=${address}`;
+            url = `${SOLSCAN_API_BASE}/account/tokens?address=${encodedAddress}`;
             break;
           case 'transactions':
-            url = `${SOLSCAN_API_BASE}/account/transactions?address=${address}`;
+            url = `${SOLSCAN_API_BASE}/account/transactions?address=${encodedAddress}`;
             break;
           default:
-            url = `${SOLSCAN_API_BASE}/account?address=${address}`;
+            url = `${SOLSCAN_API_BASE}/account?address=${encodedAddress}`;
         }
         break;
       case 'token':
-        url = `${SOLSCAN_API_BASE}/token/meta?tokenAddress=${address}`;
+        url = `${SOLSCAN_API_BASE}/token/meta?tokenAddress=${encodedAddress}`;
         break;
       case 'market':
-        url = `${SOLSCAN_API_BASE}/market/token/price?tokenAddress=${address}`;
+        url = `${SOLSCAN_API_BASE}/market/token/price?tokenAddress=${encodedAddress}`;
         break;
       default:
-        url = `${SOLSCAN_API_BASE}/account?address=${address}`;
+        return NextResponse.json(
+          { error: 'Invalid endpoint' },
+          { status: 400 }
+        );
     }
 
     const response = await fetch(url, {

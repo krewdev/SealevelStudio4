@@ -356,7 +356,7 @@ export class AISearcher {
       if (current === target && path.length > 0) {
         // Found a path
         paths.push({
-          type: path.length === 2 ? 'simple' : 'multihop',
+          type: path.length === 2 ? 'simple' : 'multi_hop',
           steps: path.map((step, i) => ({
             pool: step.pool,
             dex: step.pool.dex,

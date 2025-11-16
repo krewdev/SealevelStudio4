@@ -21,7 +21,7 @@ import {
   DollarSign,
   Percent,
 } from 'lucide-react';
-import { useConnection } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PoolScanner } from '../lib/pools/scanner';
 import { ArbitrageDetector } from '../lib/pools/arbitrage';
 import {
@@ -33,6 +33,8 @@ import {
 } from '../lib/pools/types';
 import { ScannerAgent } from './ScannerAgent';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { executeArbitrage, validateOpportunity, calculateSafeSlippage, ExecutionConfig } from '../lib/pools/execution';
+import { getUserMessage } from '../lib/error-handling';
 
 interface ArbitrageScannerProps {
   onBuildTransaction?: (opportunity: ArbitrageOpportunity) => void;
@@ -40,7 +42,10 @@ interface ArbitrageScannerProps {
 
 export function ArbitrageScanner({ onBuildTransaction }: ArbitrageScannerProps) {
   const { connection } = useConnection();
+  const wallet = useWallet();
   const { trackFeatureUsage, checkFeatureAccess, getTrialStatus } = useUsageTracking();
+  const [executing, setExecuting] = useState<string | null>(null);
+  const [executionResult, setExecutionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [scanner] = useState(() => new PoolScanner());
   const [pools, setPools] = useState<PoolData[]>([]);
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
@@ -120,13 +125,14 @@ export function ArbitrageScanner({ onBuildTransaction }: ArbitrageScannerProps) 
             return {
               id: `unconventional-${opp.type}-${Date.now()}-${Math.random()}`,
               path: opp.path,
+              type: (opp.type || 'cross_protocol') as 'simple' | 'multi_hop' | 'wrap_unwrap' | 'cross_protocol',
               profit: baseProfit,
               profitPercent,
               inputAmount,
               outputAmount,
               gasEstimate: 10000,
               netProfit: baseProfit - (10000 / 1e9),
-              confidence: opp.risk === 'low' ? 'high' as const : opp.risk === 'medium' ? 'medium' as const : 'low' as const,
+              confidence: opp.risk === 'low' ? 0.8 : opp.risk === 'medium' ? 0.5 : 0.3,
               steps: opp.path.steps || [],
               timestamp: new Date(),
             };
@@ -178,8 +184,7 @@ export function ArbitrageScanner({ onBuildTransaction }: ArbitrageScannerProps) 
         case 'profitPercent':
           return b.profitPercent - a.profitPercent;
         case 'confidence':
-          const confidenceOrder = { high: 3, medium: 2, low: 1 };
-          return confidenceOrder[b.confidence] - confidenceOrder[a.confidence];
+          return b.confidence - a.confidence;
         default:
           return 0;
       }
@@ -193,6 +198,55 @@ export function ArbitrageScanner({ onBuildTransaction }: ArbitrageScannerProps) 
       onBuildTransaction(opportunity);
     }
   };
+
+  const handleExecute = useCallback(async (opportunity: ArbitrageOpportunity) => {
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
+      setExecutionResult({ success: false, message: 'Please connect your wallet to execute arbitrage' });
+      return;
+    }
+
+    // Validate opportunity
+    const validation = validateOpportunity(opportunity, {
+      slippageTolerance: calculateSafeSlippage(opportunity),
+      priorityFee: 10000,
+    });
+
+    if (!validation.valid) {
+      setExecutionResult({ success: false, message: validation.reason || 'Invalid opportunity' });
+      return;
+    }
+
+    setExecuting(opportunity.id);
+    setExecutionResult(null);
+
+    try {
+      const config: ExecutionConfig = {
+        slippageTolerance: calculateSafeSlippage(opportunity),
+        priorityFee: 10000,
+        maxRetries: 3,
+      };
+
+      const result = await executeArbitrage(connection, wallet, opportunity, config);
+
+      if (result.success) {
+        setExecutionResult({
+          success: true,
+          message: `Successfully executed! Profit: ${result.actualProfit?.toFixed(6) || result.profit?.toFixed(6) || '0'} SOL`,
+        });
+        // Refresh opportunities after execution
+        setTimeout(() => handleScan(), 2000);
+      } else {
+        setExecutionResult({ success: false, message: getUserMessage(result.error || new Error('Execution failed')) });
+      }
+    } catch (error) {
+      setExecutionResult({
+        success: false,
+        message: getUserMessage(error),
+      });
+    } finally {
+      setExecuting(null);
+    }
+  }, [wallet, connection, handleScan]);
 
   return (
     <>
@@ -462,27 +516,44 @@ export function ArbitrageScanner({ onBuildTransaction }: ArbitrageScannerProps) 
                     </td>
                     <td className="py-3">
                       <span className={`px-2 py-1 rounded text-xs ${
-                        opp.confidence === 'high' ? 'bg-green-900/50 text-green-400' :
-                        opp.confidence === 'medium' ? 'bg-yellow-900/50 text-yellow-400' :
+                        opp.confidence >= 0.7 ? 'bg-green-900/50 text-green-400' :
+                        opp.confidence >= 0.4 ? 'bg-yellow-900/50 text-yellow-400' :
                         'bg-red-900/50 text-red-400'
                       }`}>
-                        {opp.confidence}
+                        {(opp.confidence * 100).toFixed(0)}%
                       </span>
                     </td>
                     <td className="py-3">
                       <span className="text-slate-400">{opp.path.totalHops}</span>
                     </td>
                     <td className="py-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBuildTransaction(opp);
-                        }}
-                        className="px-3 py-1 bg-teal-600 hover:bg-teal-700 rounded text-sm flex items-center gap-1"
-                      >
-                        <Zap size={14} />
-                        Build
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBuildTransaction(opp);
+                          }}
+                          className="px-3 py-1 bg-teal-600 hover:bg-teal-700 rounded text-sm flex items-center gap-1"
+                        >
+                          <Zap size={14} />
+                          Build
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExecute(opp);
+                          }}
+                          disabled={executing === opp.id || !wallet.publicKey}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded text-sm flex items-center gap-1"
+                        >
+                          {executing === opp.id ? (
+                            <RefreshCw size={14} className="animate-spin" />
+                          ) : (
+                            <Play size={14} />
+                          )}
+                          {executing === opp.id ? 'Executing...' : 'Execute'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

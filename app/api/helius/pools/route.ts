@@ -1,10 +1,9 @@
 // Next.js API route to proxy Helius pool data requests
 
 import { NextRequest, NextResponse } from 'next/server';
+import { validateNumeric, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
 export const dynamic = 'force-dynamic';
-
-const HELIUS_API_BASE = 'https://api.helius.xyz/v0';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,11 +21,31 @@ export async function GET(request: NextRequest) {
     const dex = searchParams.get('dex') || 'all';
     const limit = searchParams.get('limit') || '100';
 
+    // Validate dex parameter (whitelist only)
+    const ALLOWED_DEX = ['all', 'raydium', 'orca'];
+    if (!ALLOWED_DEX.includes(dex)) {
+      return NextResponse.json(
+        { error: `Invalid dex. Must be one of: ${ALLOWED_DEX.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate limit (must be numeric, 1-1000)
+    const limitValidation = validateNumeric(limit, 1, 1000);
+    if (!limitValidation.valid) {
+      return NextResponse.json(
+        { error: `Invalid limit: ${limitValidation.error}` },
+        { status: 400 }
+      );
+    }
+
     // Helius DEX API endpoint for pool data
-    const url = `${HELIUS_API_BASE}/token-metadata?api-key=${apiKey}`;
+    // Use validated base URL from allow-list
+    const url = `${ALLOWED_API_BASES.HELIUS}/v0/token-metadata?api-key=${safeEncodeParam(apiKey)}`;
     
     // For pool data, we'll use Helius's enhanced RPC methods
     // This is a simplified version - in production, use Helius's DEX-specific endpoints
+    // Program IDs are hardcoded (whitelist) - prevents SSRF
     const response = await fetch(url, {
       method: 'POST',
       headers: {

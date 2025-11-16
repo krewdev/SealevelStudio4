@@ -39,7 +39,7 @@ export interface PoolData {
   poolAddress?: string; // Pool account address
 }
 
-export type ArbitragePathType = 'simple' | 'multihop' | 'wrap' | 'unwrap' | 'cross-protocol';
+export type ArbitragePathType = 'simple' | 'multi_hop' | 'wrap' | 'unwrap' | 'cross-protocol';
 
 export interface ArbitrageStep {
   pool: PoolData;
@@ -64,16 +64,18 @@ export interface ArbitragePath {
 export interface ArbitrageOpportunity {
   id: string;
   path: ArbitragePath;
+  type: 'simple' | 'multi_hop' | 'wrap_unwrap' | 'cross_protocol';
   profit: number; // Estimated profit in SOL
   profitPercent: number; // Profit as percentage of input
   inputAmount: bigint;
   outputAmount: bigint;
   gasEstimate: number; // Estimated transaction cost in lamports
   netProfit: number; // Profit after gas costs
-  confidence: 'high' | 'medium' | 'low';
+  confidence: number; // 0-1 confidence score
   steps: ArbitrageStep[];
   timestamp: Date;
   expiresAt?: Date; // Optional: when opportunity might expire
+  jupiterQuote?: any; // Jupiter quote response for execution
 }
 
 export interface ScannerConfig {
