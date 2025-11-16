@@ -19,6 +19,9 @@ const MAX_TRANSACTION_SIZE = 1232; // Solana transaction size limit
 const BASE_FEE = 5000; // Base transaction fee in lamports
 const ACCOUNT_CREATION_SIZE = 165; // Approximate bytes per account creation
 
+// Memo Program ID (Solana's memo program)
+const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
+
 /**
  * Estimate transaction costs and size
  */
