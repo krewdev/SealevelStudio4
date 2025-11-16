@@ -2,6 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const HELIUS_API_BASE = 'https://api.helius.xyz/v0';
 
 export async function GET(request: NextRequest) {
