@@ -33,7 +33,18 @@ export function FreeTrialBanner() {
     );
   }
 
-  const usagePercent = (trialStatus.totalUsage / 200) * 100; // Rough estimate of total trial usage
+  // Calculate accurate total usage and max possible usage
+  const FREE_TRIAL_FEATURES = {
+    scanner_scan: 50,
+    scanner_auto_refresh: 10,
+    simulation: 30,
+    ai_query: 100,
+    code_export: 20,
+    advanced_transaction: 50,
+  };
+  
+  const maxPossibleUsage = Object.values(FREE_TRIAL_FEATURES).reduce((sum, limit) => sum + limit, 0);
+  const usagePercent = (trialStatus.totalUsage / maxPossibleUsage) * 100;
 
   return (
     <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-4 rounded-lg mb-4">
@@ -57,7 +68,7 @@ export function FreeTrialBanner() {
       <div className="mt-3">
         <div className="flex items-center justify-between text-sm mb-1">
           <span>Trial Usage</span>
-          <span>{trialStatus.totalUsage} / ~200 features</span>
+          <span>{trialStatus.totalUsage} / {maxPossibleUsage} features</span>
         </div>
         <div className="w-full bg-white/20 rounded-full h-2">
           <div

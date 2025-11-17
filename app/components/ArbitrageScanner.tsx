@@ -36,6 +36,8 @@ import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { executeArbitrage, validateOpportunity, calculateSafeSlippage, ExecutionConfig } from '../lib/pools/execution';
 import { getUserMessage } from '../lib/error-handling';
+import { AnimatedInput } from './ui/AnimatedInput';
+import { AnimatedSelect } from './ui/AnimatedSelect';
 
 interface ArbitrageScannerProps {
   onBuildTransaction?: (opportunity: ArbitrageOpportunity) => void;
@@ -272,9 +274,15 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
         onSelectOpportunity={setSelectedOpportunity}
         onBuildTransaction={handleBuildTransaction}
       />
-      <div className="h-full flex flex-col bg-slate-900 text-white">
+      <div className="h-full flex flex-col animated-bg text-white relative">
+      {/* Animated background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      </div>
+      
       {/* Header */}
-      <div className="border-b border-slate-800 p-4 flex items-center justify-between">
+      <div className="relative z-10 border-b border-slate-800/50 glass p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           {onBack && (
             <button
@@ -305,7 +313,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           <button
             onClick={handleScan}
             disabled={isScanning}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded flex items-center gap-2"
+            className="btn-modern px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:from-slate-700 disabled:to-slate-700 disabled:cursor-not-allowed text-white flex items-center gap-2"
           >
             {isScanning ? (
               <>
@@ -345,46 +353,42 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
               />
             </div>
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">Refresh Interval (ms)</label>
-              <input
+              <AnimatedInput
                 type="number"
-                value={config.refreshInterval}
+                label="Refresh Interval (ms)"
+                value={config.refreshInterval.toString()}
                 onChange={(e) => setConfig(prev => ({ ...prev, refreshInterval: parseInt(e.target.value) || 10000 }))}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1"
                 min={5000}
                 max={60000}
                 step={1000}
               />
             </div>
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">Min Profit (SOL)</label>
-              <input
+              <AnimatedInput
                 type="number"
-                value={config.minProfitThreshold}
+                label="Min Profit (SOL)"
+                value={config.minProfitThreshold.toString()}
                 onChange={(e) => setConfig(prev => ({ ...prev, minProfitThreshold: parseFloat(e.target.value) || 0.001 }))}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1"
                 step={0.001}
                 min={0}
               />
             </div>
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">Min Profit %</label>
-              <input
+              <AnimatedInput
                 type="number"
-                value={config.minProfitPercent}
+                label="Min Profit %"
+                value={config.minProfitPercent.toString()}
                 onChange={(e) => setConfig(prev => ({ ...prev, minProfitPercent: parseFloat(e.target.value) || 0.1 }))}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1"
                 step={0.1}
                 min={0}
               />
             </div>
             <div>
-              <label className="text-sm text-slate-400 mb-1 block">Max Hops</label>
-              <input
+              <AnimatedInput
                 type="number"
-                value={config.maxHops}
+                label="Max Hops"
+                value={config.maxHops.toString()}
                 onChange={(e) => setConfig(prev => ({ ...prev, maxHops: parseInt(e.target.value) || 5 }))}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1"
                 min={2}
                 max={10}
               />
@@ -402,7 +406,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       )}
 
       {/* Stats Bar */}
-      <div className="border-b border-slate-800 p-4 flex items-center gap-6">
+      <div className="relative z-10 border-b border-slate-800/50 glass p-4 flex items-center gap-6">
         <div className="flex items-center gap-2">
           <span className="text-slate-400">Pools:</span>
           <span className="font-bold">{pools.length}</span>
@@ -422,15 +426,14 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       </div>
 
       {/* Filters */}
-      <div className="border-b border-slate-800 p-4 flex items-center gap-4">
+      <div className="relative z-10 border-b border-slate-800/50 glass p-4 flex items-center gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
+          <AnimatedInput
             type="text"
-            placeholder="Search by token or DEX..."
+            label="Search by token or DEX..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 rounded pl-10 pr-4 py-2"
+            particles={true}
           />
         </div>
         <select
@@ -469,7 +472,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       )}
 
       {/* Opportunities Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
         {filteredOpportunities.length === 0 ? (
           <div className="flex items-center justify-center h-full text-slate-400">
             {isScanning ? (
@@ -502,7 +505,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
                 {filteredOpportunities.map((opp) => (
                   <tr
                     key={opp.id}
-                    className="border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer"
+                    className="border-b border-slate-800/50 hover:bg-slate-800/30 cursor-pointer transition-all card-modern"
                     onClick={() => setSelectedOpportunity(opp)}
                   >
                     <td className="py-3">

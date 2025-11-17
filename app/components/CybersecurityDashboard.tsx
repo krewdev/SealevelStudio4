@@ -105,7 +105,7 @@ export function CybersecurityDashboard({ onBack }: CybersecurityDashboardProps) 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {activeTab === 'overview' && (
-          <div className="h-full overflow-y-auto p-6">
+          <div className="h-full overflow-y-auto custom-scrollbar p-6">
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -330,7 +330,7 @@ export function CybersecurityDashboard({ onBack }: CybersecurityDashboardProps) 
         )}
 
         {activeTab === 'reports' && (
-          <div className="h-full overflow-y-auto p-6">
+          <div className="h-full overflow-y-auto custom-scrollbar p-6">
             <div className="max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold text-white mb-6">Security Reports</h2>
               

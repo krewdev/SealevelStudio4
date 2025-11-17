@@ -951,7 +951,7 @@ The model will continuously improve based on real-world usage and feedback.`
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 border-r border-gray-700 bg-gray-800 overflow-y-auto">
+        <div className="w-64 border-r border-gray-700 bg-gray-800 overflow-y-auto custom-scrollbar">
           <div className="p-4">
             <h2 className="text-sm font-semibold text-gray-400 uppercase mb-3">Categories</h2>
             <div className="space-y-2">
@@ -981,7 +981,7 @@ The model will continuously improve based on real-world usage and feedback.`
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
           {selectedDoc ? (
             <div className="max-w-4xl mx-auto">
               <div className="mb-6">

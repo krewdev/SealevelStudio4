@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -29,6 +29,10 @@ import { TransactionBundler } from './components/TransactionBundler';
 import { AdvertisingBots } from './components/AdvertisingBots';
 import { SocialFeatures } from './components/SocialFeatures';
 import { ServiceBot } from './components/ServiceBot';
+import { AdminAnalytics } from './components/AdminAnalytics';
+import { SealPresale } from './components/SealPresale';
+import { AICyberPlayground } from './components/AICyberPlayground';
+import { RevenueLanding } from './components/RevenueLanding';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -674,42 +678,187 @@ function Header({
 // 2. Sidebar Component
 function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveView: (view: string) => void }) {
   const navItems = [
-    { id: 'inspector', label: 'Account Inspector', icon: <Search className="h-4 w-4" /> },
-    { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" /> },
-    { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" /> },
-    { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" /> },
-    { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" /> },
-    { id: 'premium', label: 'Premium Services', icon: <Zap className="h-4 w-4" /> },
+    // Core Tools
+    { id: 'inspector', label: 'Account Inspector', icon: <Search className="h-4 w-4" />, section: 'core' },
+    { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
+    { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
+    
+    // Revenue
+    { id: 'presale', label: 'SEAL Presale', icon: <TrendingUp className="h-4 w-4" />, section: 'revenue', badge: 'Hot' },
+    { id: 'premium', label: 'Premium Services', icon: <Zap className="h-4 w-4" />, section: 'revenue' },
+    { id: 'revenue', label: 'Pricing & Revenue', icon: <DollarSign className="h-4 w-4" />, section: 'revenue' },
+    
+    // AI
+    { id: 'cyber-playground', label: 'AI Cyber Playground', icon: <Brain className="h-4 w-4" />, section: 'ai' },
+    
+    // Tools Hub
+    { id: 'tools', label: 'Tools Hub', icon: <Code className="h-4 w-4" />, section: 'tools' },
+    
+    // Legacy/Other
+    { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" />, section: 'other' },
+    { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" />, section: 'other' },
+    { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" />, section: 'other' },
     { id: 'web2', label: 'Web2 Tools', icon: <Terminal className="h-4 w-4" /> },
     { id: 'wallets', label: 'Wallet Manager', icon: <Wallet className="h-4 w-4" /> },
     { id: 'rd-console', label: 'R&D Console', icon: <Lock className="h-4 w-4" /> },
     { id: 'cybersecurity', label: 'Cybersecurity Dashboard', icon: <Shield className="h-4 w-4" /> },
     { id: 'docs', label: 'Documentation', icon: <Book className="h-4 w-4" /> },
+    { id: 'admin', label: 'Admin Analytics', icon: <BarChart3 className="h-4 w-4" /> },
   ];
 
+  const coreItems = navItems.filter(item => item.section === 'core');
+  const revenueItems = navItems.filter(item => item.section === 'revenue');
+  const aiItems = navItems.filter(item => item.section === 'ai');
+  const toolsItems = navItems.filter(item => item.section === 'tools');
+  const otherItems = navItems.filter(item => !item.section || item.section === 'other');
+
   return (
-    <nav className="flex w-64 flex-col border-r border-gray-700 bg-gray-900/50 p-4 shrink-0">
-      <ul className="flex-1 space-y-2">
-        {navItems.map((item) => (
-          <li key={item.id}>
-            <button
-              onClick={() => setActiveView(item.id)}
-              className={`
-                flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
-                transition-colors
-                ${
-                  activeView === item.id
-                    ? 'bg-purple-600/20 text-purple-300'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                }
-              `}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
+    <nav className="flex w-64 flex-col border-r border-gray-700 bg-gray-900/50 p-4 shrink-0 custom-scrollbar overflow-y-auto">
+      <ul className="flex-1 space-y-6">
+        {/* Core Tools */}
+        {coreItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Core</div>
+            <ul className="space-y-1">
+              {coreItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </li>
-        ))}
+        )}
+
+        {/* Revenue */}
+        {revenueItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Revenue</div>
+            <ul className="space-y-1">
+              {revenueItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge && (
+                      <span className="text-xs bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-0.5 rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {/* AI */}
+        {aiItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">AI</div>
+            <ul className="space-y-1">
+              {aiItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {/* Tools Hub */}
+        {toolsItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Tools</div>
+            <ul className="space-y-1">
+              {toolsItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {/* Other */}
+        {otherItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Other</div>
+            <ul className="space-y-1">
+              {otherItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
       </ul>
       {/* Opaque Logo */}
       <div className="mt-auto pt-8 pb-4 flex justify-center">
@@ -827,6 +976,32 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <DocsView onBack={() => setActiveView('inspector')} />;
   }
 
+  // Admin Analytics has its own full-screen layout
+  if (activeView === 'admin') {
+    return <AdminAnalytics onBack={() => setActiveView('inspector')} />;
+  }
+
+  // SEAL Presale has its own full-screen layout
+  if (activeView === 'presale') {
+    return <SealPresale onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Revenue Landing has its own full-screen layout
+  if (activeView === 'revenue') {
+    return (
+      <RevenueLanding
+        onBack={() => setActiveView('inspector')}
+        onNavigateToPresale={() => setActiveView('presale')}
+        onNavigateToPremium={() => setActiveView('premium')}
+      />
+    );
+  }
+
+  // AI Cyber Playground has its own full-screen layout
+  if (activeView === 'cyber-playground') {
+    return <AICyberPlayground onBack={() => setActiveView('inspector')} />;
+  }
+
   // Default single-column layout for other views
   return (
     <>
@@ -886,8 +1061,10 @@ function ExporterView() {
 
 // Main App Component
 export default function App() {
+  // ALL HOOKS MUST BE CALLED AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'tutorial' | 'app'>('landing');
   const [activeView, setActiveView] = useState('inspector');
+  const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
   const { publicKey } = useWallet();
   const { network, setNetwork } = useNetwork();
   const { shouldShowTutorial, completeTutorial } = useTutorial();
@@ -896,6 +1073,13 @@ export default function App() {
   const connection = useMemo(() => {
     return new Connection(NETWORKS[network].rpcUrl, 'confirmed');
   }, [network]);
+
+  // Open console when nav item is clicked
+  useEffect(() => {
+    if (activeView === 'rd-console') {
+      setRdConsoleMinimized(false);
+    }
+  }, [activeView]);
 
   const handleGetStarted = () => {
     if (shouldShowTutorial('accountInspector') || shouldShowTutorial('instructionAssembler')) {
@@ -922,15 +1106,7 @@ export default function App() {
   }
 
   // Main app interface
-  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot';
-  const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
-  
-  // Open console when nav item is clicked
-  useEffect(() => {
-    if (activeView === 'rd-console') {
-      setRdConsoleMinimized(false);
-    }
-  }, [activeView]);
+  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools' || activeView === 'revenue';
   
   return (
     <ClientOnly>

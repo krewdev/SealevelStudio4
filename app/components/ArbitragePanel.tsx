@@ -77,7 +77,7 @@ export function ArbitragePanel({ onSelectOpportunity, onClose }: ArbitragePanelP
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
         {opportunities.length === 0 ? (
           <div className="text-center text-slate-400 py-8">
             {isScanning ? (

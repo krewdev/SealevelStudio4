@@ -1,0 +1,393 @@
+/* Premium Animations Library */
+
+/* Holographic Shimmer Effect */
+@keyframes holographic-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.holographic-shimmer {
+  background: linear-gradient(
+    135deg,
+    #667eea 0%,
+    #764ba2 25%,
+    #667eea 50%,
+    #764ba2 75%,
+    #667eea 100%
+  );
+  background-size: 200% 200%;
+  animation: holographic-shimmer 3s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Particle System */
+.particle-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: rgba(139, 92, 246, 0.6);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particle-float 3s ease-in-out infinite;
+}
+
+.particle:nth-child(2) {
+  animation-delay: 0.5s;
+  background: rgba(59, 130, 246, 0.6);
+}
+
+.particle:nth-child(3) {
+  animation-delay: 1s;
+  background: rgba(236, 72, 153, 0.6);
+}
+
+.particle:nth-child(4) {
+  animation-delay: 1.5s;
+  background: rgba(139, 92, 246, 0.6);
+}
+
+.particle:nth-child(5) {
+  animation-delay: 2s;
+  background: rgba(59, 130, 246, 0.6);
+}
+
+@keyframes particle-float {
+  0% {
+    transform: translateY(0) translateX(0) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) translateX(20px) scale(1);
+    opacity: 0;
+  }
+}
+
+/* 3D Transform Effects */
+.transform-3d {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.transform-3d:hover {
+  transform: rotateY(5deg) rotateX(-5deg) translateZ(20px);
+  transition: transform 0.3s ease;
+}
+
+/* Gradient Animations */
+.gradient-animate {
+  background: linear-gradient(-45deg, #667eea, #764ba2, #667eea, #764ba2);
+  background-size: 400% 400%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Glow Pulse Effects */
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.6);
+  }
+}
+
+.glow-pulse-blue {
+  animation: glow-pulse-blue 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse-blue {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.6);
+  }
+}
+
+.glow-pulse-green {
+  animation: glow-pulse-green 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
+  }
+}
+
+/* Micro-interaction Library */
+.micro-bounce {
+  transition: transform 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.micro-bounce:active {
+  transform: scale(0.95);
+}
+
+.micro-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.micro-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.micro-scale {
+  transition: transform 0.2s ease;
+}
+
+.micro-scale:hover {
+  transform: scale(1.05);
+}
+
+.micro-rotate {
+  transition: transform 0.3s ease;
+}
+
+.micro-rotate:hover {
+  transform: rotate(5deg);
+}
+
+/* Loading Spinner with Holographic Effect */
+.spinner-holographic {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(139, 92, 246, 0.2);
+  border-top: 4px solid rgba(139, 92, 246, 0.8);
+  border-right: 4px solid rgba(59, 130, 246, 0.8);
+  border-radius: 50%;
+  animation: spin-holographic 1s linear infinite;
+}
+
+@keyframes spin-holographic {
+  0% {
+    transform: rotate(0deg);
+    border-top-color: rgba(139, 92, 246, 0.8);
+    border-right-color: rgba(59, 130, 246, 0.8);
+  }
+  25% {
+    border-top-color: rgba(59, 130, 246, 0.8);
+    border-right-color: rgba(236, 72, 153, 0.8);
+  }
+  50% {
+    border-top-color: rgba(236, 72, 153, 0.8);
+    border-right-color: rgba(139, 92, 246, 0.8);
+  }
+  75% {
+    border-top-color: rgba(139, 92, 246, 0.8);
+    border-right-color: rgba(59, 130, 246, 0.8);
+  }
+  100% {
+    transform: rotate(360deg);
+    border-top-color: rgba(139, 92, 246, 0.8);
+    border-right-color: rgba(59, 130, 246, 0.8);
+  }
+}
+
+/* Ripple Effect */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.ripple:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Morphing Background */
+.morph-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+  animation: morph 8s ease-in-out infinite;
+}
+
+@keyframes morph {
+  0%, 100% {
+    border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+  }
+  25% {
+    border-radius: 70% 30% 30% 70% / 70% 70% 30% 30%;
+  }
+  50% {
+    border-radius: 30% 70% 70% 30% / 70% 30% 30% 70%;
+  }
+  75% {
+    border-radius: 70% 30% 30% 70% / 30% 70% 70% 30%;
+  }
+}
+
+/* Text Reveal Animation */
+.text-reveal {
+  overflow: hidden;
+  position: relative;
+}
+
+.text-reveal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
+  animation: text-reveal-sweep 2s ease-in-out infinite;
+}
+
+@keyframes text-reveal-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Floating Animation */
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Neon Glow Effect */
+.neon-glow {
+  text-shadow: 
+    0 0 10px rgba(139, 92, 246, 0.8),
+    0 0 20px rgba(139, 92, 246, 0.6),
+    0 0 30px rgba(139, 92, 246, 0.4);
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 10px rgba(139, 92, 246, 0.8),
+      0 0 20px rgba(139, 92, 246, 0.6),
+      0 0 30px rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    text-shadow: 
+      0 0 20px rgba(139, 92, 246, 1),
+      0 0 30px rgba(139, 92, 246, 0.8),
+      0 0 40px rgba(139, 92, 246, 0.6);
+  }
+}
+
+/* Matrix Rain Effect (for backgrounds) */
+.matrix-rain {
+  position: relative;
+  overflow: hidden;
+}
+
+.matrix-rain::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(139, 92, 246, 0.1),
+    transparent
+  );
+  animation: matrix-fall 3s linear infinite;
+}
+
+@keyframes matrix-fall {
+  0% {
+    top: -100%;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+/* Holographic Border */
+.holographic-border {
+  position: relative;
+  border: 2px solid transparent;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8)) padding-box,
+              linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.5)) border-box;
+  animation: border-rotate 3s linear infinite;
+}
+
+@keyframes border-rotate {
+  0% {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8)) padding-box,
+                linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.5)) border-box;
+  }
+  33% {
+    background: linear-gradient(225deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8)) padding-box,
+                linear-gradient(225deg, rgba(59, 130, 246, 0.5), rgba(236, 72, 153, 0.5), rgba(59, 130, 246, 0.5)) border-box;
+  }
+  66% {
+    background: linear-gradient(315deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8)) padding-box,
+                linear-gradient(315deg, rgba(236, 72, 153, 0.5), rgba(139, 92, 246, 0.5), rgba(236, 72, 153, 0.5)) border-box;
+  }
+  100% {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.8)) padding-box,
+                linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.5)) border-box;
+  }
+}
+

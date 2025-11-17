@@ -139,7 +139,21 @@ export function CybersecurityFinder({ onBack }: CybersecurityFinderProps) {
         addToConsole(fixerReport, 'fixer');
       }
     } catch (error) {
-      addToConsole(`Failed to complete analysis: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Provide helpful error message for missing API key
+      if (errorMessage.includes('Gemini API key not configured')) {
+        addToConsole('⚠️ Gemini API key is not configured.', 'error');
+        addToConsole('', 'error');
+        addToConsole('To use the Cybersecurity Finder:', 'error');
+        addToConsole('1. Get an API key from https://ai.google.dev/', 'error');
+        addToConsole('2. Add it to your .env.local file as: GEMINI_API_KEY=your-key-here', 'error');
+        addToConsole('3. Restart your development server', 'error');
+        addToConsole('', 'error');
+        addToConsole('For production, add it in Vercel project settings → Environment Variables.', 'error');
+      } else {
+        addToConsole(`Failed to complete analysis: ${errorMessage}`, 'error');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -687,7 +701,7 @@ Shell Environment Commands (for pen testing):
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 text-sm font-mono">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2 text-sm font-mono">
             {consoleOutput.length === 0 ? (
               <div className="text-gray-500">
                 <div>Welcome to the AI Cybersecurity Finder!</div>

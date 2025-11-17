@@ -118,7 +118,14 @@ export function ServiceBot({ onBack, context }: ServiceBotProps) {
       console.error('Service bot error:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       setError(errorMessage);
-      addMessage('assistant', `I apologize, but I encountered an error: ${errorMessage}. Please try again or check your API configuration.`);
+      
+      // Provide helpful error message for missing API key
+      let userMessage = `I apologize, but I encountered an error: ${errorMessage}.`;
+      if (errorMessage.includes('OpenAI API key not configured')) {
+        userMessage = `⚠️ OpenAI API key is not configured.\n\nTo use the Service Bot:\n1. Get an API key from https://platform.openai.com/api-keys\n2. Add it to your .env.local file as: OPENAI_API_KEY=sk-your-key-here\n3. Restart your development server\n\nFor production, add it in Vercel project settings → Environment Variables.`;
+      }
+      
+      addMessage('assistant', userMessage);
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +196,7 @@ export function ServiceBot({ onBack, context }: ServiceBotProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
         {messages.map((message) => (
           <div
             key={message.id}

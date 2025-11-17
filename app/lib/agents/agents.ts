@@ -58,6 +58,22 @@ export const AVAILABLE_AGENTS: Agent[] = [
     color: 'bg-blue-600',
     enabled: true,
   },
+  {
+    id: 'context-manager-agent',
+    name: 'Context Manager Agent',
+    description: 'Manages agent context and memory using GET requests for state communication',
+    icon: '🧠',
+    color: 'bg-purple-600',
+    enabled: true,
+  },
+  {
+    id: 'memory-agent',
+    name: 'Memory Agent',
+    description: 'Maintains long-term memory and context across agent sessions',
+    icon: '💾',
+    color: 'bg-indigo-600',
+    enabled: true,
+  },
 ];
 
 export function getAgentById(id: string): Agent | undefined {

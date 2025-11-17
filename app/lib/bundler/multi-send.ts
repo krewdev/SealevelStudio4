@@ -16,9 +16,14 @@ import { MultiSendConfig, MultiSendResult, MultiSendEstimate, MultiSendRecipient
 import { walletRegistry } from '../wallet-manager';
 
 const MAX_RECIPIENTS = 50;
-const MAX_TRANSACTION_SIZE = 1232; // Solana transaction size limit
+const MAX_TRANSACTION_SIZE = 1232; // Solana transaction size limit (actual limit is 1232 bytes)
+// Conservative limit to account for serialization overhead and multiple signers
+const SAFE_TRANSACTION_SIZE = 1200; // Leave buffer for signers and serialization overhead
 const BASE_FEE = 5000; // Base transaction fee in lamports
-const ACCOUNT_CREATION_SIZE = 165; // Approximate bytes per account creation
+const ACCOUNT_CREATION_SIZE = 200; // More accurate: account creation instruction + account key overhead
+const TRANSFER_INSTRUCTION_SIZE = 180; // System transfer instruction size
+const SIGNER_OVERHEAD = 64; // Each additional signer adds ~64 bytes (public key + signature space)
+const TRANSACTION_HEADER_SIZE = 120; // Transaction header + recent blockhash + fee payer
 
 // Memo Program ID (Solana's memo program)
 const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');
@@ -38,7 +43,10 @@ export async function estimateMultiSend(
   let estimatedSize = 0;
   
   // Base transaction overhead
-  estimatedSize += 100; // Transaction header
+  estimatedSize += TRANSACTION_HEADER_SIZE;
+  
+  // Count signers (payer + new account keypairs)
+  let signerCount = 1; // Payer is always a signer
   
   for (const recipient of recipients) {
     totalAmount += recipient.amount;
@@ -46,6 +54,7 @@ export async function estimateMultiSend(
     if (recipient.address === 'new' || config.createAccounts) {
       accountsToCreate++;
       estimatedSize += ACCOUNT_CREATION_SIZE;
+      signerCount++; // Each new account keypair is a signer
     } else {
       // Check if account exists
       try {
@@ -54,21 +63,30 @@ export async function estimateMultiSend(
         if (!accountInfo && config.createAccounts) {
           accountsToCreate++;
           estimatedSize += ACCOUNT_CREATION_SIZE;
+          signerCount++; // New account keypair is a signer
         }
       } catch {
         // Invalid address, will create account
         accountsToCreate++;
         estimatedSize += ACCOUNT_CREATION_SIZE;
+        signerCount++; // New account keypair is a signer
       }
     }
     
-    // Transfer instruction size
-    estimatedSize += 200; // Approximate per transfer
+    // Transfer instruction size (only if not creating account, as createAccount includes transfer)
+    if (recipient.address !== 'new' && !config.createAccounts) {
+      estimatedSize += TRANSFER_INSTRUCTION_SIZE;
+    }
+  }
+  
+  // Add overhead for additional signers (beyond the payer)
+  if (signerCount > 1) {
+    estimatedSize += (signerCount - 1) * SIGNER_OVERHEAD;
   }
   
   // Priority fee instruction
   if (config.priorityFee) {
-    estimatedSize += 200;
+    estimatedSize += TRANSFER_INSTRUCTION_SIZE;
   }
   
   // Memo instruction
@@ -81,12 +99,15 @@ export async function estimateMultiSend(
     (config.priorityFee || 0) +
     (accountsToCreate * rentExempt);
   
+  // Use conservative limit to account for serialization overhead
+  const canFit = estimatedSize < SAFE_TRANSACTION_SIZE;
+  
   return {
     totalAmount,
     totalFees: totalFees / LAMPORTS_PER_SOL,
     accountsToCreate,
     transactionSize: estimatedSize,
-    canFitInTransaction: estimatedSize < MAX_TRANSACTION_SIZE,
+    canFitInTransaction: canFit,
   };
 }
 
@@ -98,8 +119,6 @@ export async function buildMultiSendTransaction(
   payer: PublicKey,
   config: MultiSendConfig
 ): Promise<{ transaction: Transaction; signers: Keypair[]; estimate: MultiSendEstimate; createdWallets: Array<{ keypair: Keypair; label?: string }> }> {
-  const transaction = new Transaction();
-  const signers: Keypair[] = [];
   const maxRecipients = config.maxRecipients || MAX_RECIPIENTS;
   
   if (config.recipients.length > maxRecipients) {
@@ -109,18 +128,14 @@ export async function buildMultiSendTransaction(
   // Get estimate first
   const estimate = await estimateMultiSend(connection, config);
   
-  if (!estimate.canFitInTransaction) {
-    throw new Error(
-      `Transaction too large (${estimate.transactionSize} bytes). ` +
-      `Maximum ${MAX_TRANSACTION_SIZE} bytes. Reduce number of recipients.`
-    );
-  }
-
+  // Build transaction to get actual size
+  const transaction = new Transaction();
+  const signers: Keypair[] = [];
   const rentExempt = await connection.getMinimumBalanceForRentExemption(0);
   let accountsCreated = 0;
   const createdWallets: Array<{ keypair: Keypair; label?: string }> = [];
-
-  // Process each recipient
+  
+  // Process each recipient to build actual transaction
   for (const recipient of config.recipients) {
     let recipientPubkey: PublicKey;
     let shouldCreateAccount = false;
@@ -131,7 +146,6 @@ export async function buildMultiSendTransaction(
       signers.push(newKeypair);
       recipientPubkey = newKeypair.publicKey;
       shouldCreateAccount = true;
-      // Store for registration
       createdWallets.push({ keypair: newKeypair, label: recipient.label });
     } else {
       try {
@@ -150,7 +164,6 @@ export async function buildMultiSendTransaction(
         signers.push(newKeypair);
         recipientPubkey = newKeypair.publicKey;
         shouldCreateAccount = true;
-        // Store for registration
         createdWallets.push({ keypair: newKeypair, label: recipient.label });
       }
     }
@@ -158,7 +171,6 @@ export async function buildMultiSendTransaction(
     // Create account if needed
     if (shouldCreateAccount) {
       const totalLamports = rentExempt + (recipient.amount * LAMPORTS_PER_SOL);
-      
       transaction.add(
         SystemProgram.createAccount({
           fromPubkey: payer,
@@ -186,7 +198,7 @@ export async function buildMultiSendTransaction(
     transaction.add(
       SystemProgram.transfer({
         fromPubkey: payer,
-        toPubkey: payer, // Self-transfer for priority fee
+        toPubkey: payer,
         lamports: config.priorityFee,
       })
     );
@@ -202,12 +214,33 @@ export async function buildMultiSendTransaction(
     transaction.add(memoInstruction);
   }
 
+  // Set fee payer and get blockhash for accurate size calculation
+  transaction.feePayer = payer;
+  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+  transaction.recentBlockhash = blockhash;
+
+  // Get actual serialized size (critical for accurate size checking)
+  const serialized = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+  const actualSize = serialized.length;
+  
+  // Update estimate with actual size
+  estimate.transactionSize = actualSize;
+  estimate.canFitInTransaction = actualSize < SAFE_TRANSACTION_SIZE;
+  
+  if (!estimate.canFitInTransaction) {
+    throw new Error(
+      `Transaction too large (${actualSize} bytes). ` +
+      `Maximum safe size: ${SAFE_TRANSACTION_SIZE} bytes (hard limit: ${MAX_TRANSACTION_SIZE} bytes). ` +
+      `With ${signers.length} signer(s), reduce number of recipients or remove account creation.`
+    );
+  }
+
   return { 
     transaction, 
     signers, 
     estimate, 
     createdWallets 
-  } as { transaction: Transaction; signers: Keypair[]; estimate: MultiSendEstimate; createdWallets: Array<{ keypair: Keypair; label?: string }> };
+  };
 }
 
 /**

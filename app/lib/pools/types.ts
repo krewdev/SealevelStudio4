@@ -64,7 +64,7 @@ export interface ArbitragePath {
 export interface ArbitrageOpportunity {
   id: string;
   path: ArbitragePath;
-  type: 'simple' | 'multi_hop' | 'wrap_unwrap' | 'cross_protocol';
+  type: 'simple' | 'multi_hop' | 'wrap_unwrap' | 'cross_protocol' | 'flash_loan' | 'mev';
   profit: number; // Estimated profit in SOL
   profitPercent: number; // Profit as percentage of input
   inputAmount: bigint;
@@ -76,6 +76,10 @@ export interface ArbitrageOpportunity {
   timestamp: Date;
   expiresAt?: Date; // Optional: when opportunity might expire
   jupiterQuote?: any; // Jupiter quote response for execution
+  // Advanced features
+  requiresFlashLoan?: boolean;
+  jitoBundleId?: string;
+  signalType?: 'new_pool' | 'large_swap' | 'lsd_depeg' | 'oracle_update';
 }
 
 export interface ScannerConfig {

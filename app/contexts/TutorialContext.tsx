@@ -28,22 +28,30 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     exporter: false,
   });
 
-  // Load tutorial state from localStorage on mount
+  // Load tutorial state from localStorage on mount (client-side only)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    if (typeof window !== 'undefined') {
       try {
-        const parsed = JSON.parse(saved);
-        setTutorials(prev => ({ ...prev, ...parsed }));
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setTutorials(prev => ({ ...prev, ...parsed }));
+        }
       } catch (error) {
         console.warn('Failed to parse tutorial state:', error);
       }
     }
   }, []);
 
-  // Save tutorial state to localStorage whenever it changes
+  // Save tutorial state to localStorage whenever it changes (client-side only)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tutorials));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tutorials));
+      } catch (error) {
+        console.warn('Failed to save tutorial state:', error);
+      }
+    }
   }, [tutorials]);
 
   const completeTutorial = (section: keyof TutorialState) => {

@@ -5,8 +5,9 @@ import { FeatureType, UsageRecord, UsageStats, FreeTrialStatus } from './types';
 import { SEAL_TOKEN_ECONOMICS } from '../seal-token/config';
 
 // In-memory storage (in production, use database)
-const usageRecords: Map<string, UsageRecord[]> = new Map();
-const freeTrials: Map<string, FreeTrialStatus> = new Map();
+// Exported for admin analytics access
+export const usageRecords: Map<string, UsageRecord[]> = new Map();
+export const freeTrials: Map<string, FreeTrialStatus> = new Map();
 
 // Free trial configuration
 const FREE_TRIAL_DAYS = 7; // 7-day free trial
@@ -163,6 +164,7 @@ export function canUseFeature(userId: string, feature: FeatureType): { allowed: 
 
 /**
  * Track feature usage
+ * IMPORTANT: This function checks limits BEFORE tracking to prevent exceeding limits
  */
 export function trackUsage(
   userId: string,
@@ -201,11 +203,20 @@ export function trackUsage(
     );
   }
   
-  // Check if usage is allowed (for non-premium features)
-  if (!isPremiumService) {
+  // Check if usage is allowed BEFORE tracking (for non-premium features)
+  if (!isPremiumService && isTrialActive) {
     const canUse = canUseFeature(userId, feature);
-    if (!canUse.allowed && isTrialActive) {
+    if (!canUse.allowed) {
       throw new Error(canUse.reason || 'Feature usage not allowed');
+    }
+    
+    // Double-check: Verify we haven't exceeded the limit
+    const used = trial.featuresUsed[feature] || 0;
+    const limit = FREE_TRIAL_FEATURES[feature];
+    if (limit > 0 && used >= limit) {
+      throw new Error(
+        `Free trial limit reached for ${feature}. Used: ${used}/${limit}`
+      );
     }
   }
   
@@ -226,8 +237,12 @@ export function trackUsage(
   }
   usageRecords.get(userId)!.push(record);
   
-  // Update free trial usage
+  // Update free trial usage AFTER successful tracking
   if (isTrialActive) {
+    // Ensure feature counter exists
+    if (trial.featuresUsed[feature] === undefined) {
+      trial.featuresUsed[feature] = 0;
+    }
     trial.featuresUsed[feature]++;
     trial.totalUsage++;
     freeTrials.set(userId, trial);

@@ -1014,7 +1014,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 space-y-2 overflow-x-visible">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2 overflow-x-visible">
             {SIMPLE_BLOCK_CATEGORIES[activeCategory].map(block => (
               <BlockTooltip key={block.id} block={block}>
                 <div 
@@ -1041,8 +1041,39 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         </aside>
 
         {/* Center: Canvas */}
-        <main className="flex-1 flex flex-col relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] bg-slate-950 min-h-0 overflow-hidden">
-          <div className="absolute top-4 left-4 right-4 h-12 pointer-events-none flex justify-between items-start z-10">
+        <main 
+          className="flex-1 flex flex-col relative min-h-0 overflow-hidden"
+          style={{
+            // Dot grid background
+            backgroundImage: 'radial-gradient(#1e293b_1px, transparent_1px)',
+            backgroundSize: '16px 16px',
+            backgroundColor: '#0f172a', // slate-950
+            // Sea Level Studios logo as opaque background behind dot grid
+            position: 'relative',
+          }}
+        >
+          {/* Logo background layer - behind dot grid */}
+          <div 
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'url(/sea-level-logo.png)',
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: 0.08, // Very subtle, opaque background
+              zIndex: 0,
+            }}
+          />
+          {/* Dot grid overlay */}
+          <div 
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'radial-gradient(#1e293b_1px, transparent_1px)',
+              backgroundSize: '16px 16px',
+              zIndex: 1,
+            }}
+          />
+          <div className="absolute top-4 left-4 right-4 h-12 pointer-events-none flex justify-between items-start z-20">
             <div className="pointer-events-auto flex gap-2">
               <button 
                 onClick={buildTransaction}
@@ -1090,18 +1121,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0">
+          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0 relative z-10">
             {simpleWorkflow.length === 0 ? (
-              <div 
-                className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50 relative w-full"
-                style={{
-                  backgroundImage: 'url(/logo-2.png)',
-                  backgroundSize: 'contain',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  opacity: 0.1
-                }}
-              >
+              <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50 relative w-full">
                 <div className="relative z-10 flex flex-col items-center gap-4">
                   <Layers size={48} className="text-slate-700" />
                   <p>Drag & drop blocks here to build your transaction</p>

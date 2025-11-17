@@ -41,6 +41,8 @@ import {
   aesDecrypt,
 } from '../lib/crypto/decryption';
 import { Keypair, PublicKey } from '@solana/web3.js';
+import { BrowserVulnerabilityScanner, Vulnerability } from '../lib/security/browser-scanner';
+import { Shield, AlertTriangle, CheckCircle, Activity, Radio } from 'lucide-react';
 
 interface Command {
   input: string;
@@ -117,12 +119,24 @@ const COMMAND_HELP: CommandHelp[] = [
     usage: 'clear',
     examples: ['clear'],
   },
-  {
-    name: 'help',
-    description: 'Show help',
-    usage: 'help [command]',
-    examples: ['help', 'help base64'],
-  },
+    {
+      name: 'help',
+      description: 'Show help',
+      usage: 'help [command]',
+      examples: ['help', 'help base64'],
+    },
+    {
+      name: 'scan',
+      description: 'Control vulnerability scanner',
+      usage: 'scan <start|stop|stats|list|clear>',
+      examples: ['scan start', 'scan stats', 'scan list'],
+    },
+    {
+      name: 'mode',
+      description: 'Switch between console and scanner modes',
+      usage: 'mode <console|scanner>',
+      examples: ['mode scanner', 'mode console'],
+    },
 ];
 
 interface AdvancedRAndDConsoleProps {
@@ -136,6 +150,10 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isMinimized, setIsMinimized] = useState(initialMinimized);
+  const [scannerMode, setScannerMode] = useState<'console' | 'scanner'>('console');
+  const [isScanning, setIsScanning] = useState(false);
+  const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
+  const scannerRef = useRef<BrowserVulnerabilityScanner | null>(null);
   
   // Sync with external state
   useEffect(() => {
@@ -169,6 +187,67 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
       type,
     }]);
   }, []);
+
+  // Expose addCommand for scanner callbacks (needs to be stable)
+  const addCommandRef = useRef(addCommand);
+  useEffect(() => {
+    addCommandRef.current = addCommand;
+  }, [addCommand]);
+
+  // Initialize scanner
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      scannerRef.current = new BrowserVulnerabilityScanner();
+      
+      // Subscribe to vulnerability detections
+      const unsubscribe = scannerRef.current.onVulnerabilityDetected((vuln) => {
+        setVulnerabilities(prev => {
+          // Avoid duplicates
+          if (prev.some(v => v.id === vuln.id)) return prev;
+          return [vuln, ...prev];
+        });
+        
+        // Auto-add to console in scanner mode
+        if (scannerMode === 'scanner') {
+          const severityColor = {
+            critical: '🔴',
+            high: '🟠',
+            medium: '🟡',
+            low: '🔵',
+            info: '⚪'
+          }[vuln.severity] || '⚪';
+          
+          addCommandRef.current(
+            'scanner',
+            `${severityColor} [${vuln.severity.toUpperCase()}] ${vuln.title}\n${vuln.description}\nSource: ${vuln.source}\n${vuln.recommendation ? `\n💡 ${vuln.recommendation}` : ''}`,
+            vuln.severity === 'critical' || vuln.severity === 'high' ? 'error' : 'info'
+          );
+        }
+      });
+
+      return () => {
+        unsubscribe();
+        scannerRef.current?.stopMonitoring();
+      };
+    }
+  }, [scannerMode]);
+
+  // Start/stop scanning
+  const toggleScanner = useCallback(() => {
+    if (!scannerRef.current) return;
+
+    if (isScanning) {
+      scannerRef.current.stopMonitoring();
+      setIsScanning(false);
+      addCommand('scanner', '🛑 Vulnerability scanner stopped', 'info');
+    } else {
+      scannerRef.current.clear();
+      setVulnerabilities([]);
+      scannerRef.current.startMonitoring();
+      setIsScanning(true);
+      addCommand('scanner', '🟢 Real-time vulnerability scanner started\nMonitoring: Network requests, DOM mutations, Storage, Sensitive data', 'success');
+    }
+  }, [isScanning, addCommand]);
 
   const executeCommand = useCallback(async (cmd: string) => {
     const parts = cmd.trim().split(/\s+/);
@@ -365,6 +444,49 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
           break;
         }
 
+        case 'scan':
+        case 'scanner': {
+          if (args[0] === 'start') {
+            toggleScanner();
+          } else if (args[0] === 'stop') {
+            if (isScanning) toggleScanner();
+          } else if (args[0] === 'stats') {
+            if (scannerRef.current) {
+              const stats = scannerRef.current.getStats();
+              addCommand(cmd, `Scanner Statistics:\n\nTotal Threats: ${stats.totalThreats}\nCritical: ${stats.critical}\nHigh: ${stats.high}\nMedium: ${stats.medium}\nLow: ${stats.low}\n\nBy Type:\n${Object.entries(stats.byType).map(([type, count]) => `  ${type}: ${count}`).join('\n')}\n\nStatus: ${isScanning ? '🟢 Active' : '🔴 Inactive'}`);
+            } else {
+              addCommand(cmd, 'Scanner not initialized', 'error');
+            }
+          } else if (args[0] === 'list') {
+            const vulns = scannerRef.current?.getVulnerabilities() || [];
+            if (vulns.length === 0) {
+              addCommand(cmd, 'No vulnerabilities detected');
+            } else {
+              const output = vulns.map(v => 
+                `[${v.severity.toUpperCase()}] ${v.title}\n  Source: ${v.source}\n  Time: ${v.detectedAt.toLocaleTimeString()}`
+              ).join('\n\n');
+              addCommand(cmd, `Found ${vulns.length} vulnerability/vulnerabilities:\n\n${output}`);
+            }
+          } else if (args[0] === 'clear') {
+            scannerRef.current?.clear();
+            setVulnerabilities([]);
+            addCommand(cmd, 'Scanner history cleared');
+          } else {
+            addCommand(cmd, 'Usage: scan <start|stop|stats|list|clear>\n\n  start  - Start real-time vulnerability scanning\n  stop   - Stop scanning\n  stats  - Show scan statistics\n  list   - List all detected vulnerabilities\n  clear  - Clear vulnerability history', 'info');
+          }
+          return;
+        }
+
+        case 'mode': {
+          if (args[0] === 'scanner' || args[0] === 'console') {
+            setScannerMode(args[0] as 'scanner' | 'console');
+            addCommand(cmd, `Switched to ${args[0]} mode`);
+          } else {
+            addCommand(cmd, `Current mode: ${scannerMode}\nUsage: mode <console|scanner>`, 'info');
+          }
+          return;
+        }
+
         case 'clear': {
           setCommands([]);
           return;
@@ -450,11 +572,67 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center gap-2">
-          <Terminal className="text-purple-400" size={20} />
-          <h2 className="text-lg font-bold text-white">Advanced R&D Console</h2>
-          <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">R&D Only</span>
+          {scannerMode === 'scanner' ? (
+            <Shield className="text-red-400" size={20} />
+          ) : (
+            <Terminal className="text-purple-400" size={20} />
+          )}
+          <h2 className="text-lg font-bold text-white">
+            {scannerMode === 'scanner' ? 'Browser Vulnerability Scanner' : 'Advanced R&D Console'}
+          </h2>
+          {scannerMode === 'scanner' ? (
+            <div className="flex items-center gap-2">
+              {isScanning ? (
+                <div className="flex items-center gap-1 text-xs text-green-400 bg-green-900/30 px-2 py-0.5 rounded">
+                  <Radio size={12} className="animate-pulse" />
+                  <span>Scanning</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-xs text-gray-400 bg-gray-900/30 px-2 py-0.5 rounded">
+                  <Radio size={12} />
+                  <span>Inactive</span>
+                </div>
+              )}
+              {vulnerabilities.length > 0 && (
+                <div className="flex items-center gap-1 text-xs text-red-400 bg-red-900/30 px-2 py-0.5 rounded">
+                  <AlertTriangle size={12} />
+                  <span>{vulnerabilities.length} threats</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-yellow-400 bg-yellow-900/30 px-2 py-0.5 rounded">R&D Only</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Mode Toggle */}
+          <button
+            onClick={() => setScannerMode(scannerMode === 'console' ? 'scanner' : 'console')}
+            className={`p-2 rounded text-sm transition-colors ${
+              scannerMode === 'scanner' 
+                ? 'bg-red-900/50 text-red-400 hover:bg-red-900/70' 
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            }`}
+            title={scannerMode === 'console' ? 'Switch to Scanner Mode' : 'Switch to Console Mode'}
+          >
+            {scannerMode === 'scanner' ? <Terminal size={16} /> : <Shield size={16} />}
+          </button>
+          
+          {/* Scanner Toggle (only in scanner mode) */}
+          {scannerMode === 'scanner' && (
+            <button
+              onClick={toggleScanner}
+              className={`p-2 rounded transition-colors ${
+                isScanning
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+              title={isScanning ? 'Stop Scanner' : 'Start Scanner'}
+            >
+              {isScanning ? <Activity size={16} className="animate-pulse" /> : <Radio size={16} />}
+            </button>
+          )}
+          
           <button
             onClick={() => setCommands([])}
             className="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-white"
@@ -475,13 +653,32 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
       {/* Output Area */}
       <div
         ref={outputRef}
-        className="flex-1 overflow-y-auto p-4 font-mono text-sm bg-black text-green-400"
+        className="flex-1 overflow-y-auto custom-scrollbar p-4 font-mono text-sm bg-black text-green-400"
         style={{ fontFamily: 'monospace' }}
       >
         <div className="mb-2 text-gray-500">
-          <div>Advanced Decryption & R&D Console</div>
-          <div>Type 'help' for available commands</div>
-          <div className="mt-2 text-yellow-400">⚠️ WARNING: For R&D purposes only. Not for production use.</div>
+          {scannerMode === 'scanner' ? (
+            <>
+              <div className="text-red-400 font-bold">🛡️ Real-Time Browser Vulnerability Scanner</div>
+              <div>Detecting XSS, CSRF, injection attacks, insecure connections, and more...</div>
+              {isScanning ? (
+                <div className="mt-2 text-green-400">🟢 Scanner active - Monitoring in real-time</div>
+              ) : (
+                <div className="mt-2 text-gray-400">Type 'scan start' to begin monitoring</div>
+              )}
+              {vulnerabilities.length > 0 && (
+                <div className="mt-2 text-red-400">
+                  ⚠️ {vulnerabilities.length} vulnerability/vulnerabilities detected
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>Advanced Decryption & R&D Console</div>
+              <div>Type 'help' for available commands</div>
+              <div className="mt-2 text-yellow-400">⚠️ WARNING: For R&D purposes only. Not for production use.</div>
+            </>
+          )}
         </div>
         {commands.map((cmd, i) => (
           <div key={i} className="mb-4">

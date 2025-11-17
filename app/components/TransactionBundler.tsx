@@ -232,7 +232,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
 
       <div className="flex-1 overflow-hidden flex">
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
           {/* Settings */}
           <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
             <div className="flex items-center gap-2 mb-4">
@@ -326,7 +326,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
             </div>
 
             {/* Recipients List */}
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
               {recipients.map((recipient, index) => (
                 <div key={index} className="flex items-center gap-2 p-3 bg-gray-900/50 rounded border border-gray-700">
                   <div className="flex-1 grid grid-cols-2 gap-2">
@@ -432,7 +432,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
                   <div className={`text-xl font-bold ${
                     estimate.canFitInTransaction ? 'text-green-400' : 'text-red-400'
                   }`}>
-                    {estimate.transactionSize} / 1232 bytes
+                    {estimate.transactionSize} / 1200 bytes (safe limit)
                   </div>
                 </div>
               </div>
