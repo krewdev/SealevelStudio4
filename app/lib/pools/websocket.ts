@@ -25,6 +25,10 @@ export class PoolWebSocketManager {
   private requestIdCounter = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000;
+  // Connection pooling
+  private connectionPool: Map<string, WebSocket[]> = new Map(); // endpoint -> connections
+  private maxConnectionsPerEndpoint = 10;
+  private activeSubscriptions: Map<string, string> = new Map(); // poolKey -> connectionKey
 
   /**
    * Subscribe to real-time updates for a specific pool
@@ -78,7 +82,32 @@ export class PoolWebSocketManager {
   }
 
   /**
-   * Connect to WebSocket for a specific pool
+   * Get or create WebSocket connection from pool
+   */
+  private getConnectionFromPool(endpoint: string): WebSocket | null {
+    const pool = this.connectionPool.get(endpoint) || [];
+    
+    // Find available connection (not at max subscriptions)
+    for (const ws of pool) {
+      if (ws.readyState === WebSocket.OPEN) {
+        return ws;
+      }
+    }
+    
+    // Create new connection if pool not full
+    if (pool.length < this.maxConnectionsPerEndpoint) {
+      const ws = new WebSocket(endpoint);
+      pool.push(ws);
+      this.connectionPool.set(endpoint, pool);
+      return ws;
+    }
+    
+    // Reuse least used connection
+    return pool[0] || null;
+  }
+
+  /**
+   * Connect to WebSocket for a specific pool (with connection pooling)
    */
   private connect(key: string, dex: DEXProtocol, poolId: string): void {
     try {
@@ -90,7 +119,13 @@ export class PoolWebSocketManager {
         return;
       }
 
-      const ws = new WebSocket(wsUrl);
+      // Get connection from pool
+      let ws = this.getConnectionFromPool(wsUrl);
+      
+      if (!ws) {
+        // Fallback: create new connection
+        ws = new WebSocket(wsUrl);
+      }
       
       ws.onopen = () => {
         console.log(`[WebSocket] Connected to ${dex} for pool ${poolId}`);

@@ -46,8 +46,15 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             </span>
           </div>
           <button 
-            onClick={onGetStarted}
-            className="px-5 py-2 text-sm font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onGetStarted) {
+                onGetStarted();
+              }
+            }}
+            className="px-5 py-2 text-sm font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all cursor-pointer"
           >
             Get Started
           </button>
@@ -88,8 +95,15 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
             Visual transaction builder • Real-time simulation • Arbitrage scanner • AI agents • Code export
           </p>
           <button 
-            onClick={onGetStarted}
-            className="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onGetStarted) {
+                onGetStarted();
+              }
+            }}
+            className="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30 cursor-pointer"
           >
             Get Started
           </button>
@@ -283,8 +297,15 @@ export function LandingPage({ onGetStarted }: { onGetStarted: () => void }) {
               Join developers who are shipping Solana applications faster with AI-powered tools and real-time simulation.
             </p>
             <button
-              onClick={onGetStarted}
-              className="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onGetStarted) {
+                  onGetStarted();
+                }
+              }}
+              className="px-8 py-3 text-base font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition-all shadow-lg hover:shadow-indigo-500/30 cursor-pointer"
             >
               Start Building Free
             </button>

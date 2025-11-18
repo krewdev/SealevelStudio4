@@ -26,6 +26,14 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { ContextManagerAgent, LocalStorageContextStorage, APIContextStorage } from '../lib/agents/context-manager';
 import { ContextAwareAgent, MasterContextAggregator } from '../lib/agents/context-integration';
+import { PoolScanner } from '../lib/pools/scanner';
+import { ArbitrageDetector } from '../lib/pools/arbitrage';
+import { ArbitrageOpportunity } from '../lib/pools/types';
+import { DEFAULT_SCANNER_CONFIG } from '../lib/pools/types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface AgentStatus {
   id: string;
@@ -57,12 +65,15 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [userQuery, setUserQuery] = useState('');
   const [response, setResponse] = useState<string | null>(null);
+  const [arbitrageOpportunities, setArbitrageOpportunities] = useState<ArbitrageOpportunity[]>([]);
+  const [isScanningArbitrage, setIsScanningArbitrage] = useState(false);
   const [contextManager] = useState(() => {
     const storage = typeof window !== 'undefined' 
       ? new LocalStorageContextStorage()
       : new APIContextStorage('/api/context');
     return new ContextManagerAgent(storage);
   });
+  const [scanner] = useState(() => new PoolScanner());
 
   // Initialize agents
   useEffect(() => {
@@ -118,10 +129,13 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
   const handleQuery = useCallback(async () => {
     if (!userQuery.trim()) return;
 
+    const queryLower = userQuery.toLowerCase();
+    const isArbitrageQuery = queryLower.includes('arbitrage') || queryLower.includes('find') && (queryLower.includes('opportunity') || queryLower.includes('trade'));
+
     // Create task
     const task: Task = {
       id: `task-${Date.now()}`,
-      agentId: 'master',
+      agentId: isArbitrageQuery ? 'arbitrage' : 'master',
       description: userQuery,
       status: 'in_progress',
       progress: 0,
@@ -129,62 +143,154 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
     };
     setTasks(prev => [task, ...prev]);
 
-    // Update master agent
+    // Update agents
     setAgents(prev => prev.map(a => 
-      a.id === 'master' ? { ...a, status: 'processing' as const } : a
+      (a.id === 'master' || (isArbitrageQuery && a.id === 'arbitrage')) ? { ...a, status: 'processing' as const } : a
     ));
 
-    // Simulate AI processing with context
     try {
-      // Get context via GET request
-      const contextResponse = await fetch(
-        `/api/context?agentId=master&sessionId=${publicKey?.toString() || 'default'}&action=summary`
-      );
-      const context = contextResponse.ok ? await contextResponse.json() : null;
+      // Handle arbitrage scanning
+      if (isArbitrageQuery) {
+        setIsScanningArbitrage(true);
+        setResponse('🔍 **Arbitrage Hunter Activated**\n\nScanning DEX pools for arbitrage opportunities...\n\nThis may take 10-30 seconds...');
+        
+        // Update progress
+        for (let i = 0; i <= 90; i += 10) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          setTasks(prev => prev.map(t => 
+            t.id === task.id ? { ...t, progress: i } : t
+          ));
+        }
 
-      // Simulate processing
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setTasks(prev => prev.map(t => 
-          t.id === task.id ? { ...t, progress: i } : t
-        ));
+        // Actually scan for arbitrage
+        try {
+          scanner.updateConfig(DEFAULT_SCANNER_CONFIG);
+          const state = await scanner.scan(connection);
+          
+          if (state.pools.length > 0) {
+            // Initialize Birdeye optimizer if available
+            let birdeyeOptimizer: any = undefined;
+            try {
+              const birdeyeFetcher = scanner.getFetcher('birdeye');
+              if (birdeyeFetcher) {
+                const { BirdeyeOptimizer } = await import('../lib/pools/birdeye-optimizer');
+                birdeyeOptimizer = new BirdeyeOptimizer(birdeyeFetcher as any);
+              }
+            } catch (error) {
+              console.error('Error initializing Birdeye optimizer:', error);
+            }
+            
+            const detector = new ArbitrageDetector(state.pools, DEFAULT_SCANNER_CONFIG, connection, birdeyeOptimizer);
+            const opportunities = await detector.detectOpportunities();
+            
+            // Sort by profit
+            opportunities.sort((a, b) => Number(b.profit) - Number(a.profit));
+            setArbitrageOpportunities(opportunities);
+            
+            // Update arbitrage agent
+            setAgents(prev => prev.map(a => 
+              a.id === 'arbitrage' ? { ...a, status: 'active' as const, lastActivity: new Date() } : a
+            ));
+
+            if (opportunities.length > 0) {
+              const best = opportunities[0];
+              const simpleArb = opportunities.filter(o => o.type === 'simple').length;
+              const multiHop = opportunities.filter(o => o.type === 'multi_hop').length;
+              const crossProtocol = opportunities.filter(o => o.type === 'cross_protocol').length;
+              
+              // Analyze the opportunity type and provide strategic insights
+              let strategyAdvice = '';
+              if (best.type === 'simple') {
+                strategyAdvice = '\n**Strategy Analysis:**\n• This is a classic 2-pool spatial arbitrage\n• Best executed atomically via Jito bundles to eliminate execution risk\n• Consider flash loans from Kamino for zero-capital execution';
+              } else if (best.type === 'multi_hop') {
+                strategyAdvice = '\n**Strategy Analysis:**\n• Multi-hop pathfinding using modified Dijkstra\'s algorithm\n• Higher complexity but potentially better profit margins\n• Requires careful slippage modeling across multiple pools';
+              } else if (best.type === 'cross_protocol') {
+                strategyAdvice = '\n**Strategy Analysis:**\n• Cross-protocol opportunity (e.g., DEX-DEX arbitrage)\n• May involve different fee structures (0.10% Meteora vs 0.30% Raydium)\n• Atomic execution via Jito bundles is critical for risk-free execution';
+              }
+              
+              const responseText = `✅ **Arbitrage Opportunities Found!**\n\nFound ${opportunities.length} opportunity(ies)\n• Simple (2-pool): ${simpleArb}\n• Multi-hop: ${multiHop}\n• Cross-protocol: ${crossProtocol}\n\n🏆 **Best Opportunity:**\n• Profit: ${best.profit.toFixed(6)} SOL (${best.profitPercent.toFixed(2)}%)\n• Type: ${best.type}\n• Confidence: ${(best.confidence * 100).toFixed(0)}%\n• Path: ${best.path.startToken?.symbol || 'Token A'} → ${best.path.endToken?.symbol || 'Token B'}\n• Hops: ${best.path.totalHops || 1}\n• Net Profit (after gas): ${best.netProfit.toFixed(6)} SOL${strategyAdvice}\n\n${opportunities.length > 1 ? `\n**Top ${Math.min(3, opportunities.length)} Opportunities:**\n${opportunities.slice(0, 3).map((opp, idx) => 
+                `${idx + 1}. ${opp.profit.toFixed(6)} SOL (${opp.profitPercent.toFixed(2)}%) - ${opp.type} - ${(opp.confidence * 100).toFixed(0)}% confidence`
+              ).join('\n')}` : ''}\n\n💡 **Execution Recommendations:**\n• Use Jito bundles for atomic execution (eliminates execution risk)\n• Consider Kamino flash loans for zero-capital arbitrage\n• Monitor ShredStream for MEV opportunities\n• Use the Arbitrage Scanner view to build transactions`;
+              
+              setResponse(responseText);
+            } else {
+              setResponse(`🔍 **Scan Complete**\n\nNo arbitrage opportunities found at this time.\n\n• Scanned ${state.pools.length} pools across multiple DEXs\n• Checked for:\n  - Simple 2-pool arbitrage\n  - Multi-hop triangular arbitrage\n  - Cross-protocol opportunities\n\n**Why no opportunities?**\n• Market efficiency: Price gaps may have been closed by other bots\n• Low volatility: Arbitrage requires price discrepancies\n• High competition: 98% of arbitrage attempts fail (by design)\n\n**Advanced Strategies to Consider:**\n• Monitor Jito ShredStream for MEV opportunities (front-running/back-running)\n• Watch for new pool creation events (initialize2 on Raydium)\n• Track LSD de-pegging (mSOL, JitoSOL price deviations)\n• Consider flash loan arbitrage for zero-capital strategies\n\n💡 Try during higher volatility periods or monitor for unconventional opportunities.`);
+            }
+          } else {
+            setResponse('⚠️ **Scan Failed**\n\nNo pools were found. This could be due to:\n• Network connectivity issues\n• DEX API limitations\n• Configuration problems\n\nPlease try again or check the Arbitrage Scanner view.');
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          setResponse(`❌ **Error Scanning for Arbitrage**\n\n${errorMsg}\n\nPlease try again or check your connection.`);
+        } finally {
+          setIsScanningArbitrage(false);
+        }
+      } else {
+        // Regular AI processing
+        // Get context via GET request
+        const contextResponse = await fetch(
+          `/api/context?agentId=master&sessionId=${publicKey?.toString() || 'default'}&action=summary`
+        );
+        const context = contextResponse.ok ? await contextResponse.json() : null;
+
+        // Simulate processing
+        for (let i = 0; i <= 100; i += 10) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setTasks(prev => prev.map(t => 
+            t.id === task.id ? { ...t, progress: i } : t
+          ));
+        }
+
+        // Save context
+        await contextManager.saveContext(
+          'master',
+          publicKey?.toString() || 'default',
+          {
+            query: userQuery,
+            timestamp: new Date().toISOString(),
+          },
+          {
+            tags: ['user-query', 'interaction'],
+            priority: 'medium',
+          }
+        );
+
+        // Generate intelligent response based on query content
+        let responseText = '';
+        const queryLower = userQuery.toLowerCase();
+        
+        if (queryLower.includes('jito') || queryLower.includes('bundle') || queryLower.includes('mev')) {
+          responseText = `🤖 **Master AI - MEV Strategy Analysis**\n\nI've analyzed your query about Jito/MEV strategies.\n\n**Jito Bundles & Atomic Arbitrage:**\n• Jito bundles enable atomic execution (all-or-nothing)\n• Up to 5 transactions executed sequentially and atomically\n• Eliminates execution risk - if any transaction fails, entire bundle reverts\n• Tip-based auction system (10k-50k lamports competitive)\n\n**Key APIs to Watch:**\n• Jito ShredStream (gRPC): Lowest latency feed for MEV opportunities\n• Jito Block Engine: Submit bundles via sendBundle API\n• Monitor for large swaps, new pool creation, oracle updates\n\n**Advanced Strategies:**\n• Front-running: Spot large pending swaps, buy before, sell after\n• Back-running: Follow profitable transactions (liquidations, new pools)\n• Protected Arbitrage: Bundle user's swap + your arbitrage + profit split\n\n💡 Ask me to "Find arbitrage opportunities" to scan real DEX pools!`;
+        } else if (queryLower.includes('flash loan') || queryLower.includes('kamino')) {
+          responseText = `🤖 **Master AI - Flash Loan Strategy**\n\n**Zero-Capital Arbitrage via Flash Loans:**\n• Flash loans must be borrowed and repaid in same transaction\n• Perfect for atomic arbitrage (all-or-nothing execution)\n• Kamino Lend provides Solana-native flash loan primitives\n\n**Execution Blueprint:**\n1. Flash borrow capital (e.g., 10,000 USDC from Kamino)\n2. Execute arbitrage swaps (e.g., USDC → SOL → USDC)\n3. Repay flash loan + fee from proceeds\n4. Keep profit (all in one atomic Jito bundle)\n\n**Key Benefits:**\n• Zero starting capital required\n• Zero capital risk (transaction reverts if arbitrage fails)\n• Maximum capital efficiency\n\n💡 Flash loans transform arbitrage from capital-bound to information-bound!`;
+        } else if (queryLower.includes('strategy') || queryLower.includes('how to') || queryLower.includes('method')) {
+          responseText = `🤖 **Master AI - Arbitrage Strategy Guide**\n\n**Types of Arbitrage on Solana:**\n\n1. **Spatial Arbitrage (DEX-DEX):**\n   • Exploit price differences between pools (e.g., Raydium vs Orca)\n   • Classic 2-pool model\n\n2. **Triangular Arbitrage:**\n   • Price loop: SOL → USDC → BONK → SOL\n   • Uses modified Dijkstra's algorithm for pathfinding\n\n3. **Atomic Arbitrage (via Jito):**\n   • Both buy and sell in single atomic transaction\n   • Eliminates execution risk completely\n   • 98% failure rate is by design (speculative spam protection)\n\n4. **MEV Strategies:**\n   • Front-running: Sandwich attacks on large swaps\n   • Back-running: Liquidations, new pool sniping\n   • Protected Arbitrage: Shared MEV with users\n\n**APIs to Monitor:**\n• Jito ShredStream (gRPC) - MEV opportunities\n• WebSocket onLogs - New pool creation (Raydium initialize2)\n• Program subscriptions - Account state changes\n\n💡 Ask me to "Find arbitrage opportunities" for real-time scanning!`;
+        } else {
+          responseText = `🤖 **Master AI Response**\n\nI've analyzed your query: "${userQuery}"\n\n${context ? `📊 Context: ${context.totalContexts} previous interactions found\n` : ''}✅ Processing complete. All agents are coordinating to handle this request.\n\n**Available Capabilities:**\n• Real-time arbitrage scanning across multiple DEXs\n• MEV strategy analysis (Jito bundles, front-running, back-running)\n• Flash loan arbitrage strategies\n• Pathfinding algorithm insights\n• Market analysis and opportunity detection\n\n**Next Steps:**\n- Routing to appropriate Tier 1 agent\n- Gathering context from specialized agents\n- Generating comprehensive response\n\n💡 Try asking:\n• "Find arbitrage opportunities" - Real-time market scanning\n• "Explain Jito bundles" - MEV execution strategies\n• "How do flash loans work?" - Zero-capital arbitrage`;
+
+        }
+
+        setResponse(responseText);
       }
 
-      // Save context
-      await contextManager.saveContext(
-        'master',
-        publicKey?.toString() || 'default',
-        {
-          query: userQuery,
-          timestamp: new Date().toISOString(),
-        },
-        {
-          tags: ['user-query', 'interaction'],
-          priority: 'medium',
-        }
-      );
-
-      // Generate response (simulated)
-      const responseText = `🤖 **Master AI Response**\n\nI've analyzed your query: "${userQuery}"\n\n${context ? `📊 Context: ${context.totalContexts} previous interactions found\n` : ''}✅ Processing complete. All agents are coordinating to handle this request.\n\n**Next Steps:**\n- Routing to appropriate Tier 1 agent\n- Gathering context from specialized agents\n- Generating comprehensive response`;
-
-      setResponse(responseText);
       setTasks(prev => prev.map(t => 
         t.id === task.id ? { ...t, status: 'completed' as const, progress: 100 } : t
       ));
       setAgents(prev => prev.map(a => 
-        a.id === 'master' ? { ...a, status: 'active' as const } : a
+        (a.id === 'master' || a.id === 'arbitrage') ? { ...a, status: 'active' as const } : a
       ));
     } catch (error) {
       setTasks(prev => prev.map(t => 
         t.id === task.id ? { ...t, status: 'failed' as const } : t
       ));
       setAgents(prev => prev.map(a => 
-        a.id === 'master' ? { ...a, status: 'error' as const } : a
+        (a.id === 'master' || a.id === 'arbitrage') ? { ...a, status: 'error' as const } : a
       ));
+      setResponse(`❌ **Error**\n\n${error instanceof Error ? error.message : 'An unknown error occurred'}`);
     }
 
     setUserQuery('');
-  }, [userQuery, publicKey, contextManager]);
+  }, [userQuery, publicKey, contextManager, connection, scanner]);
 
   const getAgentIcon = (agentId: string) => {
     const icons: Record<string, React.ReactNode> = {
@@ -213,7 +319,7 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
   const tier3Agents = agents.filter(a => a.tier === 3);
 
   return (
-    <div className="min-h-screen animated-bg text-white relative overflow-hidden">
+    <div className="min-h-screen animated-bg text-white relative overflow-y-auto">
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
@@ -300,18 +406,89 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
                   />
                   <button
                     onClick={handleQuery}
-                    disabled={!userQuery.trim() || !masterActive}
+                    disabled={!userQuery.trim() || isScanningArbitrage}
                     className="btn-modern px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white flex items-center gap-2"
                   >
-                    <Zap className="w-4 h-4" />
-                    Execute
+                    {isScanningArbitrage ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4" />
+                        Execute
+                      </>
+                    )}
                   </button>
                 </div>
 
                 {response && (
                   <div className="card-modern p-4">
                     <div className="prose prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap text-sm font-mono text-gray-300">{response}</pre>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        className="markdown-content"
+                        components={{
+                          h1: ({ node, ...props }) => (
+                            <h1 className="text-2xl font-bold text-white mb-3 mt-4 first:mt-0 border-b border-gray-700 pb-2" {...props} />
+                          ),
+                          h2: ({ node, ...props }) => (
+                            <h2 className="text-xl font-bold text-white mb-2 mt-4 first:mt-0 border-b border-gray-700 pb-1" {...props} />
+                          ),
+                          h3: ({ node, ...props }) => (
+                            <h3 className="text-lg font-bold text-blue-400 mb-2 mt-3" {...props} />
+                          ),
+                          p: ({ node, ...props }) => (
+                            <p className="text-gray-200 mb-3 leading-relaxed" {...props} />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul className="list-disc list-inside mb-3 space-y-1 text-gray-200 ml-4" {...props} />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol className="list-decimal list-inside mb-3 space-y-1 text-gray-200 ml-4" {...props} />
+                          ),
+                          li: ({ node, ...props }) => (
+                            <li className="text-gray-200 leading-relaxed" {...props} />
+                          ),
+                          code: ({ node, inline, className, children, ...props }: any) => {
+                            const match = /language-(\w+)/.exec(className || '');
+                            const language = match ? match[1] : '';
+                            const codeString = String(children).replace(/\n$/, '');
+                            
+                            return !inline && language ? (
+                              <div className="my-3">
+                                <SyntaxHighlighter
+                                  language={language}
+                                  style={vscDarkPlus}
+                                  customStyle={{
+                                    margin: 0,
+                                    borderRadius: '0.5rem',
+                                    padding: '0.75rem',
+                                    fontSize: '0.875rem',
+                                  }}
+                                  PreTag="div"
+                                  {...props}
+                                >
+                                  {codeString}
+                                </SyntaxHighlighter>
+                              </div>
+                            ) : (
+                              <code className="bg-gray-900 text-blue-400 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          strong: ({ node, ...props }) => (
+                            <strong className="font-bold text-white" {...props} />
+                          ),
+                          em: ({ node, ...props }) => (
+                            <em className="italic text-gray-300" {...props} />
+                          ),
+                        }}
+                      >
+                        {response}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 )}

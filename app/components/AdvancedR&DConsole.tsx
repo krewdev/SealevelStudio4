@@ -155,6 +155,12 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
   const scannerRef = useRef<BrowserVulnerabilityScanner | null>(null);
   
+  // Dragging state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const consoleRef = useRef<HTMLDivElement>(null);
+  
   // Sync with external state
   useEffect(() => {
     setIsMinimized(initialMinimized);
@@ -553,12 +559,67 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
     navigator.clipboard.writeText(output);
   };
 
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't drag if clicking on a button or input
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') || target.closest('input')) {
+      return;
+    }
+    
+    if (consoleRef.current) {
+      const rect = consoleRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setIsDragging(true);
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging && consoleRef.current) {
+        const newX = e.clientX - dragOffset.x;
+        const newY = e.clientY - dragOffset.y;
+        
+        // Constrain to viewport
+        const maxX = window.innerWidth - consoleRef.current.offsetWidth;
+        const maxY = window.innerHeight - consoleRef.current.offsetHeight;
+        
+        setPosition({
+          x: Math.max(0, Math.min(newX, maxX)),
+          y: Math.max(0, Math.min(newY, maxY)),
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
   if (isMinimized) {
     return (
-      <div className="fixed bottom-4 right-4 z-50">
+      <div 
+        ref={consoleRef}
+        className="fixed bottom-4 right-4 z-50"
+        style={{ left: position.x || undefined, top: position.y || undefined, bottom: position.y ? undefined : '1rem', right: position.x ? undefined : '1rem' }}
+      >
         <button
           onClick={() => handleToggleMinimize(false)}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 cursor-move"
+          onMouseDown={handleMouseDown}
         >
           <Terminal size={16} />
           <span>R&D Console</span>
@@ -568,9 +629,22 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-[800px] h-[600px] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-50">
+    <div 
+      ref={consoleRef}
+      className="fixed w-[800px] h-[600px] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-50"
+      style={{ 
+        left: position.x || undefined, 
+        top: position.y || undefined, 
+        bottom: position.y ? undefined : '1rem', 
+        right: position.x ? undefined : '1rem',
+        cursor: isDragging ? 'grabbing' : 'default'
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
+      <div 
+        className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 cursor-move select-none"
+        onMouseDown={handleMouseDown}
+      >
         <div className="flex items-center gap-2">
           {scannerMode === 'scanner' ? (
             <Shield className="text-red-400" size={20} />

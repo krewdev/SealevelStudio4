@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -33,6 +33,11 @@ import { AdminAnalytics } from './components/AdminAnalytics';
 import { SealPresale } from './components/SealPresale';
 import { AICyberPlayground } from './components/AICyberPlayground';
 import { RevenueLanding } from './components/RevenueLanding';
+import { RentReclaimer } from './components/RentReclaimer';
+import { DevnetFaucet } from './components/DevnetFaucet';
+import { ToolsHub } from './components/ToolsHub';
+import { TwitterBot } from './components/TwitterBot';
+import { ChartsView } from './components/ChartsView';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -693,12 +698,16 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
     
     // Tools Hub
     { id: 'tools', label: 'Tools Hub', icon: <Code className="h-4 w-4" />, section: 'tools' },
+    { id: 'rent-reclaimer', label: 'Rent Reclaimer', icon: <Coins className="h-4 w-4" />, section: 'tools' },
+    { id: 'faucet', label: 'Devnet Faucet', icon: <Droplet className="h-4 w-4" />, section: 'tools' },
     
     // Legacy/Other
     { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" />, section: 'other' },
     { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" />, section: 'other' },
     { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" />, section: 'other' },
     { id: 'web2', label: 'Web2 Tools', icon: <Terminal className="h-4 w-4" /> },
+    { id: 'twitter-bot', label: 'Twitter Bot', icon: <Twitter className="h-4 w-4" />, section: 'social' },
+    { id: 'charts', label: 'Charts & Visualizations', icon: <LineChart className="h-4 w-4" />, section: 'tools' },
     { id: 'wallets', label: 'Wallet Manager', icon: <Wallet className="h-4 w-4" /> },
     { id: 'rd-console', label: 'R&D Console', icon: <Lock className="h-4 w-4" /> },
     { id: 'cybersecurity', label: 'Cybersecurity Dashboard', icon: <Shield className="h-4 w-4" /> },
@@ -810,6 +819,34 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
             <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Tools</div>
             <ul className="space-y-1">
               {toolsItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {/* Social */}
+        {navItems.filter(item => item.section === 'social').length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Social</div>
+            <ul className="space-y-1">
+              {navItems.filter(item => item.section === 'social').map((item) => (
                 <li key={item.id}>
                   <button
                     onClick={() => setActiveView(item.id)}
@@ -1002,6 +1039,31 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <AICyberPlayground onBack={() => setActiveView('inspector')} />;
   }
 
+  // Rent Reclaimer has its own full-screen layout
+  if (activeView === 'rent-reclaimer') {
+    return <RentReclaimer onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Devnet Faucet has its own full-screen layout
+  if (activeView === 'faucet') {
+    return <DevnetFaucet onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Tools Hub has its own full-screen layout
+  if (activeView === 'tools') {
+    return <ToolsHub onBack={() => setActiveView('inspector')} onNavigateToTool={(toolId) => setActiveView(toolId)} />;
+  }
+
+  // Twitter Bot has its own full-screen layout
+  if (activeView === 'twitter-bot') {
+    return <TwitterBot onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Charts View has its own full-screen layout
+  if (activeView === 'charts') {
+    return <ChartsView onBack={() => setActiveView('inspector')} />;
+  }
+
   // Default single-column layout for other views
   return (
     <>
@@ -1106,7 +1168,7 @@ export default function App() {
   }
 
   // Main app interface
-  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools' || activeView === 'revenue';
+  const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'charts';
   
   return (
     <ClientOnly>
@@ -1134,9 +1196,6 @@ export default function App() {
           />
         </div>
       </div>
-      
-      {/* Unified AI Agents */}
-      <UnifiedAIAgents />
       
       {/* R&D Console - Floating (always available) */}
       <AdvancedRAndDConsole 

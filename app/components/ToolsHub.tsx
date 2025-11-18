@@ -14,6 +14,7 @@ import {
   Code,
   Lock,
   FileText,
+  Droplet,
 } from 'lucide-react';
 
 interface Tool {
@@ -61,6 +62,22 @@ export function ToolsHub({ onBack, onNavigateToTool }: ToolsHubProps) {
       category: 'development',
       onNavigate: () => onNavigateToTool?.('rd-console'),
       badge: 'Advanced',
+    },
+    {
+      id: 'rent-reclaimer',
+      name: 'Rent Reclaimer',
+      description: 'Close accounts and reclaim rent-exempt SOL',
+      icon: <FileText className="w-6 h-6" />,
+      category: 'utilities',
+      onNavigate: () => onNavigateToTool?.('rent-reclaimer'),
+    },
+    {
+      id: 'faucet',
+      name: 'Devnet Faucet',
+      description: 'Request free SOL for testing on devnet',
+      icon: <Droplet className="w-6 h-6" />,
+      category: 'development',
+      onNavigate: () => onNavigateToTool?.('faucet'),
     },
     {
       id: 'web2',
