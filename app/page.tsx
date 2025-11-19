@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -16,7 +16,7 @@ import { useNetwork } from './contexts/NetworkContext';
 import { useTutorial } from './contexts/TutorialContext';
 import { TutorialFlow } from './components/TutorialFlow';
 import { VeriSolAttestation } from './components/VeriSolAttestation';
-import { LandingPage } from './components/LandingPage';
+import { LandingPage, BlockchainType } from './components/LandingPage';
 import { PremiumServices } from './components/PremiumServices';
 import { Web2Tools } from './components/Web2Tools';
 import { WalletManager } from './components/WalletManager';
@@ -689,6 +689,7 @@ function Sidebar({ activeView, setActiveView }: { activeView: string; setActiveV
     { id: 'inspector', label: 'Account Inspector', icon: <Search className="h-4 w-4" />, section: 'core' },
     { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
+    { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
     
     // Revenue
     { id: 'presale', label: 'SEAL Presale', icon: <TrendingUp className="h-4 w-4" />, section: 'revenue', badge: 'Hot' },
@@ -973,7 +974,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   // Transaction Bundler has its own full-screen layout
   if (activeView === 'bundler') {
-    return <TransactionBundler onBack={() => setActiveView('premium')} />;
+    return <TransactionBundler onBack={() => setActiveView('inspector')} />;
   }
 
   // Advertising Bots has its own full-screen layout
@@ -1141,6 +1142,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'tutorial' | 'app'>('landing');
   const [activeView, setActiveView] = useState('inspector');
   const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
+  const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const { publicKey } = useWallet();
   const { network, setNetwork } = useNetwork();
   const { shouldShowTutorial, completeTutorial } = useTutorial();
@@ -1157,7 +1159,42 @@ export default function App() {
     }
   }, [activeView]);
 
-  const handleGetStarted = () => {
+  // Store selected blockchain in localStorage
+  useEffect(() => {
+    if (selectedBlockchain && typeof window !== 'undefined') {
+      localStorage.setItem('sealevel-blockchain', selectedBlockchain);
+    }
+  }, [selectedBlockchain]);
+
+  // Load selected blockchain from localStorage, default to Solana
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sealevel-blockchain');
+      if (saved && ['polkadot', 'solana', 'ethereum', 'polygon', 'avalanche', 'base', 'arbitrum', 'optimism', 'sui', 'aptos'].includes(saved)) {
+        setSelectedBlockchain(saved as BlockchainType);
+      } else {
+        // Default to Solana if nothing saved
+        setSelectedBlockchain('solana');
+      }
+    }
+  }, []);
+
+  const handleGetStarted = (blockchain?: BlockchainType) => {
+    if (blockchain) {
+      setSelectedBlockchain(blockchain);
+      // Polkadot and Solana are fully supported
+      if (blockchain === 'polkadot' || blockchain === 'solana') {
+        // Continue with selected blockchain - both are functional
+      } else {
+        // Show coming soon message for other blockchains
+        alert(`${blockchain.charAt(0).toUpperCase() + blockchain.slice(1)} support is coming soon! For now, you can use Polkadot or Solana which have full feature support.`);
+        setSelectedBlockchain('solana');
+      }
+    } else {
+      // Default to Solana if no selection
+      setSelectedBlockchain('solana');
+    }
+    
     if (shouldShowTutorial('accountInspector') || shouldShowTutorial('instructionAssembler')) {
       setCurrentScreen('tutorial');
     } else {

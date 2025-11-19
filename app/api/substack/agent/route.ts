@@ -18,7 +18,8 @@ const agentState = new Map<string, {
     success: boolean;
     error?: string;
   }>;
-  intervalId?: NodeJS.Timeout;
+  postIntervalId?: NodeJS.Timeout;
+  commentIntervalId?: NodeJS.Timeout;
 }>();
 
 // Default intervals (in milliseconds)
@@ -119,7 +120,9 @@ export async function POST(request: NextRequest) {
         }
       }, COMMENT_CHECK_INTERVAL);
 
-      state.intervalId = postInterval as any;
+      // Store both interval IDs to prevent resource leaks
+      state.postIntervalId = postInterval as any;
+      state.commentIntervalId = commentInterval as any;
 
       // Perform initial checks
       await Promise.all([
@@ -144,8 +147,15 @@ export async function POST(request: NextRequest) {
       }
 
       state.isRunning = false;
-      if (state.intervalId) {
-        clearInterval(state.intervalId);
+      
+      // Clear both intervals to prevent resource leaks
+      if (state.postIntervalId) {
+        clearInterval(state.postIntervalId);
+        state.postIntervalId = undefined;
+      }
+      if (state.commentIntervalId) {
+        clearInterval(state.commentIntervalId);
+        state.commentIntervalId = undefined;
       }
 
       addActivity(state, 'post', 'Agent stopped', true);

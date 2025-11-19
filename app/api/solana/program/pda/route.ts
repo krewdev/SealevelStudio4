@@ -75,8 +75,9 @@ export async function POST(request: NextRequest) {
         );
       }
       
+      // Include the bump seed in the derivation
       const allSeeds = [...seedBuffers, Buffer.from([bumpSeed])];
-      pda = PublicKey.findProgramAddressSync([...seedBuffers], programId)[0];
+      pda = PublicKey.findProgramAddressSync(allSeeds, programId)[0];
       bump = bumpSeed;
     } else {
       // Find canonical bump
