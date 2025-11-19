@@ -1,0 +1,20 @@
+# Dockerfile for Ollama with GPU support
+# This is optional - the docker-compose.yml uses the official Ollama image
+# Use this if you need to customize the Ollama installation
+
+FROM ollama/ollama:latest
+
+# Set environment variables
+ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_KEEP_ALIVE=24h
+
+# Expose Ollama port
+EXPOSE 11434
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# Run Ollama
+CMD ["ollama", "serve"]
+

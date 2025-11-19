@@ -39,6 +39,7 @@ export class CoreAIModel {
       apiType: this.config.apiType,
       timeout: this.config.timeout || 30000,
       weight: this.config.weight,
+      dockerEnabled: process.env.DOCKER_AI_ENABLED === 'true',
     };
 
     this.provider = new LocalAIProvider(localConfig);

@@ -1,6 +1,7 @@
 /**
  * Local AI Model Provider
  * Supports downloaded models via Ollama, LM Studio, or direct inference
+ * Enhanced with GPU detection and Docker endpoint support
  */
 
 import { BaseConsensusProvider } from './base';
@@ -9,20 +10,26 @@ import {
   ProviderConfig,
   ConsensusQueryOptions,
 } from '../types';
+import { detectGPU, checkDockerEndpoint, getPerformanceMetrics, type GPUInfo, type PerformanceMetrics } from '../gpu-utils';
 
 export interface LocalModelConfig extends ProviderConfig {
   endpoint: string; // e.g., 'http://localhost:11434' for Ollama
   model: string; // e.g., 'llama2', 'mistral', 'codellama'
   apiType: 'ollama' | 'lmstudio' | 'openai-compatible' | 'custom';
   timeout?: number;
+  dockerEnabled?: boolean; // Whether running in Docker
 }
 
 export class LocalAIProvider extends BaseConsensusProvider {
   private localConfig: LocalModelConfig;
+  private gpuInfo: GPUInfo | null = null;
+  private performanceMetrics: PerformanceMetrics | null = null;
+  private dockerEndpointChecked = false;
 
   constructor(config: LocalModelConfig) {
     super(config);
     this.localConfig = config;
+    this.initializeGPUInfo();
   }
 
   get id(): string {
@@ -35,6 +42,58 @@ export class LocalAIProvider extends BaseConsensusProvider {
 
   get enabled(): boolean {
     return !!this.localConfig.endpoint && !!this.localConfig.model;
+  }
+
+  /**
+   * Initialize GPU information
+   */
+  private async initializeGPUInfo(): Promise<void> {
+    try {
+      this.gpuInfo = await detectGPU();
+      this.performanceMetrics = getPerformanceMetrics(this.gpuInfo);
+    } catch (error) {
+      console.warn('Failed to detect GPU:', error);
+      this.gpuInfo = {
+        type: 'cpu',
+        available: false,
+      };
+    }
+  }
+
+  /**
+   * Get GPU information
+   */
+  async getGPUInfo(): Promise<GPUInfo> {
+    if (!this.gpuInfo) {
+      await this.initializeGPUInfo();
+    }
+    return this.gpuInfo!;
+  }
+
+  /**
+   * Get performance metrics
+   */
+  getPerformanceMetrics(): PerformanceMetrics | null {
+    return this.performanceMetrics;
+  }
+
+  /**
+   * Check if running in Docker
+   */
+  async isDockerEndpoint(): Promise<boolean> {
+    if (this.localConfig.dockerEnabled) {
+      return true;
+    }
+
+    if (!this.dockerEndpointChecked) {
+      const isDocker = await checkDockerEndpoint(this.localConfig.endpoint);
+      this.dockerEndpointChecked = true;
+      if (isDocker) {
+        this.localConfig.dockerEnabled = true;
+      }
+    }
+
+    return this.localConfig.dockerEnabled || false;
   }
 
   async query(
@@ -271,6 +330,28 @@ export class LocalAIProvider extends BaseConsensusProvider {
       console.error('Failed to fetch available models:', error);
       return [this.localConfig.model];
     }
+  }
+
+  /**
+   * Get system status including GPU and Docker info
+   */
+  async getSystemStatus(): Promise<{
+    gpu: GPUInfo;
+    docker: boolean;
+    performance: PerformanceMetrics | null;
+    endpoint: string;
+    model: string;
+  }> {
+    const gpu = await this.getGPUInfo();
+    const docker = await this.isDockerEndpoint();
+    
+    return {
+      gpu,
+      docker,
+      performance: this.performanceMetrics,
+      endpoint: this.localConfig.endpoint,
+      model: this.localConfig.model,
+    };
   }
 }
 

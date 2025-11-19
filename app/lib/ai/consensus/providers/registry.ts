@@ -71,6 +71,7 @@ export class ProviderRegistry {
         apiType: (process.env.LOCAL_AI_TYPE as 'ollama' | 'lmstudio' | 'openai-compatible' | 'custom') || 'ollama',
         timeout: parseInt(process.env.LOCAL_AI_TIMEOUT || '30000'),
         weight: parseFloat(process.env.LOCAL_AI_WEIGHT || '1.5'), // Higher weight for core model
+        dockerEnabled: process.env.DOCKER_AI_ENABLED === 'true',
       };
       
       this.register(new LocalAIProvider(localConfig));

@@ -4,9 +4,121 @@ This guide explains how to set up a downloaded/local AI model as the core intell
 
 ## Overview
 
-The Local AI system allows you to use a downloaded model (via Ollama, LM Studio, or custom endpoints) as the primary AI, with optional consensus from cloud models.
+The Local AI system allows you to use a downloaded model (via Ollama, LM Studio, or custom endpoints) as the primary AI, with optional consensus from cloud models. This guide covers:
 
-## Supported Platforms
+- **Docker Deployment** - Isolated, portable containers with GPU support
+- **Native Installation** - Direct Ollama/LM Studio setup
+- **MCP Integration** - Model Context Protocol for standardized tool access
+- **GPU Acceleration** - NVIDIA CUDA and Apple Silicon Metal support
+- **Mac Server Setup** - Remote server deployment instructions
+
+## Quick Start
+
+Choose your preferred setup method:
+
+1. **Docker (Recommended)** - See [Docker Setup](#docker-setup) section
+2. **Native Installation** - See [Native Setup](#native-setup) section
+3. **MCP Integration** - See [MCP Setup](#mcp-integration) section
+
+For detailed MCP information, see [MCP_GUIDE.md](./MCP_GUIDE.md).
+
+## Docker Setup
+
+Docker provides an isolated, portable environment for running local AI models with GPU support.
+
+### Prerequisites
+
+- Docker Desktop installed ([Download](https://www.docker.com/products/docker-desktop/))
+- For NVIDIA GPU: NVIDIA Container Toolkit installed
+- For Apple Silicon: Docker Desktop with Apple Silicon support
+
+### Quick Start with Docker
+
+1. **Check GPU availability:**
+   ```bash
+   ./scripts/check-gpu.sh
+   ```
+
+2. **Run the Docker setup script:**
+   ```bash
+   ./scripts/setup-docker-ai.sh
+   ```
+
+3. **Or manually start with docker-compose:**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Configure environment variables:**
+   ```env
+   LOCAL_AI_ENABLED=true
+   LOCAL_AI_ENDPOINT=http://localhost:11434
+   LOCAL_AI_MODEL=llama2
+   LOCAL_AI_TYPE=ollama
+   DOCKER_AI_ENABLED=true
+   ```
+
+### Docker Services
+
+The `docker-compose.yml` includes:
+
+- **Ollama Service** - Local AI inference with GPU support
+- **MCP Server** (optional) - Model Context Protocol server for tool access
+
+### GPU Configuration
+
+#### NVIDIA GPU
+
+1. Install NVIDIA Container Toolkit:
+   ```bash
+   # Ubuntu/Debian
+   distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+   curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+   curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+   sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+   sudo systemctl restart docker
+   ```
+
+2. Verify GPU access:
+   ```bash
+   docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi
+   ```
+
+#### Apple Silicon (M1/M2/M3)
+
+Docker Desktop on Apple Silicon automatically uses Metal for GPU acceleration. No additional setup needed.
+
+### Docker Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f ollama
+
+# Stop services
+docker-compose down
+
+# Pull a new model
+docker-compose exec ollama ollama pull codellama
+
+# Check GPU usage
+docker stats
+```
+
+### Docker Volumes
+
+Models are stored in Docker volumes:
+- `ollama-data` - Model files and cache
+- `mcp-data` - MCP server data (if enabled)
+
+To backup models:
+```bash
+docker run --rm -v ollama-data:/data -v $(pwd):/backup alpine tar czf /backup/ollama-backup.tar.gz /data
+```
+
+## Native Setup
 
 ### 1. Ollama (Recommended)
 
@@ -81,6 +193,100 @@ LOCAL_AI_TYPE=openai-compatible
 LOCAL_AI_PRIMARY=true
 ```
 
+## MCP Integration
+
+Model Context Protocol (MCP) provides standardized access to tools, resources, and data sources for AI models.
+
+### When to Use MCP
+
+✅ **Use MCP if you need:**
+- Standardized tool access across different AI models
+- Expose Solana-specific tools/resources to AI models
+- Better context management for AI agents
+- Production system with multiple AI integrations
+
+❌ **Skip MCP if:**
+- Simple local inference is sufficient
+- Only need basic chat/completion
+- Minimal tooling requirements
+
+### MCP Setup
+
+1. **Enable MCP in docker-compose.yml:**
+   ```yaml
+   mcp-server:
+     build:
+       context: .
+       dockerfile: Dockerfile.mcp-server
+     ports:
+       - "8000:8000"
+     environment:
+       - MCP_API_KEY=your_api_key_here
+     volumes:
+       - mcp-data:/data
+   ```
+
+2. **Configure environment variables:**
+   ```env
+   MCP_ENABLED=true
+   MCP_SERVER_URL=http://localhost:8000
+   MCP_API_KEY=your_mcp_api_key
+   ```
+
+3. **Start MCP server:**
+   ```bash
+   docker-compose up -d mcp-server
+   # Or use the setup script
+   ./scripts/setup-mcp-server.sh
+   ```
+
+For detailed MCP information, see [MCP_GUIDE.md](./MCP_GUIDE.md).
+
+## GPU Support
+
+### GPU Detection
+
+Run the GPU detection script:
+```bash
+./scripts/check-gpu.sh
+```
+
+This will detect:
+- NVIDIA CUDA GPUs
+- Apple Silicon Metal support
+- GPU memory and capabilities
+- Performance recommendations
+
+### GPU Configuration
+
+```env
+# Enable GPU acceleration
+GPU_ENABLED=true
+
+# Auto-detect GPU type (auto, nvidia, apple-silicon, cpu)
+GPU_TYPE=auto
+
+# GPU memory limit in MB (optional)
+GPU_MEMORY_LIMIT=8192
+```
+
+### Performance Tuning
+
+**For NVIDIA GPUs:**
+- Use `nvidia-smi` to monitor GPU usage
+- Set `GPU_MEMORY_LIMIT` based on available VRAM
+- Larger models require more VRAM (e.g., llama2:70b needs ~40GB)
+
+**For Apple Silicon:**
+- Metal acceleration is automatic
+- Unified memory is shared between CPU and GPU
+- Monitor Activity Monitor for memory pressure
+
+**For CPU-only:**
+- Use smaller models (phi, mistral:7b)
+- Reduce `maxTokens` in queries
+- Consider cloud models for heavy tasks
+
 ## Configuration Options
 
 | Variable | Description | Default |
@@ -92,6 +298,17 @@ LOCAL_AI_PRIMARY=true
 | `LOCAL_AI_PRIMARY` | Use as primary/core model | `true` |
 | `LOCAL_AI_WEIGHT` | Weight in consensus (higher = more influence) | `1.5` |
 | `LOCAL_AI_TIMEOUT` | Request timeout in ms | `30000` |
+| `DOCKER_AI_ENABLED` | Use Docker for local AI | `false` |
+| `DOCKER_AI_CONTAINER` | Docker container name | `sealevel-ollama` |
+| `MCP_ENABLED` | Enable MCP server | `false` |
+| `MCP_SERVER_URL` | MCP server endpoint | `http://localhost:8000` |
+| `MCP_API_KEY` | MCP server API key | (required if enabled) |
+| `GPU_ENABLED` | Enable GPU acceleration | `true` |
+| `GPU_TYPE` | GPU type: `auto`, `nvidia`, `apple-silicon`, `cpu` | `auto` |
+| `GPU_MEMORY_LIMIT` | GPU memory limit in MB | (unlimited) |
+| `REMOTE_AI_ENABLED` | Use remote Mac server | `false` |
+| `REMOTE_AI_ENDPOINT` | Remote server endpoint | (required if enabled) |
+| `REMOTE_AI_SSL` | Use SSL for remote connection | `false` |
 
 ## API Usage
 
@@ -232,17 +449,120 @@ ollama pull <model-name>
 - May be slower than cloud APIs
 - Model files can be large (several GB)
 
+## Mac Server Setup
+
+For deploying local AI on a dedicated Mac server, see [MAC_SERVER_SETUP.md](./MAC_SERVER_SETUP.md).
+
+This is useful for:
+- Team/enterprise deployments
+- Dedicated GPU resources
+- Remote access from multiple clients
+- Production environments
+
+## Performance Optimization
+
+### Model Selection
+
+**Fast & Efficient:**
+- `phi` - 2.7B parameters, ~2GB RAM
+- `mistral:7b` - 7B parameters, ~4GB RAM
+- `llama2:7b` - 7B parameters, ~4GB RAM
+
+**Code-Specialized:**
+- `codellama:7b` - Optimized for code
+- `deepseek-coder:6.7b` - Excellent code understanding
+
+**High Quality (slower):**
+- `llama2:70b` - Requires ~40GB RAM/VRAM
+- `mixtral` - Mixture of experts, high quality
+
+### Resource Recommendations
+
+| Model Size | RAM/VRAM | CPU | GPU | Use Case |
+|------------|----------|-----|-----|----------|
+| 2-7B | 4-8GB | 4+ cores | Optional | Development, testing |
+| 13B | 16GB | 8+ cores | Recommended | Production, quality |
+| 30B+ | 32GB+ | 16+ cores | Required | High-quality inference |
+
+### Monitoring
+
+Check system resources:
+```bash
+# CPU and Memory
+top
+htop  # if installed
+
+# GPU (NVIDIA)
+nvidia-smi
+
+# GPU (Apple Silicon)
+# Use Activity Monitor or:
+sudo powermetrics --samplers gpu_power -i 1000
+```
+
+## Troubleshooting
+
+### Docker Issues
+
+**Container won't start:**
+```bash
+# Check logs
+docker-compose logs ollama
+
+# Verify Docker is running
+docker ps
+
+# Check GPU access
+docker run --rm --gpus all nvidia/cuda:11.0.3-base-ubuntu20.04 nvidia-smi
+```
+
+**Out of memory:**
+- Reduce model size
+- Set `GPU_MEMORY_LIMIT` in environment
+- Close other applications
+
+### GPU Issues
+
+**NVIDIA GPU not detected:**
+1. Verify NVIDIA drivers: `nvidia-smi`
+2. Install NVIDIA Container Toolkit
+3. Restart Docker: `sudo systemctl restart docker`
+
+**Apple Silicon performance:**
+- Ensure Docker Desktop is updated
+- Check Activity Monitor for memory pressure
+- Use smaller models if memory constrained
+
+### Connection Issues
+
+**Cannot connect to local AI:**
+1. Verify service is running:
+   ```bash
+   # Docker
+   docker-compose ps
+   
+   # Native
+   curl http://localhost:11434/api/tags
+   ```
+
+2. Check firewall settings
+3. Verify endpoint URL in environment variables
+4. Check port conflicts: `lsof -i :11434`
+
 ## Next Steps
 
-1. Install Ollama or LM Studio
-2. Download a model
-3. Set environment variables
-4. Restart the application
-5. Test with `/api/ai/core?action=status`
+1. Choose setup method (Docker or Native)
+2. Install and configure GPU support (if available)
+3. Download a model
+4. Set environment variables
+5. Optionally set up MCP server
+6. Restart the application
+7. Test with `/api/ai/core?action=status`
 
 The core model will automatically integrate with:
 - AI Cyber Playground
 - Consensus system
 - Agent expressions
 - All AI-powered features
+- MCP tools (if enabled)
 
