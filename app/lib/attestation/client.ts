@@ -1,9 +1,11 @@
 // Attestation Program Client
 // TypeScript client for interacting with the custom attestation program
 
-import { Program, AnchorProvider, web3 } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, web3, BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Import IDL - this will be generated after building the Anchor program
 // For now, we'll define a basic structure
@@ -19,10 +21,10 @@ export interface AttestationProgramIDL {
   types: Array<any>;
 }
 
-// Program ID - update this after deploying your program
+// Program ID - from the deployed program
 export const ATTESTATION_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID || 
-  '11111111111111111111111111111111' // Placeholder
+  'AeK2u45NkNvAcgZuYyCWqmRuCsnXPvcutR3pziXF1cDw' // Deployed program address
 );
 
 // Bubblegum Program IDs
@@ -124,8 +126,43 @@ export function createAttestationClient(
     { commitment: 'confirmed' }
   );
 
-  // TODO: Load actual IDL after building the program
-  // const program = new Program<AttestationProgramIDL>(IDL, ATTESTATION_PROGRAM_ID, provider);
+  // Load the actual IDL from the built program for beta testing
+  let program: Program<any> | null = null;
+  
+  try {
+    // Try to load the IDL from the target directory (for beta testing)
+    if (typeof window === 'undefined') {
+      // Server-side: use fs
+      const idlPath = join(process.cwd(), 'programs/attestation-program/target/idl/sealevel_attestation.json');
+      const idl = JSON.parse(readFileSync(idlPath, 'utf-8'));
+      program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
+      console.log('✅ Attestation program loaded from IDL (beta testing mode)');
+    } else {
+      // Client-side: try to fetch from public path or use dynamic import
+      try {
+        const idlResponse = await fetch('/api/attestation/idl');
+        if (idlResponse.ok) {
+          const idl = await idlResponse.json();
+          program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
+          console.log('✅ Attestation program loaded from API (beta testing mode)');
+        }
+      } catch (e) {
+        console.warn('⚠️ Could not load IDL from API:', e);
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not load IDL, will check if program is deployed:', error);
+  }
+
+  // Check if program is deployed on-chain
+  const isProgramDeployed = async () => {
+    try {
+      const programInfo = await connection.getAccountInfo(ATTESTATION_PROGRAM_ID);
+      return !!programInfo;
+    } catch {
+      return false;
+    }
+  };
 
   return {
     async initialize(merkleTree: PublicKey) {
@@ -134,17 +171,31 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
-      // TODO: Implement once program is deployed
-      // const tx = await program.methods
-      //   .initialize(merkleTree)
-      //   .accounts({
-      //     registry,
-      //     authority: wallet.publicKey,
-      //     systemProgram: web3.SystemProgram.programId,
-      //   })
-      //   .rpc();
+      // Use real program if available
+      if (program) {
+        try {
+          const tx = await program.methods
+            .initialize(merkleTree)
+            .accounts({
+              registry,
+              authority: wallet.publicKey!,
+              systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
+          return tx;
+        } catch (error) {
+          console.error('Error initializing attestation program:', error);
+          throw error;
+        }
+      }
 
-      throw new Error('Program not yet deployed. Please build and deploy the Anchor program first.');
+      // Fallback: check if program is deployed but IDL not loaded
+      const deployed = await isProgramDeployed();
+      if (deployed) {
+        throw new Error('Program is deployed but IDL could not be loaded. Please ensure the IDL file exists at programs/attestation-program/target/idl/sealevel_attestation.json');
+      }
+
+      throw new Error('Attestation program not deployed. Please deploy the program first.');
     },
 
     async mintAttestation(usageCount: number, metadata: AttestationMetadata) {
@@ -153,40 +204,59 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
-      // TODO: Implement once program is deployed
-      // const tx = await program.methods
-      //   .mintAttestation(
-      //     new anchor.BN(usageCount),
-      //     {
-      //       name: metadata.name,
-      //       symbol: metadata.symbol,
-      //       uri: metadata.uri,
-      //       attributes: metadata.attributes.map(attr => ({
-      //         traitType: attr.trait_type,
-      //         value: attr.value,
-      //       })),
-      //     }
-      //   )
-      //   .accounts({
-      //     registry,
-      //     payer: wallet.publicKey,
-      //     wallet: wallet.publicKey,
-      //     systemProgram: web3.SystemProgram.programId,
-      //   })
-      //   .rpc();
-      //
-      // const tier = await program.methods
-      //   .verifyEligibility(new anchor.BN(usageCount))
-      //   .accounts({ registry, wallet: wallet.publicKey })
-      //   .view();
+      // Use real program if available (beta testing)
+      if (program) {
+        try {
+          const tx = await program.methods
+            .mintAttestation(
+              new BN(usageCount),
+              {
+                name: metadata.name,
+                symbol: metadata.symbol,
+                uri: metadata.uri,
+                attributes: metadata.attributes.map(attr => ({
+                  traitType: attr.trait_type,
+                  value: attr.value,
+                })),
+              }
+            )
+            .accounts({
+              registry,
+              payer: wallet.publicKey!,
+              wallet: wallet.publicKey!,
+              systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
 
-      // For now, determine tier client-side
+          // Get tier from the program response
+          const tier = await program.methods
+            .verifyEligibility(new BN(usageCount))
+            .accounts({ 
+              registry, 
+              wallet: wallet.publicKey! 
+            })
+            .view();
+
+          return { txSignature: tx, tier: tier as number };
+        } catch (error) {
+          console.error('Error minting attestation:', error);
+          throw error;
+        }
+      }
+
+      // Fallback: check if program is deployed but IDL not loaded
+      const deployed = await isProgramDeployed();
+      if (deployed) {
+        throw new Error('Program is deployed but IDL could not be loaded. Please ensure the IDL file exists.');
+      }
+
+      // For now, determine tier client-side as fallback
       const tier = this.getTierForUsage(usageCount);
       if (tier === 0) {
         throw new Error('Insufficient usage to qualify for any tier');
       }
 
-      throw new Error('Program not yet deployed. Please build and deploy the Anchor program first.');
+      throw new Error('Attestation program not available. Please ensure the program is deployed and IDL is accessible.');
     },
 
     getTierForUsage(usageCount: number): number {

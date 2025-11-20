@@ -299,7 +299,14 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                   {selectedBlockchain && (
                     <button
                       type="button"
-                      onClick={() => setShowBlockchainSelector(false)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowBlockchainSelector(false);
+                        if (onGetStarted) {
+                          onGetStarted(selectedBlockchain);
+                        }
+                      }}
                       className="px-6 py-2 text-sm font-medium rounded-lg text-white bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 transition-all"
                     >
                       Continue with {BLOCKCHAINS.find(b => b.id === selectedBlockchain)?.name}
