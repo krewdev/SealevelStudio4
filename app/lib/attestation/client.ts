@@ -272,18 +272,24 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
-      // TODO: Implement once program is deployed
-      // const tier = await program.methods
-      //   .verifyEligibility(new anchor.BN(usageCount))
-      //   .accounts({
-      //     registry,
-      //     wallet: wallet.publicKey,
-      //   })
-      //   .view();
+      // Use real program if available (beta testing)
+      if (program) {
+        try {
+          const tier = await program.methods
+            .verifyEligibility(new BN(usageCount))
+            .accounts({
+              registry,
+              wallet: wallet.publicKey!,
+            })
+            .view();
+          return tier as number;
+        } catch (error) {
+          console.error('Error verifying eligibility:', error);
+          // Fallback to client-side calculation
+        }
+      }
 
-      // return tier as number;
-
-      // For now, determine tier client-side
+      // Fallback: determine tier client-side
       return this.getTierForUsage(usageCount);
     },
 
