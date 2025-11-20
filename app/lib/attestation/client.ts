@@ -124,33 +124,45 @@ export function createAttestationClient(
     { commitment: 'confirmed' }
   );
 
-  // Load the actual IDL from the built program for beta testing
+  // Lazy-load the IDL when needed (for beta testing)
   let program: Program<any> | null = null;
-  
-  try {
-    // Try to load the IDL from the target directory (for beta testing)
-    if (typeof window === 'undefined') {
-      // Server-side: use fs
-      const idlPath = join(process.cwd(), 'programs/attestation-program/target/idl/sealevel_attestation.json');
-      const idl = JSON.parse(readFileSync(idlPath, 'utf-8'));
-      program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
-      console.log('✅ Attestation program loaded from IDL (beta testing mode)');
-    } else {
-      // Client-side: try to fetch from public path or use dynamic import
+  let idlLoadPromise: Promise<Program<any> | null> | null = null;
+
+  // Lazy load function for IDL
+  const loadProgram = async (): Promise<Program<any> | null> => {
+    if (program) return program;
+    if (idlLoadPromise) return idlLoadPromise;
+
+    idlLoadPromise = (async () => {
       try {
-        const idlResponse = await fetch('/api/attestation/idl');
-        if (idlResponse.ok) {
-          const idl = await idlResponse.json();
-          program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
-          console.log('✅ Attestation program loaded from API (beta testing mode)');
+        let idl: any;
+        
+        if (typeof window === 'undefined') {
+          // Server-side: use fs
+          const { readFileSync } = await import('fs');
+          const { join } = await import('path');
+          const idlPath = join(process.cwd(), 'programs/attestation-program/target/idl/sealevel_attestation.json');
+          idl = JSON.parse(readFileSync(idlPath, 'utf-8'));
+        } else {
+          // Client-side: fetch from API
+          const idlResponse = await fetch('/api/attestation/idl');
+          if (!idlResponse.ok) {
+            throw new Error('Failed to fetch IDL');
+          }
+          idl = await idlResponse.json();
         }
-      } catch (e) {
-        console.warn('⚠️ Could not load IDL from API:', e);
+        
+        program = new Program(idl, ATTESTATION_PROGRAM_ID, provider);
+        console.log('✅ Attestation program loaded from IDL (beta testing mode)');
+        return program;
+      } catch (error) {
+        console.warn('⚠️ Could not load IDL, will check if program is deployed:', error);
+        return null;
       }
-    }
-  } catch (error) {
-    console.warn('⚠️ Could not load IDL, will check if program is deployed:', error);
-  }
+    })();
+
+    return idlLoadPromise;
+  };
 
   // Check if program is deployed on-chain
   const isProgramDeployed = async () => {
@@ -169,10 +181,13 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
+      // Load program if not already loaded
+      const loadedProgram = await loadProgram();
+
       // Use real program if available
-      if (program) {
+      if (loadedProgram) {
         try {
-          const tx = await program.methods
+          const tx = await loadedProgram.methods
             .initialize(merkleTree)
             .accounts({
               registry,
@@ -202,10 +217,13 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
+      // Load program if not already loaded
+      const loadedProgram = await loadProgram();
+
       // Use real program if available (beta testing)
-      if (program) {
+      if (loadedProgram) {
         try {
-          const tx = await program.methods
+          const tx = await loadedProgram.methods
             .mintAttestation(
               new BN(usageCount),
               {
@@ -227,7 +245,7 @@ export function createAttestationClient(
             .rpc();
 
           // Get tier from the program response
-          const tier = await program.methods
+          const tier = await loadedProgram.methods
             .verifyEligibility(new BN(usageCount))
             .accounts({ 
               registry, 
@@ -270,10 +288,13 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
+      // Load program if not already loaded
+      const loadedProgram = await loadProgram();
+
       // Use real program if available (beta testing)
-      if (program) {
+      if (loadedProgram) {
         try {
-          const tier = await program.methods
+          const tier = await loadedProgram.methods
             .verifyEligibility(new BN(usageCount))
             .accounts({
               registry,
@@ -297,10 +318,13 @@ export function createAttestationClient(
         ATTESTATION_PROGRAM_ID
       );
 
+      // Load program if not already loaded
+      const loadedProgram = await loadProgram();
+
       // Use real program if available (beta testing)
-      if (program) {
+      if (loadedProgram) {
         try {
-          const tx = await program.methods
+          const tx = await loadedProgram.methods
             .updateThresholds(
               new BN(tier1),
               new BN(tier2),
