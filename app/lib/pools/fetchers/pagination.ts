@@ -54,7 +54,9 @@ export async function fetchAllProgramAccountsV2(
   const allAccounts: PaginatedAccountsResponse['accounts'] = [];
   let paginationKey: string | null | undefined = null;
   let pageCount = 0;
-  const maxPages = 1000; // Safety limit to prevent infinite loops
+  // Reduced max pages to prevent excessive API calls (was 1000, now 50 = max 50,000 accounts per DEX)
+  const maxPages = 50; // Safety limit - 50 pages * 10000 limit = 500k accounts max per DEX
+  const REQUEST_DELAY = 100; // 100ms delay between requests to avoid rate limits
 
   do {
     // Helius getProgramAccountsV2 format:
@@ -175,9 +177,9 @@ export async function fetchAllProgramAccountsV2(
       break;
     }
 
-    // Small delay to avoid rate limiting
+    // Rate limiting: Add delay between pagination requests to avoid hitting Helius limits
     if (paginationKey) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
     }
   } while (paginationKey);
 
@@ -196,7 +198,8 @@ export async function fetchAllProgramAccountsV2WithProgress(
   const accounts: PaginatedAccountsResponse['accounts'] = [];
   let paginationKey: string | null | undefined = null;
   let pageCount = 0;
-  const maxPages = 1000;
+  const maxPages = 50; // Reduced to prevent excessive API calls
+  const REQUEST_DELAY = 100; // 100ms delay between requests
 
   const {
     limit = 1000,

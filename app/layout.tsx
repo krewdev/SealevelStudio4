@@ -5,6 +5,8 @@ import { ClientOnly } from './components/ClientOnly'
 import { WalletProvider } from './components/WalletProvider'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { ChunkErrorHandler } from './components/ChunkErrorHandler'
 import './globals.css'
 import './styles/design-system.css'
 import './styles/animations.css'
@@ -42,13 +44,16 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} bg-gray-900 text-gray-100 antialiased`} suppressHydrationWarning>
-        <NetworkProvider>
-          <WalletProvider>
-            <TutorialProvider>
-              {children}
-            </TutorialProvider>
-          </WalletProvider>
-        </NetworkProvider>
+        <ChunkErrorHandler />
+        <ErrorBoundary>
+          <NetworkProvider>
+            <WalletProvider>
+              <TutorialProvider>
+                {children}
+              </TutorialProvider>
+            </WalletProvider>
+          </NetworkProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )
