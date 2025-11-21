@@ -15,6 +15,9 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface Message {
   id: string;
@@ -29,6 +32,7 @@ interface ServiceBotProps {
 }
 
 export function ServiceBot({ onBack, context }: ServiceBotProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('service-bot');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -42,6 +46,38 @@ export function ServiceBot({ onBack, context }: ServiceBotProps) {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Service Desk AI Bot"
+        summary="This assistant can draft responses for customers and may process sensitive data. Confirm you will follow privacy law, keep transcripts secure, and acknowledge Sealevel Studio provides tooling only."
+        bulletPoints={[
+          'Semantic memory for tickets & docs',
+          'Escalation hotkeys for humans',
+          'JSON-rich responses for workflows',
+        ]}
+        costDetails={[
+          `AI usage metered at ~${SEAL_TOKEN_ECONOMICS.pricing.ai_query.toLocaleString()} SEAL per 1k tokens`,
+          'Enterprise session pricing available upon request',
+        ]}
+        disclaimers={[
+          'Do not paste production secrets unless you own the environment.',
+          'Comply with GDPR/CCPA and local privacy regulations when handling PII.',
+        ]}
+        accent="emerald"
+        onAccept={accept}
+      />
+    );
+  }
 
   // Auto-scroll to bottom
   useEffect(() => {

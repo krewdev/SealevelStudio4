@@ -43,6 +43,8 @@ import {
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { BrowserVulnerabilityScanner, Vulnerability } from '../lib/security/browser-scanner';
 import { Shield, AlertTriangle, CheckCircle, Activity, Radio } from 'lucide-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
 
 interface Command {
   input: string;
@@ -145,6 +147,7 @@ interface AdvancedRAndDConsoleProps {
 }
 
 export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: AdvancedRAndDConsoleProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('rd-console');
   const [commands, setCommands] = useState<Command[]>([]);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
@@ -624,6 +627,38 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
           <Terminal size={16} />
           <span>R&D Console</span>
         </button>
+      </div>
+    );
+  }
+
+  if (!initialized) {
+    return null;
+  }
+
+  if (!hasConsent) {
+    return (
+      <div className="fixed bottom-6 right-6 max-w-md w-[calc(100vw-2rem)] z-40">
+        <RiskAcknowledgement
+          featureName="Advanced R&D Console"
+          summary="This console can decode keys, decrypt payloads, and run vulnerability scanners. Confirm you have authorization to inspect any data you load and that you accept all risk."
+          bulletPoints={[
+            'Keypair + transaction decoding utilities',
+            'AES/base64/hex helpers for sensitive payloads',
+            'Live browser vulnerability monitor',
+          ]}
+          costDetails={[
+            'Runs locally—no remote data exfiltration',
+            'Logging is disabled by default; copy anything you need before closing',
+          ]}
+          disclaimers={[
+            'Do not paste secrets you are not authorized to handle.',
+            'You are solely responsible for legal compliance in your jurisdiction.',
+          ]}
+          accent="orange"
+          layout="inline"
+          cardClassName="shadow-2xl"
+          onAccept={accept}
+        />
       </div>
     );
   }

@@ -25,6 +25,9 @@ import {
   Pause,
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface TwitterPost {
   id: string;
@@ -40,6 +43,7 @@ interface TwitterBotProps {
 }
 
 export function TwitterBot({ onBack }: TwitterBotProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('twitter-bot');
   const { publicKey } = useWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -60,6 +64,39 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
   const [isStartingAgent, setIsStartingAgent] = useState(false);
 
   const maxCharacters = 280;
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Twitter Automation Bot"
+        summary="This tool can schedule, post, and run autonomous agents on your Twitter account. Confirm that you will comply with platform rules and local marketing regulations before continuing."
+        bulletPoints={[
+          'OAuth login keeps secrets client-side',
+          'Autonomous agent can reply, post, and monitor DMs',
+          'Analytics panel highlights performance + failures',
+        ]}
+        costDetails={[
+          `Setup: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL`,
+          `Monthly: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL`,
+          `Per Tweet: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_tweet.toLocaleString()} SEAL`,
+        ]}
+        disclaimers={[
+          'Never automate manipulative or unlawful content.',
+          'You assume full responsibility for account safety and regional compliance.',
+        ]}
+        accent="blue"
+        onAccept={accept}
+      />
+    );
+  }
 
   // Check authentication status on mount and handle OAuth callback
   useEffect(() => {

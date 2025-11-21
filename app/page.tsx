@@ -43,6 +43,8 @@ import { TelegramBot } from './components/TelegramBot';
 import { ChartsView } from './components/ChartsView';
 import { DisclaimerAgreement } from './components/DisclaimerAgreement';
 import { DeveloperCommunity } from './components/DeveloperCommunity';
+import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
+import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -1185,33 +1187,47 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 function SimulationView({ transactionDraft }: { transactionDraft: any }) {
   return (
     <div className="relative">
-      {/* Background Logo Placeholder */}
       <img
         src="/sea-level-logo.png"
         alt="Sealevel Studio Background"
-        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain opacity-[0.04] pointer-events-none"
         style={{
           objectPosition: 'center right',
-          transform: 'scale(0.6) rotate(-5deg)',
-          zIndex: 0
+          transform: 'scale(0.65) rotate(-4deg)',
+          zIndex: 0,
         }}
         onError={(e) => {
           (e.target as HTMLImageElement).style.display = 'none';
         }}
       />
-      <div style={{ zIndex: 1, position: 'relative' }}>
-        <h1 className="text-2xl font-bold text-white mb-4">Simulation</h1>
-      <p className="text-gray-400">
-        Feature coming soon. This is where the "before and after" state diff will be shown.
-      </p>
-      {transactionDraft && (
-        <div className="mt-6 p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
-          <h3 className="text-lg font-semibold text-blue-300 mb-2">Transaction Draft</h3>
-          <pre className="bg-blue-800/50 p-3 rounded text-sm overflow-x-auto text-blue-200 font-mono">
-            {JSON.stringify(transactionDraft, null, 2)}
-          </pre>
-        </div>
-      )}
+      <div style={{ zIndex: 1, position: 'relative' }} className="space-y-6">
+        <ComingSoonBanner
+          title="State-Diff Simulator"
+          description="We are polishing the Solana state diff visualizer. Soon you will be able to compare before/after states, account deltas, and emitted logs in a single pane."
+          highlights={[
+            'Visual balance changes, rent impacts, and CPI cascades',
+            'Simulate across devnet/mainnet forks with deterministic snapshots',
+            'Share signed simulation bundles with teammates',
+          ]}
+          checklist={[
+            'Finalizing compute unit historians',
+            'Adding fault isolation for failed CUs',
+            'Hardening transaction guards & caching',
+          ]}
+          accent="blue"
+        >
+          <p className="text-sm text-gray-300">
+            While we finish the simulator, you can still capture draft instructions below and share them with QA.
+          </p>
+          {transactionDraft && (
+            <div className="mt-4 p-4 bg-blue-900/20 border border-blue-700 rounded-2xl">
+              <h3 className="text-lg font-semibold text-blue-200 mb-2">Current Transaction Draft</h3>
+              <pre className="bg-blue-950/60 p-3 rounded text-sm overflow-x-auto text-blue-100 font-mono">
+                {JSON.stringify(transactionDraft, null, 2)}
+              </pre>
+            </div>
+          )}
+        </ComingSoonBanner>
       </div>
     </div>
   );
@@ -1220,28 +1236,45 @@ function SimulationView({ transactionDraft }: { transactionDraft: any }) {
 function ExporterView() {
   return (
     <div className="relative">
-      {/* Background Logo Placeholder */}
       <img
         src="/sea-level-logo.png"
         alt="Sealevel Studio Background"
-        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
+        className="absolute inset-0 w-full h-full object-contain opacity-[0.04] pointer-events-none"
         style={{
           objectPosition: 'center right',
-          transform: 'scale(0.6) rotate(-5deg)',
-          zIndex: 0
+          transform: 'scale(0.65) rotate(2deg)',
+          zIndex: 0,
         }}
         onError={(e) => {
           (e.target as HTMLImageElement).style.display = 'none';
         }}
       />
       <div style={{ zIndex: 1, position: 'relative' }}>
-        <h1 className="text-2xl font-bold text-white mb-4">Code Exporter</h1>
-        <p className="text-gray-400">
-          Feature coming soon. This is where you will get your copy-paste code snippets.
-        </p>
+        <ComingSoonBanner
+          title="Copy-Paste Code Exporter"
+          description="Automatic client, server, and script generation is wrapping up. You'll soon export fully typed SDK snippets for JS, Rust, Python, and Anchor without leaving the IDE."
+          highlights={[
+            'Generates Anchor, web3.js, helius, and validator-ready scripts',
+            'Context-aware comments & guardrails baked in',
+          ]}
+          checklist={[
+            'Finishing transaction recipe templating',
+            'Adding pricing transparency for bulk exports',
+          ]}
+          accent="purple"
+        />
       </div>
     </div>
   );
+}
+
+interface LoaderContextInfo {
+  featureName: string;
+  description: string;
+  directions?: string[];
+  cost?: string;
+  disclaimer?: string;
+  extraNote?: string;
 }
 
 // Landing Page Component is now imported from ./components/LandingPage
@@ -1385,6 +1418,140 @@ export default function App() {
       }
     };
 
+    const getLoadingContext = (): LoaderContextInfo => {
+      const bundlerCost = `${SEAL_TOKEN_ECONOMICS.pricing.bundler_multi_send.toLocaleString()} SEAL per bundle + ${SEAL_TOKEN_ECONOMICS.pricing.bundler_recipient} SEAL per recipient`;
+      const twitterCost = `${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL monthly`;
+      const telegramCost = `${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_monthly.toLocaleString()} SEAL monthly`;
+      const builderCost = `${SEAL_TOKEN_ECONOMICS.pricing.advanced_transaction.toLocaleString()} SEAL per advanced build`;
+      const scannerCost = `${SEAL_TOKEN_ECONOMICS.pricing.scanner_scan.toLocaleString()} SEAL per scan`;
+
+      const baseContext: LoaderContextInfo = {
+        featureName: 'Sealevel Studio',
+        description: 'Spinning up your workspace with wallet, network, and AI assistants.',
+        directions: [
+          'Connect a wallet or stay in read-only mode',
+          'Select Devnet or Mainnet RPC access',
+        ],
+        cost: 'Free tier usage (limits apply)',
+        disclaimer: 'Experimental tooling. Verify all addresses before signing.',
+      };
+
+      const contextMap: Record<string, LoaderContextInfo> = {
+        inspector: {
+          featureName: 'Account Inspector',
+          description: 'Fetching account data, lamport balances, and token state.',
+          directions: [
+            'Paste or select an address',
+            'Use history panel to compare snapshots',
+          ],
+          disclaimer: 'Data is fetched directly from Solana RPC endpoints.',
+        },
+        builder: {
+          featureName: 'Instruction Builder',
+          description: 'Preparing programmable transaction templates with guardrails.',
+          directions: [
+            'Select a program + instruction',
+            'Fill required accounts & args, then export or simulate',
+          ],
+          cost: builderCost,
+          disclaimer: 'Transactions execute on-chain; double check keys before sending.',
+        },
+        scanner: {
+          featureName: 'Arbitrage Scanner',
+          description: 'Booting price oracles, MEV defenses, and liquidity watchers.',
+          directions: [
+            'Select pools or let AI suggest routes',
+            'Configure alert thresholds & auto-trading rules',
+          ],
+          cost: scannerCost,
+          disclaimer: 'Signals are informational, not trading advice.',
+        },
+        bundler: {
+          featureName: 'Transaction Bundler',
+          description: 'Loading multi-send builder with size estimator and wallet registry.',
+          directions: [
+            'Connect wallet & paste recipient list',
+            'Estimate size before broadcast',
+          ],
+          cost: bundlerCost,
+          disclaimer: 'Multi-sends are irreversible. Ensure you comply with sanctions & AML laws.',
+        },
+        'twitter-bot': {
+          featureName: 'Twitter Automation Bot',
+          description: 'Linking OAuth session, scheduling queue, and AI agent policies.',
+          directions: [
+            'Authenticate with Twitter and scope permissions',
+            'Draft content or configure autonomous agent cadence',
+          ],
+          cost: twitterCost,
+          disclaimer: 'Respect platform policies and local communications law; logs are locally stored.',
+        },
+        'telegram-bot': {
+          featureName: 'Telegram Command Center',
+          description: 'Bootstrapping bot token storage and responder flows.',
+          directions: [
+            'Provide BotFather token securely',
+            'Map commands to playbooks before activating',
+          ],
+          cost: telegramCost,
+          disclaimer: 'Never spam or violate telecom regulations. You are responsible for distribution.',
+        },
+        'service-bot': {
+          featureName: 'AI Service Desk',
+          description: 'Preparing customer support macros and compliance guardrails.',
+          directions: [
+            'Select tone + escalation rules',
+            'Feed FAQs or knowledge base links',
+          ],
+          cost: 'Usage billed per resolved session (quote on request)',
+          disclaimer: 'Ensure responses respect privacy laws (GDPR/CCPA etc.).',
+        },
+        'substack-bot': {
+          featureName: 'Substack Growth Bot',
+          description: 'Linking newsletter API tokens and drafting drip sequences.',
+          directions: [
+            'Connect Substack API key',
+            'Review queue before enabling auto-post',
+          ],
+          cost: 'Included in bot beta; SEAL usage billed later',
+          disclaimer: 'Content must obey jurisdictional advertising law.',
+        },
+        presale: {
+          featureName: 'Presale Portal',
+          description: 'Validating wallet allowlist and vesting schedule preview.',
+          directions: [
+            'Connect wallet and pass KYC/region gates',
+            'Select tranche and confirm token lockups',
+          ],
+          cost: 'Presale allocations vary per tranche',
+          disclaimer: 'Not an offer to sell securities. Always comply with your local regulations.',
+          extraNote: 'Countdown widget stays visible globally so you never miss go-live.',
+        },
+        docs: {
+          featureName: 'Docs & Change Logs',
+          description: 'Fetching latest on-chain references and integration guides.',
+          directions: [
+            'Use search to filter by stack',
+            'Bookmark frequently used runbooks',
+          ],
+          cost: 'Free access',
+          disclaimer: 'Documentation may describe beta features subject to change.',
+        },
+        web2: {
+          featureName: 'Web2 Integrations',
+          description: 'Loading CRM, analytics, and webhook blueprints.',
+          directions: [
+            'Store secrets in your self-hosted vault',
+            'Review rate limits before syncing',
+          ],
+          cost: 'Usage billed per connector (coming soon)',
+          disclaimer: 'Never paste production API keys into shared demos.',
+        },
+      };
+
+      return contextMap[activeView] ?? baseContext;
+    };
+
     content = (
       <ClientOnly>
         {/* Page Loader Overlay */}
@@ -1393,6 +1560,7 @@ export default function App() {
           duration={3000}
           onAnimationComplete={() => setIsPageLoading(false)}
           quote={getLoadingQuote()}
+          context={getLoadingContext()}
         />
         
         <div className="h-screen flex flex-col bg-gray-900">

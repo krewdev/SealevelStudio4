@@ -21,6 +21,8 @@ import {
   Pause,
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
 
 interface SubstackPost {
   id: string;
@@ -36,6 +38,7 @@ interface SubstackBotProps {
 }
 
 export function SubstackBot({ onBack }: SubstackBotProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('substack-bot');
   const { publicKey } = useWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -55,6 +58,38 @@ export function SubstackBot({ onBack }: SubstackBotProps) {
   const [apiKey, setApiKey] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Substack Automation Bot"
+        summary="This writer bot can publish to your subscribers, schedule newsletters, and run autonomous drip campaigns. Confirm that you own the content and respect local communication laws."
+        bulletPoints={[
+          'OAuth secrets stored locally—never on our servers',
+          'Autonomous cadence with manual approval toggles',
+          'Templates for paid/free issues and referral boosts',
+        ]}
+        costDetails={[
+          'Beta testers: included with your SEAL airdrop',
+          'Future pricing: billed per campaign export',
+        ]}
+        disclaimers={[
+          'Content must not be misleading financial advice.',
+          'You remain responsible for CAN-SPAM/GDPR compliance.',
+        ]}
+        accent="amber"
+        onAccept={accept}
+      />
+    );
+  }
 
   // Check authentication status on mount
   useEffect(() => {

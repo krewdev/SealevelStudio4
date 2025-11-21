@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ClientOnly } from './components/ClientOnly'
 import { WalletProvider } from './components/WalletProvider'
+import { PresaleCountdown } from './components/PresaleCountdown'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -61,6 +62,9 @@ export default function RootLayout({
             </WalletProvider>
           </NetworkProvider>
         </ErrorBoundary>
+        <ClientOnly>
+          <PresaleCountdown />
+        </ClientOnly>
       </body>
     </html>
   )

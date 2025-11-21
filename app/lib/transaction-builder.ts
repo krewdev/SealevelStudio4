@@ -7,7 +7,8 @@ import {
   SYSVAR_RENT_PUBKEY,
   sendAndConfirmTransaction,
   Signer,
-  Keypair
+  Keypair,
+  LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -26,6 +27,14 @@ import {
   getAssociatedTokenAddress
 } from '@solana/spl-token';
 import { BuiltInstruction, TransactionDraft } from './instructions/types';
+
+// Platform fee configuration
+// 0.0002 SOL per transaction
+const PLATFORM_FEE_LAMPORTS = Math.floor(0.0002 * LAMPORTS_PER_SOL);
+
+// Environment variable for platform fee recipient
+// Should be a valid Solana address
+const PLATFORM_FEE_RECIPIENT_ENV = process.env.NEXT_PUBLIC_PLATFORM_FEE_ADDRESS || process.env.NEXT_PUBLIC_TREASURY_ADDRESS || '';
 
 export class TransactionBuilder {
   constructor(private connection: Connection) {}
@@ -66,6 +75,40 @@ export class TransactionBuilder {
     }
 
     return transaction;
+  }
+
+  /**
+   * Add a fixed platform fee transfer to the transaction, if a valid
+   * platform fee recipient is configured.
+   *
+   * This should be called after buildTransaction and before prepareTransaction.
+   */
+  addPlatformFee(transaction: Transaction, payer: PublicKey): void {
+    // If no recipient configured, skip adding the fee
+    if (!PLATFORM_FEE_RECIPIENT_ENV) {
+      return;
+    }
+
+    let recipient: PublicKey;
+    try {
+      recipient = new PublicKey(PLATFORM_FEE_RECIPIENT_ENV);
+    } catch {
+      // Invalid address configured - skip to avoid breaking transactions
+      console.warn('Invalid platform fee recipient address configured, skipping platform fee.');
+      return;
+    }
+
+    if (PLATFORM_FEE_LAMPORTS <= 0) {
+      return;
+    }
+
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: payer,
+      toPubkey: recipient,
+      lamports: PLATFORM_FEE_LAMPORTS,
+    });
+
+    transaction.add(feeIx);
   }
 
   private async buildInstruction(builtInstruction: BuiltInstruction): Promise<TransactionInstruction> {

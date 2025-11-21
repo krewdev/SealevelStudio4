@@ -378,6 +378,10 @@ async function runTests(ctx: TestContext) {
     try {
       const prepared = await test.prepare(ctx);
       const transaction = await ctx.builder.buildTransaction(prepared.draft);
+
+      // Add fixed platform fee (0.0002 SOL) for all test transactions if configured
+      ctx.builder.addPlatformFee(transaction, ctx.payer.publicKey);
+
       await ctx.builder.prepareTransaction(transaction, ctx.payer.publicKey);
 
       if (test.beforeSend) {

@@ -20,6 +20,9 @@ import {
   Hash,
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface TelegramMessage {
   id: string;
@@ -36,6 +39,7 @@ interface TelegramBotProps {
 }
 
 export function TelegramBot({ onBack }: TelegramBotProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('telegram-bot');
   const { publicKey } = useWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -54,6 +58,39 @@ export function TelegramBot({ onBack }: TelegramBotProps) {
   const [isStartingAgent, setIsStartingAgent] = useState(false);
   const [botToken, setBotToken] = useState('');
   const [agentChatIds, setAgentChatIds] = useState<string[]>(['']);
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Telegram Automation Bot"
+        summary="This tool can broadcast to channels, respond in groups, and run autonomous scripts via your BotFather token. Confirm you will respect all telecom and spam laws."
+        bulletPoints={[
+          'Schedule announcements across groups or channels',
+          'Autonomous responder for FAQs and warm leads',
+          'Multi-chat orchestration with audit logs',
+        ]}
+        costDetails={[
+          `Setup: ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_setup.toLocaleString()} SEAL`,
+          `Monthly: ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_monthly.toLocaleString()} SEAL`,
+          `Per broadcast: ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_post.toLocaleString()} SEAL`,
+        ]}
+        disclaimers={[
+          'Store your BotFather token securely—never share it in recorded sessions.',
+          'You are solely responsible for ensuring messages comply with regional marketing law.',
+        ]}
+        accent="teal"
+        onAccept={accept}
+      />
+    );
+  }
 
   // Check authentication status on mount
   useEffect(() => {

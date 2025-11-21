@@ -3,6 +3,15 @@
 import React, { useEffect, useState } from 'react';
 import { SealAnimation } from './SealAnimation';
 
+interface LoadingContext {
+  featureName: string;
+  description: string;
+  directions?: string[];
+  cost?: string;
+  disclaimer?: string;
+  extraNote?: string;
+}
+
 interface PageLoaderProps {
   isLoading: boolean;
   duration?: number; // Duration in milliseconds (default 3000ms = 3 seconds)
@@ -11,9 +20,10 @@ interface PageLoaderProps {
     text: string;
     author: string;
   }; // Custom quote for loading screen
+  context?: LoadingContext;
 }
 
-export function PageLoader({ isLoading, duration = 3000, onAnimationComplete, quote }: PageLoaderProps) {
+export function PageLoader({ isLoading, duration = 3000, onAnimationComplete, quote, context }: PageLoaderProps) {
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -95,6 +105,47 @@ export function PageLoader({ isLoading, duration = 3000, onAnimationComplete, qu
       <p className="text-gray-400 text-sm mt-4">
         {Math.round(progress)}%
       </p>
+
+      {context && (
+        <div className="w-full max-w-xl mt-8 bg-gray-950/70 border border-gray-800 rounded-2xl p-5 text-left space-y-4 shadow-xl">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-blue-300 flex items-center gap-2">
+              Preparing
+              <span className="text-white/80 tracking-normal">{context.featureName}</span>
+            </p>
+            <p className="text-sm text-gray-300 mt-2 leading-relaxed">{context.description}</p>
+          </div>
+
+          {context.directions && context.directions.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                Quick Directions
+              </p>
+              <ul className="space-y-1 text-sm text-gray-200 list-disc list-inside">
+                {context.directions.map((step, index) => (
+                  <li key={`direction-${index}`}>{step}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {context.cost && (
+            <div className="text-sm text-blue-200">
+              <span className="font-semibold text-blue-300">Estimated Cost:</span> {context.cost}
+            </div>
+          )}
+
+          {context.disclaimer && (
+            <div className="text-xs text-gray-400 border-t border-gray-800 pt-2">
+              {context.disclaimer}
+            </div>
+          )}
+
+          {context.extraNote && (
+            <p className="text-xs text-gray-400 italic">{context.extraNote}</p>
+          )}
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes shimmer {

@@ -901,6 +901,10 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       };
 
       const transaction = await builder.buildTransaction(draft);
+
+      // Add fixed platform fee (0.0002 SOL) if a valid fee recipient is configured
+      builder.addPlatformFee(transaction, publicKey);
+
       await builder.prepareTransaction(transaction, publicKey);
       
       const cost = await builder.estimateCost(transaction);
@@ -1445,8 +1449,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   );
 
   // Render Advanced Mode (InstructionAssembler)
-  const renderAdvancedMode = () => (
-    <div className="h-full flex flex-col overflow-hidden">
+  const renderAdvancedMode = () => {
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
       {/* Fixed Header */}
       <div className="flex-shrink-0 p-6 pb-4">
         <div className="flex items-center justify-between mb-6">
@@ -1561,26 +1566,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           onClose={() => setShowTemplateSelector(false)}
         />
       )}
-    </div>
-  );
+      </div>
+    );
+  };
 
+  // Main Transaction Builder layout
   return (
-    <div className="flex flex-col h-full bg-gray-900 relative">
-      {/* Background Logo Placeholder */}
-      <img
-        src="/sea-level-logo.png"
-        alt="Sealevel Studio Background"
-        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
-        style={{
-          objectPosition: 'center right',
-          transform: 'scale(0.6) rotate(-5deg)',
-          zIndex: 0
-        }}
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = 'none';
-        }}
-      />
-      <div style={{ zIndex: 1, position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="flex flex-col h-full bg-gray-900">
       {/* Mode Toggle Header */}
       <div className="border-b border-gray-700 bg-gray-800/50 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
