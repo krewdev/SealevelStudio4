@@ -1151,6 +1151,18 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <ChartsView onBack={() => setActiveView('inspector')} />;
   }
 
+  // Developer Community has its own full-screen layout
+  if (activeView === 'freelance-devs') {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        {/* Import the page component dynamically or create a wrapper */}
+        <div className="w-full">
+          {/* We'll need to import and render the FreelanceDevsPage component */}
+        </div>
+      </div>
+    );
+  }
+
   // Default single-column layout for other views
   return (
     <>

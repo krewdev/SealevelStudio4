@@ -95,6 +95,14 @@ export function ToolsHub({ onBack, onNavigateToTool }: ToolsHubProps) {
       category: 'social',
       onNavigate: () => onNavigateToTool?.('social'),
     },
+    {
+      id: 'freelance-devs',
+      name: 'Developer Community',
+      description: 'Find teammates, discuss ideas, job postings, and crypto news',
+      icon: <Users className="w-6 h-6" />,
+      category: 'social',
+      onNavigate: () => onNavigateToTool?.('freelance-devs'),
+    },
   ];
 
   const categories = [
