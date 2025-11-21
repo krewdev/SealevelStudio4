@@ -148,11 +148,12 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
         style={{ zIndex: 0 }}
       >
         <img
-          src="/transaction-builder-logo.jpeg"
+          src="/sea-level-logo.png"
           alt="Sealevel Studio Background"
-          className="absolute inset-0 w-full h-full object-contain opacity-[0.06]"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.04] filter hue-rotate-[180deg] saturate-50"
           style={{
             objectPosition: 'center',
+            transform: 'scale(0.8)',
           }}
           onError={(e) => {
             console.warn('Background logo not found');

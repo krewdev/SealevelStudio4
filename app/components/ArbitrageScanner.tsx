@@ -275,6 +275,26 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
         onBuildTransaction={handleBuildTransaction}
       />
       <div className="h-full flex flex-col animated-bg text-white relative">
+      {/* Background Logo */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{ zIndex: 0 }}
+      >
+        <img
+          src="/sea-level-logo.png"
+          alt="Sealevel Studio Background"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.06] filter hue-rotate-[270deg] saturate-60 contrast-125"
+          style={{
+            objectPosition: 'bottom left',
+            transform: 'scale(0.7) rotate(10deg)',
+          }}
+          onError={(e) => {
+            console.warn('Background logo not found');
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30">
         <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl" />

@@ -7,9 +7,13 @@ interface PageLoaderProps {
   isLoading: boolean;
   duration?: number; // Duration in milliseconds (default 3000ms = 3 seconds)
   onAnimationComplete?: () => void; // Callback when animation finishes
+  quote?: {
+    text: string;
+    author: string;
+  }; // Custom quote for loading screen
 }
 
-export function PageLoader({ isLoading, duration = 3000, onAnimationComplete }: PageLoaderProps) {
+export function PageLoader({ isLoading, duration = 3000, onAnimationComplete, quote }: PageLoaderProps) {
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -48,7 +52,7 @@ export function PageLoader({ isLoading, duration = 3000, onAnimationComplete }: 
   if (!showLoader) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-gray-900/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center transition-opacity duration-300"
       style={{
         opacity: showLoader ? 1 : 0,
@@ -60,9 +64,14 @@ export function PageLoader({ isLoading, duration = 3000, onAnimationComplete }: 
       </div>
 
       {/* Loading Text */}
-      <h2 className="text-2xl font-bold text-white mb-4">
-        Loading...
-      </h2>
+      <div className="text-center mb-4">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          "{quote?.text || "The future of money is programmable."}"
+        </h2>
+        <p className="text-gray-400 text-sm italic">
+          - {quote?.author || "Vitalik Buterin"}
+        </p>
+      </div>
 
       {/* Progress Bar */}
       <div className="w-80 max-w-[90vw] h-2 bg-gray-800 rounded-full overflow-hidden shadow-lg">

@@ -382,11 +382,12 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
         style={{ zIndex: 0 }}
       >
         <img
-          src="/transaction-builder-logo.jpeg"
+          src="/sea-level-logo.png"
           alt="Sealevel Studio Background"
-          className="absolute inset-0 w-full h-full object-contain opacity-[0.06]"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110"
           style={{
-            objectPosition: 'center',
+            objectPosition: 'center right',
+            transform: 'scale(0.6) rotate(-5deg)',
           }}
           onError={(e) => {
             console.warn('Background logo not found');
@@ -1328,10 +1329,33 @@ export default function App() {
     // Main app interface
     const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
 
+    // Get loading quote based on destination view
+    const getLoadingQuote = () => {
+      switch (activeView) {
+        case 'inspector':
+          return { text: "In crypto, you're not buying a security, you're buying into a community.", author: "Naval Ravikant" };
+        case 'builder':
+          return { text: "Code is law.", author: "Ethereum Community" };
+        case 'scanner':
+          return { text: "The blockchain is an incorruptible digital ledger.", author: "Don Tapscott" };
+        case 'presale':
+          return { text: "The future of money is programmable.", author: "Vitalik Buterin" };
+        case 'cyber-playground':
+          return { text: "Web3 is about restoring power to people.", author: "Web3 Advocates" };
+        default:
+          return { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" };
+      }
+    };
+
     content = (
       <ClientOnly>
         {/* Page Loader Overlay */}
-        <PageLoader isLoading={isPageLoading} duration={3000} onAnimationComplete={() => setIsPageLoading(false)} />
+        <PageLoader
+          isLoading={isPageLoading}
+          duration={3000}
+          onAnimationComplete={() => setIsPageLoading(false)}
+          quote={getLoadingQuote()}
+        />
         
         <div className="h-screen flex flex-col bg-gray-900">
           {!isFullScreenView && (

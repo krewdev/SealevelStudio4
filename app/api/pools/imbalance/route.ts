@@ -67,8 +67,8 @@ export async function GET(request: NextRequest) {
           // Predictive analytics
           let predictedPrice: number | undefined;
           let predictionConfidence: number | undefined;
-          if (predictiveAnalytics && opp.steps.length > 0) {
-            const pool = state.pools.find(p => p.id === opp.steps[0].pool.id);
+          if (predictiveAnalytics && opp.path?.steps && opp.path.steps.length > 0) {
+            const pool = state.pools.find(p => p.id === opp.path.steps[0].pool.id);
             if (pool) {
               const prediction = await predictiveAnalytics.predictPrice(pool, 60);
               predictedPrice = prediction.predictedPrice;
@@ -78,8 +78,8 @@ export async function GET(request: NextRequest) {
 
           // Pattern matching
           let historicalMatches = 0;
-          if (opp.steps.length > 0) {
-            const pool = state.pools.find(p => p.id === opp.steps[0].pool.id);
+          if (opp.path?.steps && opp.path.steps.length > 0) {
+            const pool = state.pools.find(p => p.id === opp.path.steps[0].pool.id);
             if (pool) {
               const matches = patternMatcher.findMatches(opp, pool);
               historicalMatches = matches.length;

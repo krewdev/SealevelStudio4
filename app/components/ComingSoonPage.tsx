@@ -14,8 +14,18 @@ export default function ComingSoonPage({ title, description, eta = 'Q3 2025' }: 
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
-      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 text-center relative">
+      {/* Transparent Logo Watermark */}
+      <img
+        src="/sea-level-logo.png"
+        alt="Sealevel Studio Background"
+        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110"
+        style={{
+          objectPosition: 'center right',
+          transform: 'scale(0.6) rotate(-5deg)',
+        }}
+      />
+      <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 max-w-md w-full shadow-2xl relative z-10">
         <div className="w-16 h-16 bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
           <Clock className="w-8 h-8 text-purple-400" />
         </div>

@@ -156,18 +156,30 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
     };
   }, [size]);
 
-  // Check if video file exists (only check once on mount)
+  // Prioritize video over canvas animation
   useEffect(() => {
     const checkVideo = async () => {
       try {
+        // Check for MP4 video file
         const response = await fetch('/sea-lion-animation.mp4', { method: 'HEAD' });
         if (response.ok) {
           setUseVideo(true);
-        } else {
-          setUseVideo(false);
+          console.log('Using sea lion MP4 animation');
+          return;
         }
-      } catch {
-        // Video not found, use canvas animation
+
+        // Fallback to alternate MP4
+        const altResponse = await fetch('/sea-lion-animation.1mp4', { method: 'HEAD' });
+        if (altResponse.ok) {
+          setUseVideo(true);
+          console.log('Using alternate sea lion MP4 animation');
+          return;
+        }
+
+        console.log('MP4 video not found, canvas animation disabled');
+        setUseVideo(false);
+      } catch (error) {
+        console.log('Video check failed, canvas animation disabled:', error);
         setUseVideo(false);
       }
     };
@@ -202,16 +214,13 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
     );
   }
 
-  // Fallback to canvas animation
+  // No fallback - only MP4 video allowed
+  console.warn('Sea lion MP4 animation not available');
   return (
-    <canvas
-      ref={canvasRef}
-      className={`seal-animation ${className}`}
-      style={{
-        display: 'block',
-        filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))',
-      }}
-    />
+    <div className={`flex items-center justify-center ${className}`}
+         style={{ width: size, height: size }}>
+      <div className="text-gray-400 text-sm">Loading...</div>
+    </div>
   );
 }
 
