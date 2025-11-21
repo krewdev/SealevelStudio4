@@ -1608,7 +1608,11 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                   : 'text-gray-400 hover:text-gray-200'
               }`}
             >
-              <Wrench size={16} />
+              <img
+                src="/transaction-builder-logo.jpeg"
+                alt="Transaction Builder Logo"
+                className="w-4 h-4 rounded-sm"
+              />
               Advanced
             </button>
           </div>

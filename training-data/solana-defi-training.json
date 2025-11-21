@@ -1,0 +1,187 @@
+{
+  "training_data": [
+    {
+      "topic": "Solana Transaction Types",
+      "content": "Solana supports multiple transaction types: System Program (account creation, SOL transfers), SPL Token Program (token transfers, minting, burning), Associated Token Account Program (ATA creation), Metaplex (NFT creation and metadata), Stake Program (staking operations), Vote Program (validator voting), and various DeFi protocols like Jupiter, Raydium, Orca, Marinade, and Kamino."
+    },
+    {
+      "topic": "System Program Transactions",
+      "content": "System Program handles core Solana operations: CreateAccount (requires lamports for rent exemption), Transfer (SOL transfers between accounts), Allocate (space allocation), Assign (program assignment), CreateAccountWithSeed (deterministic account creation), and TransferWithSeed (transfers from seeded accounts)."
+    },
+    {
+      "topic": "SPL Token Operations",
+      "content": "SPL Token Program enables: Token transfers (with optional multisig), Minting new tokens (requires mint authority), Burning tokens (reduces supply), Approving delegates (allows third parties to transfer), Freezing accounts (pauses transfers), Thawing accounts (resumes transfers), and setting authorities (transferring control)."
+    },
+    {
+      "topic": "DEX Trading Strategies",
+      "content": "Profitable DEX strategies include: Arbitrage between Raydium and Orca pools, triangular arbitrage (SOL→USDC→BONK→SOL), cross-protocol arbitrage (Jupiter vs direct pools), sandwich attacks (MEV), back-running profitable transactions, liquidation sniping, and new pool sniping on launch."
+    },
+    {
+      "topic": "Flash Loans on Solana",
+      "content": "Flash loans on Solana: Kamino provides decentralized flash loans for arbitrage, liquidation, and refinancing. Solend offers flash loans for various DeFi operations. Port Finance supports flash loans with credit delegation. Flash loans must be borrowed and repaid in the same transaction - perfect for atomic arbitrage where the arbitrage profit covers the loan fee."
+    },
+    {
+      "topic": "MEV Strategies",
+      "content": "MEV (Miner Extractable Value) on Solana: Front-running (detecting large pending swaps and buying before them), back-running (following profitable transactions), sandwich attacks (buying before and selling after a large trade), liquidation extraction (being first to liquidate underwater positions), arbitrage extraction (capturing price differences), and time-bandit attacks (manipulating timestamp-dependent logic)."
+    },
+    {
+      "topic": "Jupiter Aggregator",
+      "content": "Jupiter is Solana's premier DEX aggregator supporting: Multi-hop routing (up to 3 hops), split trades across multiple routes, real-time quote updates, transaction bundling, and MEV protection. Jupiter integrates with Raydium, Orca, Whirlpool, Aldrin, and many other AMMs. Use Jupiter for optimal price execution and slippage protection."
+    },
+    {
+      "topic": "Raydium AMM",
+      "content": "Raydium is Solana's leading AMM: Concentrated liquidity (like Uniswap V3), standard AMM pools, CLMM (Concentrated Liquidity Market Maker), farm mining rewards, and integration with Jupiter. Raydium supports stable swaps, weighted pools, and permissionless pool creation. Monitor new pool creation events for sniping opportunities."
+    },
+    {
+      "topic": "Orca Whirlpool",
+      "content": "Orca Whirlpool provides: Concentrated liquidity with customizable fee tiers (0.01% to 1%), position management, yield farming, and integration with Jupiter. Whirlpool supports: Opening positions with custom tick ranges, collecting fees, compounding rewards, and migrating between fee tiers. Use for high-efficiency liquidity provision and arbitrage."
+    },
+    {
+      "topic": "Marinade Staking",
+      "content": "Marinade enables liquid staking: Deposit SOL to receive mSOL tokens representing staked SOL, unstake with various lockup periods (immediate to 4 years), claim rewards, and use mSOL in DeFi protocols. Marinade provides: Instant unstaking (with fee), delayed unstaking (no fee), and integration with various DeFi platforms."
+    },
+    {
+      "topic": "Kamino Lending",
+      "content": "Kamino is Solana's leading lending protocol: Multi-asset support (SOL, USDC, USDT, etc.), isolated and cross-collateral positions, flash loans, leverage farming, and liquidation protection. Kamino features: Dynamic interest rates, liquidation bonuses, position management, and integration with Kamino vaults for automated strategies."
+    },
+    {
+      "topic": "Atomic Arbitrage",
+      "content": "Atomic arbitrage on Solana: Execute arbitrage in a single transaction using flash loans, eliminate execution risk through atomicity, bundle multiple operations in one transaction, and use Jito bundles for priority execution. Strategies include: Cross-DEX arbitrage, triangular arbitrage, statistical arbitrage, and merger arbitrage."
+    },
+    {
+      "topic": "Liquidity Mining",
+      "content": "Liquidity mining opportunities: Provide liquidity to AMM pools and earn trading fees, stake LP tokens for additional rewards, participate in yield farming programs, and compound rewards automatically. Monitor: Impermanent loss vs rewards ratio, pool depth, trading volume, and reward token value."
+    },
+    {
+      "topic": "MEV Protection",
+      "content": "Protect against MEV: Use private RPC endpoints, implement slippage protection, bundle transactions with Jito, use limit orders instead of market orders, execute during low-congestion periods, and monitor for front-running bots. Advanced protection includes: Transaction simulation before execution and using DEX aggregators with MEV protection."
+    },
+    {
+      "topic": "Token Launch Strategies",
+      "content": "Token launch strategies: Fair launches with bonding curves, initial DEX offerings (IDO), initial farm offerings (IFO), and sniper protection. Monitor: New pool creation events on Raydium, token launch platforms, fair launch contracts, and initial liquidity provisions. Use tools to detect pump-and-dump schemes and rug pulls."
+    },
+    {
+      "topic": "Cross-Protocol Arbitrage",
+      "content": "Cross-protocol arbitrage: Exploit price differences between different DeFi protocols, lending rates arbitrage (deposit high-yield, borrow low-yield), staking yield arbitrage, and liquidity mining arbitrage. Monitor: Interest rate changes, reward token prices, and protocol-specific opportunities."
+    },
+    {
+      "topic": "Transaction Optimization",
+      "content": "Optimize Solana transactions: Use compute budget instructions to set compute limits and priority fees, bundle multiple instructions in one transaction, use lookup tables for address compression, implement proper account ordering, and monitor transaction costs vs profits."
+    },
+    {
+      "topic": "Risk Management",
+      "content": "DeFi risk management: Monitor liquidation ratios, maintain healthy collateralization, use stop-loss orders, diversify across protocols, stay updated on protocol changes, and use insurance protocols like Solace or Cover Protocol for protection against smart contract bugs."
+    },
+    {
+      "topic": "Yield Farming Strategies",
+      "content": "Advanced yield farming: Stake tokens for governance rewards, provide liquidity for trading fees and incentives, participate in dual farming (stake and farm simultaneously), and use leverage farming with flash loans. Calculate: APY, APR, impermanent loss risk, and reward token correlation."
+    },
+    {
+      "topic": "Liquidation Opportunities",
+      "content": "Liquidation strategies: Monitor underwater positions on lending protocols, execute liquidations for profit, front-run liquidations with MEV, and use flash loans for efficient liquidation execution. Monitor: Health factors, liquidation thresholds, and liquidation bonuses."
+    },
+    {
+      "topic": "Statistical Arbitrage",
+      "content": "Statistical arbitrage on Solana: Identify correlated token pairs, exploit mean-reversion opportunities, monitor price divergences from fundamental values, and use statistical models to predict price movements. Implement: Cointegration tests, error correction models, and pairs trading strategies."
+    },
+    {
+      "topic": "Program-Derived Addresses",
+      "content": "PDAs (Program-Derived Addresses) on Solana: Deterministic account creation using program ID + seeds, used for vaults, escrow accounts, and protocol-owned accounts. Common patterns: Associated token accounts, Metaplex metadata accounts, and protocol-specific PDAs for different functionalities."
+    },
+    {
+      "topic": "Cross-Program Invocations",
+      "content": "CPIs (Cross-Program Invocations) enable: Program composition where one program calls another, creating complex DeFi operations, automated strategies, and protocol integrations. Examples: DEX aggregators calling multiple AMMs, lending protocols interacting with liquidators, and yield farming protocols managing multiple positions."
+    },
+    {
+      "topic": "Versioned Transactions",
+      "content": "Versioned transactions support: Address lookup tables for compressed accounts, more efficient transaction encoding, reduced fees for complex transactions, and better scalability. Use versioned transactions for: Large DEX aggregations, complex DeFi operations, and batched transaction execution."
+    },
+    {
+      "topic": "Priority Fees",
+      "content": "Priority fees on Solana: Pay additional fees to increase transaction priority, crucial for MEV strategies and time-sensitive operations. Calculate fees based on: Current network congestion, desired inclusion time, and transaction compute requirements. Use tools to monitor optimal fee levels."
+    }
+  ],
+  "trading_strategies": [
+    {
+      "name": "Cross-DEX Arbitrage",
+      "description": "Exploit price differences between different DEXes like Raydium vs Orca",
+      "execution": "Monitor price feeds, calculate optimal routes, execute atomic swaps",
+      "tools": ["Jupiter API", "Price feeds", "Flash loans"],
+      "risk": "Slippage, execution failure, network congestion"
+    },
+    {
+      "name": "Triangular Arbitrage",
+      "description": "Exploit inefficiencies in token pairs through three-token cycles",
+      "execution": "Find triangular relationships, calculate optimal amounts, execute in one transaction",
+      "tools": ["Pathfinding algorithms", "Price oracles", "Atomic transactions"],
+      "risk": "Price movements during execution, gas costs"
+    },
+    {
+      "name": "MEV Front-Running",
+      "description": "Detect pending profitable transactions and execute before them",
+      "execution": "Monitor mempool, identify profitable opportunities, execute with higher priority",
+      "tools": ["Mempool monitoring", "Priority fees", "Jito bundles"],
+      "risk": "Competition, failed transactions, regulatory concerns"
+    },
+    {
+      "name": "Liquidation Sniping",
+      "description": "Monitor and execute liquidations on underwater positions",
+      "execution": "Track health factors, calculate liquidation amounts, execute with flash loans",
+      "tools": ["Protocol APIs", "Health factor monitoring", "Flash loans"],
+      "risk": "Position recovery, gas wars, smart contract changes"
+    },
+    {
+      "name": "New Pool Sniping",
+      "description": "Be first to provide liquidity to newly created pools",
+      "execution": "Monitor pool creation events, execute immediate liquidity provision",
+      "tools": ["Event monitoring", "Fast execution", "Liquidity calculation"],
+      "risk": "Rug pulls, low liquidity, impermanent loss"
+    }
+  ],
+  "flash_loan_strategies": [
+    {
+      "protocol": "Kamino",
+      "description": "Decentralized flash loans for various DeFi operations",
+      "use_cases": ["Arbitrage", "Liquidation", "Refinancing"],
+      "fees": "Protocol fee + flash loan premium",
+      "requirements": "Must repay in same transaction"
+    },
+    {
+      "protocol": "Solend",
+      "description": "Flash loans integrated with lending platform",
+      "use_cases": ["Arbitrage", "Position management", "Yield farming"],
+      "fees": "Flash loan fee + interest",
+      "requirements": "Healthy account status"
+    },
+    {
+      "protocol": "Port Finance",
+      "description": "Flash loans with credit delegation features",
+      "use_cases": ["Arbitrage", "Cross-protocol operations"],
+      "fees": "Variable based on utilization",
+      "requirements": "Credit delegation setup"
+    }
+  ],
+  "mev_techniques": [
+    {
+      "technique": "Sandwich Attacks",
+      "description": "Buy before and sell after a large trade to profit from slippage",
+      "implementation": "Monitor pending transactions, calculate optimal amounts, execute in sequence",
+      "tools": ["Mempool monitoring", "Transaction simulation", "Priority execution"],
+      "ethics": "Controversial, can harm regular users"
+    },
+    {
+      "technique": "Back-Running",
+      "description": "Execute profitable transactions immediately after observing successful ones",
+      "implementation": "Monitor confirmed transactions, identify patterns, execute similar trades",
+      "tools": ["Transaction monitoring", "Pattern recognition", "Fast execution"],
+      "ethics": "Generally acceptable, following market movements"
+    },
+    {
+      "technique": "Liquidation Front-Running",
+      "description": "Execute liquidations before others can react",
+      "implementation": "Monitor position health, prepare liquidation transactions, execute at optimal time",
+      "tools": ["Health monitoring", "Flash loans", "Priority fees"],
+      "ethics": "Provides liquidity to protocols, generally beneficial"
+    }
+  ]
+}

@@ -375,8 +375,28 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
   };
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-white mb-4">Account Inspector</h1>
+    <div className="relative">
+      {/* Background Logo */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{ zIndex: 0 }}
+      >
+        <img
+          src="/transaction-builder-logo.jpeg"
+          alt="Sealevel Studio Background"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.06]"
+          style={{
+            objectPosition: 'center',
+          }}
+          onError={(e) => {
+            console.warn('Background logo not found');
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+
+      <div style={{ zIndex: 1, position: 'relative' }}>
+        <h1 className="text-2xl font-bold text-white mb-4">Account Inspector</h1>
       
       {/* Network Mismatch Warning */}
       {networkMismatch && 
@@ -627,6 +647,7 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

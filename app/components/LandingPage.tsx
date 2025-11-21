@@ -141,7 +141,26 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
           border: 2px solid #111827;
         }
       `}</style>
-      
+
+      {/* Background Logo */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{ zIndex: 0 }}
+      >
+        <img
+          src="/transaction-builder-logo.jpeg"
+          alt="Sealevel Studio Background"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.06]"
+          style={{
+            objectPosition: 'center',
+          }}
+          onError={(e) => {
+            console.warn('Background logo not found');
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-700/50">
         <nav className="container mx-auto max-w-7xl px-6 py-4 flex justify-between items-center">
