@@ -24,6 +24,49 @@ interface TestResult {
 
 const results: TestResult[] = [];
 
+async function runTest(service: string, testName: string, testFn: () => Promise<any>): Promise<void> {
+  console.log(`🔄 Testing ${service} ${testName}...`);
+
+  try {
+    const result = await testFn();
+
+    if (typeof result === 'boolean') {
+      results.push({
+        service,
+        test: testName,
+        status: result ? 'pass' : 'fail',
+        message: result ? 'OK' : 'Test returned false'
+      });
+      console.log(`${result ? '✅' : '❌'} ${service} ${testName}: ${result ? 'OK' : 'Test returned false'}`);
+    } else if (typeof result === 'string') {
+      results.push({
+        service,
+        test: testName,
+        status: 'fail',
+        message: result
+      });
+      console.log(`❌ ${service} ${testName}: ${result}`);
+    } else if (result && typeof result === 'object' && 'pass' in result) {
+      results.push({
+        service,
+        test: testName,
+        status: result.pass ? 'pass' : 'fail',
+        message: result.message || (result.pass ? 'OK' : 'Test failed'),
+        response: result.response
+      });
+      console.log(`${result.pass ? '✅' : '❌'} ${service} ${testName}: ${result.message || (result.pass ? 'OK' : 'Test failed')}`);
+    }
+  } catch (error) {
+    results.push({
+      service,
+      test: testName,
+      status: 'fail',
+      message: error instanceof Error ? error.message : String(error),
+    });
+    console.log(`❌ ${service} ${testName}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function test(service: string, testName: string, testFn: () => Promise<boolean | string | { pass: boolean; message?: string; response?: any }>): void {
   testFn().then(result => {
     if (typeof result === 'boolean') {
@@ -315,25 +358,22 @@ async function runTests() {
 
   // Twitter Tests
   console.log('\n🐦 TWITTER BOT TESTS\n');
-  test('Twitter', 'OAuth Initiation', testTwitterAuthInitiate);
-  test('Twitter', 'Agent Status Check', testTwitterAgentStatus);
-  test('Twitter', 'Agent Start Without Auth', testTwitterAgentStartWithoutAuth);
+  await runTest('Twitter', 'OAuth Initiation', testTwitterAuthInitiate);
+  await runTest('Twitter', 'Agent Status Check', testTwitterAgentStatus);
+  await runTest('Twitter', 'Agent Start Without Auth', testTwitterAgentStartWithoutAuth);
 
   // Telegram Tests
   console.log('\n✈️ TELEGRAM BOT TESTS\n');
-  test('Telegram', 'Auth Status Check', testTelegramAuthCheck);
-  test('Telegram', 'Auth With Invalid Token', testTelegramAuthWithInvalidToken);
-  test('Telegram', 'Auth Without Token', testTelegramAuthWithoutToken);
-  test('Telegram', 'Agent Status Check', testTelegramAgentStatus);
+  await runTest('Telegram', 'Auth Status Check', testTelegramAuthCheck);
+  await runTest('Telegram', 'Auth With Invalid Token', testTelegramAuthWithInvalidToken);
+  await runTest('Telegram', 'Auth Without Token', testTelegramAuthWithoutToken);
+  await runTest('Telegram', 'Agent Status Check', testTelegramAgentStatus);
 
   // Substack Tests
   console.log('\n📝 SUBSTACK BOT TESTS\n');
-  test('Substack', 'Auth Status Check', testSubstackAuthCheck);
-  test('Substack', 'Auth Without Credentials', testSubstackAuthWithoutCredentials);
-  test('Substack', 'Agent Status Check', testSubstackAgentStatus);
-
-  // Wait for all tests to complete
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  await runTest('Substack', 'Auth Status Check', testSubstackAuthCheck);
+  await runTest('Substack', 'Auth Without Credentials', testSubstackAuthWithoutCredentials);
+  await runTest('Substack', 'Agent Status Check', testSubstackAgentStatus);
 
   // ============================================================================
   // RESULTS SUMMARY

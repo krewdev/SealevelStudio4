@@ -7,21 +7,91 @@ import { TwitterApi } from 'twitter-api-v2';
 export const dynamic = 'force-dynamic';
 
 /**
- * Initiate Twitter OAuth 2.0 flow
+ * Initiate Twitter OAuth 2.0 flow or direct authentication
  * POST /api/twitter/auth/initiate
+ * Body: { useDirectAuth?: boolean } - optional, defaults to OAuth
  */
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json().catch(() => ({}));
+    const { useDirectAuth = false } = body;
+
+    // Check for direct access token first
+    const accessToken = process.env.TWITTER_ACCESS_TOKEN;
+    const bearerToken = process.env.TWITTER_BEARER_TOKEN;
+
+    if (useDirectAuth && accessToken) {
+      // Direct authentication using access token
+      const client = new TwitterApi(accessToken);
+
+      try {
+        // Verify the token works by getting user info
+        const user = await client.v2.me({
+          'user.fields': ['username', 'name', 'profile_image_url'],
+        });
+
+        // Store token in secure cookie
+        const response = NextResponse.json({
+          success: true,
+          authenticated: true,
+          user: {
+            id: user.data.id,
+            username: user.data.username,
+            name: user.data.name,
+          },
+          message: 'Successfully authenticated with direct access token',
+        });
+
+        response.cookies.set('twitter_access_token', accessToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7, // 7 days
+        });
+
+        response.cookies.set('twitter_user_id', user.data.id, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+        });
+
+        response.cookies.set('twitter_username', user.data.username || '', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+        });
+
+        return response;
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error: 'Invalid access token',
+            success: false,
+            details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+          },
+          { status: 401 }
+        );
+      }
+    }
+
+    // Standard OAuth 2.0 flow
     const clientId = process.env.TWITTER_CLIENT_ID;
     const clientSecret = process.env.TWITTER_CLIENT_SECRET;
-    const callbackUrl = process.env.TWITTER_CALLBACK_URL || 
+    const callbackUrl = process.env.TWITTER_CALLBACK_URL ||
                        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/twitter/auth/callback`;
 
     if (!clientId || !clientSecret) {
+      const errorMsg = accessToken
+        ? 'Twitter OAuth credentials not configured, but direct access token is available. Try setting useDirectAuth=true.'
+        : 'Twitter API credentials not configured. Please set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET in your environment variables.';
+
       return NextResponse.json(
-        { 
-          error: 'Twitter API credentials not configured. Please set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET in your environment variables.',
+        {
+          error: errorMsg,
           success: false,
+          directAuthAvailable: !!accessToken,
         },
         { status: 500 }
       );
@@ -39,13 +109,12 @@ export async function POST(request: NextRequest) {
     });
 
     // Store codeVerifier and state in session/cookie
-    // In production, use secure session storage (Redis, database, etc.)
-    // For now, we'll return them to be stored client-side temporarily
     const response = NextResponse.json({
       success: true,
       authUrl: url,
       state,
       codeVerifier, // In production, store server-side
+      authMethod: 'oauth',
     });
 
     // Set secure cookie for codeVerifier (httpOnly, secure in production)

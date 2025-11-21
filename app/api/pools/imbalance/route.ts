@@ -37,8 +37,14 @@ export interface ImbalanceSignal {
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const signalTypes = searchParams.get('types')?.split(',') || [];
-  const minSeverity = searchParams.get('severity') || 'low';
+  let minSeverity = searchParams.get('severity') || 'low';
   const enhanced = searchParams.get('enhanced') === 'true';
+
+  // Validate minSeverity
+  const validSeverities = ['low', 'medium', 'high', 'critical'];
+  if (!validSeverities.includes(minSeverity)) {
+    minSeverity = 'low';
+  }
   
   try {
     const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
