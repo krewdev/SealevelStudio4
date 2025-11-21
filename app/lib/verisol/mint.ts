@@ -1,14 +1,13 @@
-// VeriSol cNFT Minting Functions
+// Custom Attestation Program Minting Functions
+// Replaces VeriSol with custom Anchor program
 import {
   Connection,
   PublicKey,
   Transaction,
   SystemProgram,
 } from '@solana/web3.js';
-import { Program, AnchorProvider, web3 } from '@coral-xyz/anchor';
-import { IDL as VeriSolIDL, AletheiaProtocol as VeriSolProgram } from './aletheia_protocol';
+import { createAttestationClient, checkAttestationProgramDeployed, TIER_CONFIG, TierInfo, getTierForUsage, getTierInfo } from '../attestation/client';
 import {
-  VERISOL_PROGRAM_ID,
   BUBBLEGUM_PROGRAM_ID,
   COMPRESSION_PROGRAM_ID,
   LOG_WRAPPER,
@@ -21,8 +20,9 @@ import type { WalletContextState } from '@solana/wallet-adapter-react';
 export interface MintAttestationParams {
   connection: Connection;
   wallet: WalletContextState;
-  proofBytes: Buffer;
-  publicInputBytes: Buffer;
+  usageCount: number; // Usage count for simple verification (replaces ZK proof)
+  proofBytes?: Buffer; // Optional: kept for backward compatibility
+  publicInputBytes?: Buffer; // Optional: kept for backward compatibility
   metadata?: {
     name?: string;
     symbol?: string;
@@ -31,15 +31,26 @@ export interface MintAttestationParams {
 }
 
 /**
- * Mint a compressed NFT attestation using VeriSol protocol
+ * Mint a compressed NFT attestation using custom attestation program
+ * Replaces VeriSol with custom Anchor program
  */
 export async function mintVeriSolAttestation(
   params: MintAttestationParams
 ): Promise<string> {
-  const { connection, wallet, proofBytes, publicInputBytes, metadata } = params;
+  const { connection, wallet, usageCount, proofBytes, publicInputBytes, metadata } = params;
 
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
     throw new Error('Wallet not connected or missing required methods');
+  }
+
+  // Check if custom attestation program is deployed
+  const isDeployed = await checkAttestationProgramDeployed(connection);
+  if (!isDeployed) {
+    throw new Error(
+      'Custom attestation program not deployed. ' +
+      'Please build and deploy the program first. ' +
+      'See docs/ATTESTATION_PROGRAM_SETUP.md for instructions.'
+    );
   }
 
   // Get merkle tree and tree authority
@@ -50,75 +61,74 @@ export async function mintVeriSolAttestation(
     throw new Error('Merkle tree not configured. Please set NEXT_PUBLIC_BETA_TESTER_MERKLE_TREE or NEXT_PUBLIC_VERISOL_MERKLE_TREE environment variable.');
   }
 
-  const treeAuthority = getTreeAuthority() || deriveTreeAuthority(merkleTree);
+  // Create attestation client
+  const client = createAttestationClient(connection, wallet);
 
-  // Create Anchor provider
-  // AnchorProvider expects a wallet adapter that has signTransaction and sendTransaction
-  const walletAdapter = {
-    publicKey: wallet.publicKey,
-    signTransaction: wallet.signTransaction?.bind(wallet),
-    signAllTransactions: wallet.signAllTransactions?.bind(wallet),
+  // Use provided usage count, or default to 10 if not provided
+  const finalUsageCount = usageCount || 10;
+
+  // Determine tier and get tier-specific metadata
+  const tier = getTierForUsage(finalUsageCount);
+  if (tier === 0) {
+    throw new Error(`Insufficient usage: ${finalUsageCount} (minimum 10 required)`);
+  }
+
+  const tierInfo = getTierInfo(tier);
+  const tierMetadata = {
+    name: metadata?.name || `Sealevel Studio Beta Tester - ${tierInfo.name}`,
+    symbol: metadata?.symbol || `BETA-${tierInfo.name.toUpperCase().slice(0, 1)}`,
+    uri: metadata?.uri || `https://sealevel.studio/metadata/beta-tester-${tierInfo.name.toLowerCase()}.json`,
+    attributes: [
+      { trait_type: 'Type', value: 'Beta Tester' },
+      { trait_type: 'Tier', value: tierInfo.name },
+      { trait_type: 'Rarity', value: tierInfo.rarity },
+      { trait_type: 'Platform', value: 'Sealevel Studio' },
+      { trait_type: 'Usage Count', value: finalUsageCount.toString() },
+    ],
   };
-  
-  const provider = new AnchorProvider(
-    connection,
-    walletAdapter as any,
-    { commitment: 'confirmed' }
-  );
-
-  // Create program instance
-  const program = new Program<VeriSolProgram>(VeriSolIDL, VERISOL_PROGRAM_ID, provider);
 
   try {
-    // Try full compressed NFT minting
-    // Anchor expects bytes as Buffer or Uint8Array
-    const txSignature = await program.methods
-      .verifyAndMint(proofBytes, publicInputBytes)
-      .accounts({
-        payer: wallet.publicKey,
-        merkleTree: merkleTree,
-        treeAuthority: treeAuthority,
-        logWrapper: LOG_WRAPPER,
-        compressionProgram: COMPRESSION_PROGRAM_ID,
-        bubblegumProgram: BUBBLEGUM_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Mint attestation with simple verification (usage count instead of ZK proof)
+    const result = await client.mintAttestation(
+      finalUsageCount,
+      tierMetadata
+    );
 
-      // Airdrop SEAL tokens to beta tester if eligible
-      try {
-        const { airdropSealToBetaTester, checkAirdropEligibility } = await import('../seal-token/airdrop');
-        const eligibility = await checkAirdropEligibility(connection, wallet.publicKey);
-        
-        if (eligibility.eligible) {
-          // Note: In production, this would be done server-side with treasury wallet
-          // For now, log that airdrop should be processed
-          console.log('Beta tester eligible for SEAL airdrop. Processing...');
-          // await airdropSealToBetaTester(connection, treasuryWallet, wallet.publicKey);
-        }
-      } catch (airdropError) {
-        console.error('Airdrop processing failed (non-critical):', airdropError);
-        // Don't fail the mint if airdrop fails
-      }
-
-      return txSignature;
-    } catch (mintError: any) {
-      console.error('Compressed NFT minting failed:', mintError);
-    
-    // Fallback to proof-only verification if minting fails
+    // Airdrop SEAL tokens to beta tester if eligible
     try {
-      const txSignature = await program.methods
-        .verifyProofOnly(proofBytes, publicInputBytes)
-        .accounts({
-          payer: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+      const { airdropSealToBetaTester, checkAirdropEligibility } = await import('../seal-token/airdrop');
+      const eligibility = await checkAirdropEligibility(connection, wallet.publicKey);
+      
+      if (eligibility.eligible) {
+        // Note: In production, this would be done server-side with treasury wallet
+        // For now, log that airdrop should be processed
+        console.log('Beta tester eligible for SEAL airdrop. Processing...');
+        // await airdropSealToBetaTester(connection, treasuryWallet, wallet.publicKey);
+      }
+    } catch (airdropError) {
+      console.error('Airdrop processing failed (non-critical):', airdropError);
+      // Don't fail the mint if airdrop fails
+    }
 
-      console.warn('Used proof-only verification (cNFT minting unavailable)');
-      return txSignature;
+    return result.txSignature;
+  } catch (mintError: any) {
+    console.error('Attestation minting failed:', mintError);
+    
+    // Fallback: Try eligibility check to see if user qualifies
+    try {
+      console.warn('Checking eligibility as fallback...');
+      const eligibleTier = await client.verifyEligibility(finalUsageCount);
+      if (eligibleTier === 0) {
+        throw new Error(
+          `Insufficient usage: ${finalUsageCount} (minimum 10 required). ${mintError.message || ''}`
+        );
+      }
+      // If eligible but minting failed, throw original error
+      throw new Error(
+        `Failed to mint attestation: ${mintError.message || 'Unknown error'}`
+      );
     } catch (fallbackError: any) {
-      console.error('Proof-only verification also failed:', fallbackError);
+      console.error('Eligibility check also failed:', fallbackError);
       throw new Error(
         `Failed to mint attestation: ${mintError.message || 'Unknown error'}`
       );
@@ -127,12 +137,14 @@ export async function mintVeriSolAttestation(
 }
 
 /**
- * Check if VeriSol infrastructure is set up
+ * Check if custom attestation program infrastructure is set up
+ * Replaces VeriSol setup check
  */
 export async function checkVeriSolSetup(connection: Connection): Promise<{
   programExists: boolean;
   merkleTreeExists: boolean;
   treeAuthorityExists: boolean;
+  registryExists: boolean;
   ready: boolean;
   errors: string[];
 }> {
@@ -140,13 +152,13 @@ export async function checkVeriSolSetup(connection: Connection): Promise<{
   let programExists = false;
   let merkleTreeExists = false;
   let treeAuthorityExists = false;
+  let registryExists = false;
 
-  // Check program
+  // Check custom attestation program
   try {
-    const programInfo = await connection.getAccountInfo(VERISOL_PROGRAM_ID);
-    programExists = !!programInfo;
+    programExists = await checkAttestationProgramDeployed(connection);
     if (!programExists) {
-      errors.push('VeriSol program not found on blockchain');
+      errors.push('Custom attestation program not found on blockchain. Please deploy it first.');
     }
   } catch (error) {
     errors.push(`Error checking program: ${error instanceof Error ? error.message : 'Unknown'}`);
@@ -165,7 +177,7 @@ export async function checkVeriSolSetup(connection: Connection): Promise<{
       errors.push(`Error checking merkle tree: ${error instanceof Error ? error.message : 'Unknown'}`);
     }
   } else {
-    errors.push('Merkle tree not configured (NEXT_PUBLIC_VERISOL_MERKLE_TREE not set)');
+    errors.push('Merkle tree not configured (NEXT_PUBLIC_VERISOL_MERKLE_TREE or NEXT_PUBLIC_ATTESTATION_MERKLE_TREE not set)');
   }
 
   // Check tree authority
@@ -182,12 +194,31 @@ export async function checkVeriSolSetup(connection: Connection): Promise<{
     }
   }
 
-  const ready = programExists && merkleTreeExists && treeAuthorityExists;
+  // Check registry (custom program feature)
+  if (programExists) {
+    try {
+      const { ATTESTATION_PROGRAM_ID } = await import('../attestation/client');
+      const [registry] = PublicKey.findProgramAddressSync(
+        [Buffer.from('attestation_registry')],
+        ATTESTATION_PROGRAM_ID
+      );
+      const registryInfo = await connection.getAccountInfo(registry);
+      registryExists = !!registryInfo;
+      if (!registryExists) {
+        errors.push('Attestation registry not initialized. Call initialize() first.');
+      }
+    } catch (error) {
+      errors.push(`Error checking registry: ${error instanceof Error ? error.message : 'Unknown'}`);
+    }
+  }
+
+  const ready = programExists && merkleTreeExists && treeAuthorityExists && registryExists;
 
   return {
     programExists,
     merkleTreeExists,
     treeAuthorityExists,
+    registryExists,
     ready,
     errors,
   };

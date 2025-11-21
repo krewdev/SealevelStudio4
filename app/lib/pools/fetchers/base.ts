@@ -11,7 +11,29 @@ export interface PoolFetcher {
 
 export abstract class BasePoolFetcher implements PoolFetcher {
   abstract dex: DEXProtocol;
-  
+  protected rpcUrl?: string;
+
+  /**
+   * Set RPC URL (used when Helius RPC is provided)
+   */
+  setRpcUrl(rpcUrl: string): void {
+    this.rpcUrl = rpcUrl;
+  }
+
+  /**
+   * Get RPC URL from connection or stored value
+   */
+  protected getRpcUrl(connection: Connection): string {
+    if (this.rpcUrl) {
+      console.log(`[${this.dex}] Using stored RPC URL: ${this.rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')}`);
+      return this.rpcUrl;
+    }
+    // Try to get from connection (may not include query params)
+    const url = (connection as any).rpcEndpoint || (connection as any)._rpcEndpoint || connection.rpcEndpoint || '';
+    console.log(`[${this.dex}] Using connection RPC URL: ${url.replace(/api-key=[^&]+/, 'api-key=***')}`);
+    return url;
+  }
+
   abstract fetchPools(connection: Connection): Promise<FetcherResult>;
   abstract fetchPoolById(connection: Connection, poolId: string): Promise<PoolData | null>;
 

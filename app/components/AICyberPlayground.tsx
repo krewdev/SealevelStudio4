@@ -208,9 +208,13 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
                 strategyAdvice = '\n**Strategy Analysis:**\n• Cross-protocol opportunity (e.g., DEX-DEX arbitrage)\n• May involve different fee structures (0.10% Meteora vs 0.30% Raydium)\n• Atomic execution via Jito bundles is critical for risk-free execution';
               }
               
-              const responseText = `✅ **Arbitrage Opportunities Found!**\n\nFound ${opportunities.length} opportunity(ies)\n• Simple (2-pool): ${simpleArb}\n• Multi-hop: ${multiHop}\n• Cross-protocol: ${crossProtocol}\n\n🏆 **Best Opportunity:**\n• Profit: ${best.profit.toFixed(6)} SOL (${best.profitPercent.toFixed(2)}%)\n• Type: ${best.type}\n• Confidence: ${(best.confidence * 100).toFixed(0)}%\n• Path: ${best.path.startToken?.symbol || 'Token A'} → ${best.path.endToken?.symbol || 'Token B'}\n• Hops: ${best.path.totalHops || 1}\n• Net Profit (after gas): ${best.netProfit.toFixed(6)} SOL${strategyAdvice}\n\n${opportunities.length > 1 ? `\n**Top ${Math.min(3, opportunities.length)} Opportunities:**\n${opportunities.slice(0, 3).map((opp, idx) => 
-                `${idx + 1}. ${opp.profit.toFixed(6)} SOL (${opp.profitPercent.toFixed(2)}%) - ${opp.type} - ${(opp.confidence * 100).toFixed(0)}% confidence`
-              ).join('\n')}` : ''}\n\n💡 **Execution Recommendations:**\n• Use Jito bundles for atomic execution (eliminates execution risk)\n• Consider Kamino flash loans for zero-capital arbitrage\n• Monitor ShredStream for MEV opportunities\n• Use the Arbitrage Scanner view to build transactions`;
+              const topOpportunities = opportunities.length > 1 
+                ? `\n**Top ${Math.min(3, opportunities.length)} Opportunities:**\n${opportunities.slice(0, 3).map((opp, idx) => 
+                    `${idx + 1}. ${opp.profit.toFixed(6)} SOL (${opp.profitPercent.toFixed(2)}%) - ${opp.type} - ${(opp.confidence * 100).toFixed(0)}% confidence`
+                  ).join('\n')}`
+                : '';
+              
+              const responseText = `✅ **Arbitrage Opportunities Found!**\n\nFound ${opportunities.length} opportunity(ies)\n• Simple (2-pool): ${simpleArb}\n• Multi-hop: ${multiHop}\n• Cross-protocol: ${crossProtocol}\n\n🏆 **Best Opportunity:**\n• Profit: ${best.profit.toFixed(6)} SOL (${best.profitPercent.toFixed(2)}%)\n• Type: ${best.type}\n• Confidence: ${(best.confidence * 100).toFixed(0)}%\n• Path: ${best.path.startToken?.symbol || 'Token A'} → ${best.path.endToken?.symbol || 'Token B'}\n• Hops: ${best.path.totalHops || 1}\n• Net Profit (after gas): ${best.netProfit.toFixed(6)} SOL${strategyAdvice}${topOpportunities}\n\n💡 **Execution Recommendations:**\n• Use Jito bundles for atomic execution (eliminates execution risk)\n• Consider Kamino flash loans for zero-capital arbitrage\n• Monitor ShredStream for MEV opportunities\n• Use the Arbitrage Scanner view to build transactions`;
               
               setResponse(responseText);
             } else {
@@ -395,103 +399,11 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
               </div>
 
               <div className="space-y-4">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={userQuery}
-                    onChange={(e) => setUserQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleQuery()}
-                    placeholder="Ask the Master AI anything..."
-                    className="input-modern flex-1 px-4 py-3 text-white placeholder-gray-500"
-                  />
-                  <button
-                    onClick={handleQuery}
-                    disabled={!userQuery.trim() || isScanningArbitrage}
-                    className="btn-modern px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white flex items-center gap-2"
-                  >
-                    {isScanningArbitrage ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4" />
-                        Execute
-                      </>
-                    )}
-                  </button>
+                <div className="text-center text-gray-400 py-8">
+                  <Brain className="w-16 h-16 mx-auto mb-4 text-purple-400 opacity-50" />
+                  <p className="text-lg font-medium">AI Orchestration Paused</p>
+                  <p className="text-sm">Master AI agents are currently offline for maintenance.</p>
                 </div>
-
-                {response && (
-                  <div className="card-modern p-4">
-                    <div className="prose prose-invert max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        className="markdown-content"
-                        components={{
-                          h1: ({ node, ...props }) => (
-                            <h1 className="text-2xl font-bold text-white mb-3 mt-4 first:mt-0 border-b border-gray-700 pb-2" {...props} />
-                          ),
-                          h2: ({ node, ...props }) => (
-                            <h2 className="text-xl font-bold text-white mb-2 mt-4 first:mt-0 border-b border-gray-700 pb-1" {...props} />
-                          ),
-                          h3: ({ node, ...props }) => (
-                            <h3 className="text-lg font-bold text-blue-400 mb-2 mt-3" {...props} />
-                          ),
-                          p: ({ node, ...props }) => (
-                            <p className="text-gray-200 mb-3 leading-relaxed" {...props} />
-                          ),
-                          ul: ({ node, ...props }) => (
-                            <ul className="list-disc list-inside mb-3 space-y-1 text-gray-200 ml-4" {...props} />
-                          ),
-                          ol: ({ node, ...props }) => (
-                            <ol className="list-decimal list-inside mb-3 space-y-1 text-gray-200 ml-4" {...props} />
-                          ),
-                          li: ({ node, ...props }) => (
-                            <li className="text-gray-200 leading-relaxed" {...props} />
-                          ),
-                          code: ({ node, inline, className, children, ...props }: any) => {
-                            const match = /language-(\w+)/.exec(className || '');
-                            const language = match ? match[1] : '';
-                            const codeString = String(children).replace(/\n$/, '');
-                            
-                            return !inline && language ? (
-                              <div className="my-3">
-                                <SyntaxHighlighter
-                                  language={language}
-                                  style={vscDarkPlus}
-                                  customStyle={{
-                                    margin: 0,
-                                    borderRadius: '0.5rem',
-                                    padding: '0.75rem',
-                                    fontSize: '0.875rem',
-                                  }}
-                                  PreTag="div"
-                                  {...props}
-                                >
-                                  {codeString}
-                                </SyntaxHighlighter>
-                              </div>
-                            ) : (
-                              <code className="bg-gray-900 text-blue-400 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          strong: ({ node, ...props }) => (
-                            <strong className="font-bold text-white" {...props} />
-                          ),
-                          em: ({ node, ...props }) => (
-                            <em className="italic text-gray-300" {...props} />
-                          ),
-                        }}
-                      >
-                        {response}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -690,28 +602,32 @@ export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
               </h3>
               <div className="space-y-2">
                 <button
-                  onClick={() => setUserQuery('Find best arbitrage opportunity')}
-                  className="w-full text-left px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors text-sm"
+                  disabled
+                  className="w-full text-left px-4 py-2 bg-gray-700/50 rounded-lg transition-colors text-sm text-gray-500 cursor-not-allowed"
+                  title="AI orchestration currently paused"
                 >
-                  🔍 Find Arbitrage
+                  🔍 Find Arbitrage (Disabled)
                 </button>
                 <button
-                  onClick={() => setUserQuery('Analyze my wallet security')}
-                  className="w-full text-left px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors text-sm"
+                  disabled
+                  className="w-full text-left px-4 py-2 bg-gray-700/50 rounded-lg transition-colors text-sm text-gray-500 cursor-not-allowed"
+                  title="AI orchestration currently paused"
                 >
-                  🛡️ Security Audit
+                  🛡️ Security Audit (Disabled)
                 </button>
                 <button
-                  onClick={() => setUserQuery('Create PvP dice game')}
-                  className="w-full text-left px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors text-sm"
+                  disabled
+                  className="w-full text-left px-4 py-2 bg-gray-700/50 rounded-lg transition-colors text-sm text-gray-500 cursor-not-allowed"
+                  title="AI orchestration currently paused"
                 >
-                  🎲 Create Game
+                  🎲 Create Game (Disabled)
                 </button>
                 <button
-                  onClick={() => setUserQuery('Show system health')}
-                  className="w-full text-left px-4 py-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg transition-colors text-sm"
+                  disabled
+                  className="w-full text-left px-4 py-2 bg-gray-700/50 rounded-lg transition-colors text-sm text-gray-500 cursor-not-allowed"
+                  title="AI orchestration currently paused"
                 >
-                  📊 System Health
+                  📊 System Health (Disabled)
                 </button>
               </div>
             </div>

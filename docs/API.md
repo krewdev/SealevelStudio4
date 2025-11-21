@@ -8,12 +8,180 @@ This document describes all API endpoints available in Sealevel Studio. All endp
 
 ## Table of Contents
 
+- [Agent APIs](#agent-apis)
+- [Pool Scanning API](#pool-scanning-api)
 - [Jupiter API](#jupiter-api)
 - [Helius API](#helius-api)
 - [Birdeye API](#birdeye-api)
 - [Dune Analytics API](#dune-analytics-api)
 - [Solscan API](#solscan-api)
 - [VeriSol API](#verisol-api)
+
+---
+
+## Agent APIs
+
+### POST `/api/agents/create`
+
+Create a new autonomous trading agent.
+
+**Request Body:**
+```json
+{
+  "type": "arbitrage" | "portfolio-rebalancing" | "liquidity-scanning" | "ai-enhanced",
+  "config": {
+    "name": "My Trading Bot",
+    "strategy": "arbitrage",
+    "riskTolerance": "low" | "medium" | "high",
+    "maxPositionSize": 1.0,
+    "minProfitThreshold": 0.01,
+    "slippageTolerance": 0.5,
+    "priorityFee": 10000,
+    "useJito": false,
+    "plugins": ["jupiter-swap", "risk-assessment"]
+  },
+  "agentWalletSeed": "optional-seed-for-deterministic-wallet"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "agent": {
+    "wallet": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "type": "arbitrage",
+    "config": { ... },
+    "status": { ... }
+  }
+}
+```
+
+### GET `/api/agents/list`
+
+List all active agents.
+
+**Response:**
+```json
+{
+  "success": true,
+  "agents": [
+    {
+      "wallet": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "type": "arbitrage",
+      "status": { ... },
+      "config": { ... }
+    }
+  ],
+  "count": 1
+}
+```
+
+### POST `/api/agents/control`
+
+Control agent (start, stop, get status, execute).
+
+**Request Body:**
+```json
+{
+  "action": "start" | "stop" | "status" | "execute",
+  "wallet": "agent_wallet_address"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Agent started",
+  "status": {
+    "isRunning": true,
+    "agentWallet": "...",
+    "strategy": "arbitrage",
+    "totalActions": 5,
+    "totalProfit": 0.15
+  }
+}
+```
+
+**Note:** See [Solana Agent Kit Guide](./SOLANA_AGENT_KIT.md) for detailed usage.
+
+---
+
+## Pool Scanning API
+
+### GET `/api/pools/scan`
+
+Scan and aggregate pools from all DEXs on-chain.
+
+**Query Parameters:**
+- `network` (optional): `mainnet` or `devnet` (default: `mainnet`)
+- `dexes` (optional): Comma-separated list of DEXes (e.g., `orca,raydium,meteora`)
+- `minLiquidity` (optional): Minimum liquidity filter (number)
+- `opportunities` (optional): Include arbitrage opportunities (`true`/`false`)
+
+**Example:**
+```
+GET /api/pools/scan?network=mainnet&dexes=orca,raydium&minLiquidity=1000&opportunities=true
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "stats": {
+    "totalPools": 150,
+    "poolsByDex": {
+      "orca": 45,
+      "raydium": 60,
+      "meteora": 30,
+      "lifinity": 15
+    },
+    "totalLiquidity": 1250000.50,
+    "scanDuration": 3500,
+    "network": "mainnet",
+    "timestamp": "2024-01-01T00:00:00.000Z"
+  },
+  "pools": [ ... ],
+  "poolsByDex": { ... },
+  "opportunities": [ ... ],
+  "errors": []
+}
+```
+
+### POST `/api/pools/scan`
+
+Search for pools containing a specific token pair.
+
+**Request Body:**
+```json
+{
+  "tokenA": "So11111111111111111111111111111111111111112",
+  "tokenB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "network": "mainnet"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "tokenA": "So11111111111111111111111111111111111111112",
+  "tokenB": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "pools": [ ... ],
+  "count": 5,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+**Note:** This API aggregates pools from:
+- Raydium
+- Orca
+- Meteora
+- Lifinity
+- Jupiter (aggregator)
+- Helius (if API key provided)
+- Birdeye (if API key provided)
 
 ---
 

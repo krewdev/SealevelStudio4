@@ -20,7 +20,7 @@ export class MeteoraFetcher extends BasePoolFetcher {
       
       // Always try to use getProgramAccountsV2 with pagination first
       // This is required for large datasets like Meteora pools
-      const rpcUrl = connection.rpcEndpoint;
+      const rpcUrl = this.getRpcUrl(connection);
       
       let accounts;
       let usePagination = false;
@@ -37,9 +37,16 @@ export class MeteoraFetcher extends BasePoolFetcher {
           let apiRpcUrl = rpcUrl;
           
           if (rpcUrl.includes('helius') && process.env.NEXT_PUBLIC_HELIUS_API_KEY && !rpcUrl.includes('api-key')) {
+            // Extract just the API key if env var is accidentally set to full URL
+            let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+            if (apiKey.includes('helius-rpc.com')) {
+              const match = apiKey.match(/[?&]api-key=([^&]+)/);
+              apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
+            }
+            
             // Add API key to Helius URL if not present
             const separator = rpcUrl.includes('?') ? '&' : '?';
-            apiRpcUrl = `${rpcUrl}${separator}api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+            apiRpcUrl = `${rpcUrl}${separator}api-key=${apiKey}`;
           }
           
           // Use getProgramAccountsV2 with pagination

@@ -10,47 +10,116 @@ export class BirdeyeFetcher extends BasePoolFetcher {
   async fetchPools(connection: Connection): Promise<FetcherResult> {
     const pools: PoolData[] = [];
     const errors: string[] = [];
+    const poolMap = new Map<string, PoolData>(); // Use Map to avoid duplicates
 
     try {
-      // Fetch popular token pairs from Birdeye
-      // Note: API key is handled server-side in the API route
+      // Fetch popular tokens to get their pairs across all DEXs
       const popularTokens = [
         'So11111111111111111111111111111111111111112', // SOL
         'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
         'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
+        'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So', // mSOL
+        'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+        '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utBjxDKyWSARGX', // SEI
+        'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
       ];
 
-      // Fetch price and volume data for token pairs
-      for (let i = 0; i < popularTokens.length; i++) {
-        for (let j = i + 1; j < popularTokens.length; j++) {
-          try {
-            const tokenA = popularTokens[i];
-            const tokenB = popularTokens[j];
+      // Fetch pairs for each token (this will return pools from all DEXs)
+      for (const tokenAddress of popularTokens) {
+        try {
+          // Fetch pairs data to get pool information across all DEXs
+          const pairsResponse = await fetch(`/api/birdeye/prices?address=${tokenAddress}&type=pairs`);
+          
+          if (pairsResponse.ok) {
+            const pairsData = await pairsResponse.json();
+            
+            // Parse Birdeye pairs data
+            if (pairsData && pairsData.data && Array.isArray(pairsData.data.pairs)) {
+              for (const pair of pairsData.data.pairs) {
+                try {
+                  // Extract DEX name from pair data
+                  const dexName = this.mapDexName(pair.dex || pair.platform || 'unknown');
+                  
+                  // Skip if not one of our enabled DEXs
+                  if (!['raydium', 'orca', 'jupiter', 'meteora', 'lifinity'].includes(dexName)) {
+                    continue;
+                  }
 
-            // Fetch price data (API key handled server-side)
-            const priceResponse = await fetch(`/api/birdeye/prices?address=${tokenA}&type=price`);
-            if (priceResponse.ok) {
-              const priceData = await priceResponse.json();
-              
-              // Fetch pairs data to get pool information
-              const pairsResponse = await fetch(`/api/birdeye/prices?address=${tokenA}&type=pairs`);
-              
-              if (pairsResponse.ok) {
-                const pairsData = await pairsResponse.json();
-                
-                // Parse Birdeye pairs data to extract pool information
-                // This is simplified - actual parsing depends on Birdeye API structure
-                if (pairsData && pairsData.data) {
-                  // Extract pool data from Birdeye response
-                  // Placeholder for actual parsing
+                  // Get token info
+                  const baseToken = pair.baseToken || pair.tokenA || {};
+                  const quoteToken = pair.quoteToken || pair.tokenB || {};
+                  
+                  const tokenA: TokenInfo = {
+                    mint: baseToken.address || baseToken.mint || tokenAddress,
+                    symbol: baseToken.symbol || 'UNKNOWN',
+                    decimals: baseToken.decimals || 9,
+                    name: baseToken.name,
+                  };
+                  
+                  const tokenB: TokenInfo = {
+                    mint: quoteToken.address || quoteToken.mint || '',
+                    symbol: quoteToken.symbol || 'UNKNOWN',
+                    decimals: quoteToken.decimals || 9,
+                    name: quoteToken.name,
+                  };
+
+                  // Skip if we don't have both tokens
+                  if (!tokenA.mint || !tokenB.mint) {
+                    continue;
+                  }
+
+                  // Create pool ID
+                  const poolId = `birdeye-${dexName}-${tokenA.mint}-${tokenB.mint}`;
+                  
+                  // Skip if we already have this pool
+                  if (poolMap.has(poolId)) {
+                    continue;
+                  }
+
+                  // Get price
+                  const price = pair.price || pair.priceNative || 0;
+                  
+                  // Get reserves (if available)
+                  const reserves = {
+                    tokenA: BigInt(pair.liquidity?.base || pair.reserveA || 0),
+                    tokenB: BigInt(pair.liquidity?.quote || pair.reserveB || 0),
+                  };
+
+                  const pool: PoolData = {
+                    id: poolId,
+                    dex: dexName as DEXProtocol,
+                    tokenA,
+                    tokenB,
+                    reserves,
+                    price: price || 0,
+                    fee: pair.fee || 30, // Default 0.3%
+                    volume24h: pair.volume24h || pair.v24hUSD || 0,
+                    tvl: pair.liquidity || pair.tvl || 0,
+                    recentTrades: [],
+                    lastUpdated: new Date(),
+                    poolAddress: pair.address || pair.poolAddress,
+                    programId: pair.programId,
+                  };
+                  
+                  poolMap.set(poolId, pool);
+                } catch (error) {
+                  errors.push(this.handleError(error, `Parsing pair for ${tokenAddress}`));
                 }
               }
             }
-          } catch (error) {
-            errors.push(this.handleError(error, `Fetching Birdeye data for ${popularTokens[i]}-${popularTokens[j]}`));
+          } else {
+            const errorText = await pairsResponse.text();
+            errors.push(`Failed to fetch pairs for ${tokenAddress}: ${pairsResponse.status} ${errorText}`);
           }
+        } catch (error) {
+          errors.push(this.handleError(error, `Fetching pairs for ${tokenAddress}`));
         }
       }
+
+      // Convert map to array
+      pools.push(...Array.from(poolMap.values()));
+
+      console.log(`[Birdeye] Fetched ${pools.length} pools from ${poolMap.size} unique pairs`);
 
     } catch (error) {
       errors.push(this.handleError(error, 'fetchPools'));
@@ -61,6 +130,21 @@ export class BirdeyeFetcher extends BasePoolFetcher {
       errors: errors.length > 0 ? errors : undefined,
       lastUpdated: new Date(),
     };
+  }
+
+  /**
+   * Map Birdeye DEX names to our DEX protocol names
+   */
+  private mapDexName(birdeyeDex: string): string {
+    const lower = birdeyeDex.toLowerCase();
+    
+    if (lower.includes('raydium')) return 'raydium';
+    if (lower.includes('orca') || lower.includes('whirlpool')) return 'orca';
+    if (lower.includes('jupiter')) return 'jupiter';
+    if (lower.includes('meteora') || lower.includes('dlmm')) return 'meteora';
+    if (lower.includes('lifinity')) return 'lifinity';
+    
+    return 'unknown';
   }
 
   async fetchPoolById(connection: Connection, poolId: string): Promise<PoolData | null> {

@@ -22,7 +22,9 @@ const PROGRAM_NAMES: Record<string, string> = {
   'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4': 'Jupiter',
   'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc': 'Orca Whirlpool',
   'MarBmsSgKXdrN1egZf5sqe1TMai9K1rChYNDJgjq7aD': 'Marinade',
-  'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K': 'Magic Eden'
+  'M2mx93ekt1fmXSVkTrUL9xVFHkmME8HTUi5Cyc5aF7K': 'Magic Eden',
+  'AeK2u45NkNvAcgZuYyCWqmRuCsnXPvcutR3pziXF1cDw': 'Sealevel Studios Attestation',
+  'mUQFmu8w9jf4RGd5cHE6Y54y1B7Bou5an5Rvezu9GY6': 'VeriSol (Legacy)',
 };
 
 export function TransactionPreview({ 

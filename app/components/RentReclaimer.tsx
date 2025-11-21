@@ -110,7 +110,7 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
           // Token accounts can be closed if balance is 0
           reclaimable = tokenAccount.amount === BigInt(0) && publicKey && 
             (tokenAccount.owner.toString() === publicKey.toString() || 
-             tokenAccount.closeAuthority?.toString() === publicKey.toString());
+              tokenAccount.closeAuthority?.toString() === publicKey.toString()) || false;
         } catch (err) {
           accountType = 'unknown';
         }

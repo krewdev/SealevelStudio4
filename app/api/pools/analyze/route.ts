@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const opportunityId = searchParams.get('opportunityId');
-  const minProfit = parseFloat(searchParams.get('minProfit') || '0.01', 10);
+  const minProfit = parseFloat(searchParams.get('minProfit') || '0.01');
   
   try {
     const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 

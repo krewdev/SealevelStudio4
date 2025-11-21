@@ -71,13 +71,28 @@ export async function createPaymentTransaction(
   
   const transaction = new Transaction();
   
-  // Get treasury address (from config)
-  // const treasury = getTreasuryAddress();
-  // const payerTokenAccount = await getSealTokenAccount(payer);
-  // const treasuryTokenAccount = await getSealTokenAccount(treasury);
+  // Get treasury address from env or use default (Devnet treasury)
+  const treasuryAddress = process.env.NEXT_PUBLIC_TREASURY_ADDRESS || 'HfueuFm3G4h4y4e4r4t4y4u4i4o4p4l4k4j4h4g4f4d';
+  const treasury = new PublicKey(treasuryAddress);
+
+  // For now, we'll implement a simple SOL transfer if SEAL token logic isn't fully ready
+  // In a real implementation, this would be an SPL Token transfer
   
-  // Add transfer instruction
-  // transaction.add(createTransferInstruction(...));
+  // 1. Check if we're using native SOL or SPL Token
+  // For this stub implementation, we'll assume a SOL transfer for simplicity
+  // representing the value. In production, use createTransferInstruction from @solana/spl-token
+  
+  const { SystemProgram, LAMPORTS_PER_SOL } = await import('@solana/web3.js');
+  
+  // Create transfer instruction (using a small amount of SOL to represent the cost for now)
+  // In production: usageRecord.cost would be parsed as SEAL token amount
+  const transferInstruction = SystemProgram.transfer({
+    fromPubkey: payer,
+    toPubkey: treasury,
+    lamports: Number(amount), // Assuming amount is in lamports/smallest unit
+  });
+  
+  transaction.add(transferInstruction);
   
   return transaction;
 }

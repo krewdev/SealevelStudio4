@@ -25,35 +25,61 @@ export class RaydiumFetcher extends BasePoolFetcher {
       const programId = RAYDIUM_AMM_PROGRAM_ID;
       
       // Use Helius RPC if available, otherwise fall back to standard RPC
-      const rpcUrl = connection.rpcEndpoint;
-      const useHelius = rpcUrl.includes('helius') || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+      const rpcUrl = this.getRpcUrl(connection);
+      const useHelius = rpcUrl.includes('helius') || !!process.env.NEXT_PUBLIC_HELIUS_API_KEY;
       
       let accounts;
       
-      if (useHelius && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+      if (useHelius) {
         // Use Helius API with getProgramAccountsV2 pagination
-        const heliusRpcUrl = rpcUrl.includes('helius') 
-          ? rpcUrl 
-          : `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`;
+        // Don't add API key again if URL already has it
+        let heliusRpcUrl = rpcUrl;
         
-        accounts = await fetchAllProgramAccountsV2(
-          heliusRpcUrl,
-          programId,
-          {
-            limit: 1000, // Fetch in batches of 1000
-            encoding: 'jsonParsed',
-            filters: [
-              {
-                dataSize: 752, // Raydium AMM pool account size
-              },
-            ],
-            dataSlice: {
-              offset: 0,
-              length: 752,
-            },
+        // Only add API key if URL doesn't already have one
+        if (!heliusRpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
+          // Extract just the API key if env var is accidentally set to full URL
+          let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
+          if (apiKey.includes('helius-rpc.com')) {
+            const match = apiKey.match(/[?&]api-key=([^&]+)/);
+            apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
           }
-        );
-      } else {
+          
+          const separator = heliusRpcUrl.includes('?') ? '&' : '?';
+          heliusRpcUrl = `${heliusRpcUrl}${separator}api-key=${apiKey}`;
+        }
+        
+        try {
+          accounts = await fetchAllProgramAccountsV2(
+            heliusRpcUrl,
+            programId,
+            {
+              limit: 1000, // Fetch in batches of 1000
+              encoding: 'jsonParsed',
+              filters: [
+                {
+                  dataSize: 752, // Raydium AMM pool account size
+                },
+              ],
+              dataSlice: {
+                offset: 0,
+                length: 752,
+              },
+            }
+          );
+        } catch (error: any) {
+          // If Helius method fails (403, rate limit, etc.), fallback to standard method
+          const errorMsg = error?.message || String(error);
+          if (errorMsg.includes('403') || errorMsg.includes('Forbidden') || errorMsg.includes('401')) {
+            console.warn(`[${this.dex}] Helius getProgramAccountsV2 failed (${errorMsg}), falling back to standard method`);
+            // Fall through to standard method below
+          } else {
+            throw error; // Re-throw if it's a different error
+          }
+        }
+      }
+      
+      // Fallback to standard getProgramAccounts if Helius failed or not using Helius
+      if (!accounts) {
         // Fallback to standard getProgramAccounts (limited)
         const programPubkey = new PublicKey(programId);
         const standardAccounts = await connection.getProgramAccounts(programPubkey, {

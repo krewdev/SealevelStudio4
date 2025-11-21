@@ -21,8 +21,13 @@ import {
   Hash,
   AtSign,
   ArrowLeft,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface TwitterPost {
   id: string;
@@ -38,6 +43,7 @@ interface TwitterBotProps {
 }
 
 export function TwitterBot({ onBack }: TwitterBotProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('twitter-bot');
   const { publicKey } = useWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -47,20 +53,139 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
   const [isPosting, setIsPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'compose' | 'scheduled' | 'history' | 'analytics'>('compose');
+  const [activeTab, setActiveTab] = useState<'compose' | 'scheduled' | 'history' | 'analytics' | 'agent'>('compose');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [characterCount, setCharacterCount] = useState(0);
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagInput, setHashtagInput] = useState('');
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentActivities, setAgentActivities] = useState<any[]>([]);
+  const [isStartingAgent, setIsStartingAgent] = useState(false);
 
   const maxCharacters = 280;
 
-  // Check authentication status on mount
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Twitter Automation Bot"
+        summary="This tool can schedule, post, and run autonomous agents on your Twitter account. Confirm that you will comply with platform rules and local marketing regulations before continuing."
+        bulletPoints={[
+          'OAuth login keeps secrets client-side',
+          'Autonomous agent can reply, post, and monitor DMs',
+          'Analytics panel highlights performance + failures',
+        ]}
+        costDetails={[
+          `Setup: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL`,
+          `Monthly: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL`,
+          `Per Tweet: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_tweet.toLocaleString()} SEAL`,
+        ]}
+        disclaimers={[
+          'Never automate manipulative or unlawful content.',
+          'You assume full responsibility for account safety and regional compliance.',
+        ]}
+        accent="blue"
+        onAccept={accept}
+      />
+    );
+  }
+
+  // Check authentication status on mount and handle OAuth callback
   useEffect(() => {
+    // Check for OAuth callback success/error
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+    
+    if (success === 'auth_complete') {
+      setSuccess('Successfully logged in to Twitter!');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      checkAuthStatus();
+    } else if (error) {
+      setError(`Twitter login failed: ${error}`);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    
     checkAuthStatus();
     loadPosts();
   }, []);
+
+  // Monitor agent when authenticated
+  useEffect(() => {
+    if (isAuthenticated && userInfo) {
+      checkAgentStatus();
+      // Poll agent activities every 5 seconds
+      const interval = setInterval(checkAgentStatus, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, userInfo]);
+
+  const checkAgentStatus = async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const response = await fetch('/api/twitter/agent?userId=' + (userInfo?.username || 'default'));
+      if (response.ok) {
+        const data = await response.json();
+        setAgentRunning(data.isRunning || false);
+        setAgentActivities(data.activities || []);
+      }
+    } catch (error) {
+      console.error('Error checking agent status:', error);
+    }
+  };
+
+  const handleStartAgent = async () => {
+    setIsStartingAgent(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/twitter/agent?action=start&userId=' + (userInfo?.username || 'default'), {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to start agent');
+      }
+      
+      const data = await response.json();
+      setAgentRunning(true);
+      setSuccess('Agent started successfully!');
+      await checkAgentStatus();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to start agent');
+    } finally {
+      setIsStartingAgent(false);
+    }
+  };
+
+  const handleStopAgent = async () => {
+    try {
+      const response = await fetch('/api/twitter/agent?action=stop&userId=' + (userInfo?.username || 'default'), {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to stop agent');
+      }
+      
+      setAgentRunning(false);
+      setSuccess('Agent stopped successfully');
+      await checkAgentStatus();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to stop agent');
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {
@@ -354,7 +479,7 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
           <>
             {/* Tabs */}
             <div className="flex gap-2 mb-6 border-b border-gray-700">
-              {(['compose', 'scheduled', 'history', 'analytics'] as const).map(tab => (
+              {(['compose', 'scheduled', 'history', 'analytics', 'agent'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -587,6 +712,109 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
                   <div className="p-4 bg-gray-800/50 rounded-lg">
                     <p className="text-sm text-gray-400 mb-1">Success Rate</p>
                     <p className="text-2xl font-bold">100%</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Agent Tab */}
+            {activeTab === 'agent' && (
+              <div className="card-modern p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold">Autonomous Agent</h2>
+                  <div className="flex items-center gap-3">
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      agentRunning 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                    }`}>
+                      {agentRunning ? '● Running' : '○ Stopped'}
+                    </div>
+                    {agentRunning ? (
+                      <button
+                        onClick={handleStopAgent}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Pause size={16} />
+                        Stop Agent
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleStartAgent}
+                        disabled={isStartingAgent}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isStartingAgent ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Starting...
+                          </>
+                        ) : (
+                          <>
+                            <Play size={16} />
+                            Start Agent
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Agent Info */}
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <h3 className="font-semibold text-blue-400 mb-2">Agent Capabilities</h3>
+                    <ul className="text-sm text-gray-300 space-y-1 list-disc list-inside">
+                      <li>Posts periodically (every 60 minutes by default)</li>
+                      <li>Monitors mentions and auto-replies</li>
+                      <li>Monitors direct messages and responds</li>
+                      <li>Runs autonomously once started</li>
+                    </ul>
+                  </div>
+
+                  {/* Activity Log */}
+                  <div>
+                    <h3 className="font-semibold mb-3">Activity Log</h3>
+                    <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
+                      {agentActivities.length === 0 ? (
+                        <p className="text-gray-400 text-center py-8">No activity yet. Start the agent to see activity.</p>
+                      ) : (
+                        agentActivities.map((activity) => (
+                          <div
+                            key={activity.id}
+                            className={`p-3 rounded-lg border ${
+                              activity.success
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : 'bg-red-500/10 border-red-500/30'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    activity.type === 'post' ? 'bg-blue-500/20 text-blue-400' :
+                                    activity.type === 'reply' || activity.type === 'mention_reply' ? 'bg-purple-500/20 text-purple-400' :
+                                    activity.type === 'dm_reply' ? 'bg-cyan-500/20 text-cyan-400' :
+                                    'bg-gray-500/20 text-gray-400'
+                                  }`}>
+                                    {activity.type}
+                                  </span>
+                                  {activity.success ? (
+                                    <CheckCircle size={14} className="text-green-400" />
+                                  ) : (
+                                    <AlertCircle size={14} className="text-red-400" />
+                                  )}
+                                </div>
+                                <p className="text-sm text-white">{activity.message}</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  {new Date(activity.timestamp).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

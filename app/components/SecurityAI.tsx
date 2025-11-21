@@ -8,12 +8,16 @@ import { SecurityAIBot } from './SecurityAIBot';
 import { SecurityReport } from './SecurityReport';
 import { TruthValidator } from '../lib/ai/truth-validator';
 import { AIAccessControl } from '../lib/ai/access-control';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface SecurityAIProps {
   onBack?: () => void;
 }
 
 export function SecurityAI({ onBack }: SecurityAIProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('security-ai');
   const { publicKey } = useWallet();
   const [scanner] = useState(() => new SecurityScanner());
   const [validator] = useState(() => new TruthValidator());
@@ -125,6 +129,38 @@ export function SecurityAI({ onBack }: SecurityAIProps) {
 
     return unsubscribe;
   }, [scanner]);
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Security AI Scanner"
+        summary="This scanner inspects network calls, DOM mutations, and certificates. Use it only on assets you own or have explicit permission to test, and accept responsibility for any actions you automate."
+        bulletPoints={[
+          'Live telemetry of trackers, watchers, and suspicious scripts',
+          'Auto-generated remediation report with validator checks',
+          'History log of your last 10 scans',
+        ]}
+        costDetails={[
+          `Each scan: ${SEAL_TOKEN_ECONOMICS.pricing.scanner_scan.toLocaleString()} SEAL`,
+          'Auto-refresh / continuous monitoring billed separately',
+        ]}
+        disclaimers={[
+          'Unauthorized scanning may violate local and international law.',
+          'Reports are advisory only; always validate before deploying fixes.',
+        ]}
+        accent="blue"
+        onAccept={accept}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white">

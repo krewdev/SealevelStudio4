@@ -39,6 +39,7 @@ export class CoreAIModel {
       apiType: this.config.apiType,
       timeout: this.config.timeout || 30000,
       weight: this.config.weight,
+      dockerEnabled: process.env.DOCKER_AI_ENABLED === 'true',
     };
 
     this.provider = new LocalAIProvider(localConfig);
@@ -228,6 +229,14 @@ export function initializeCoreModel(): CoreAIModel {
   };
 
   coreModelInstance = new CoreAIModel(config);
+  
+  // Log initialization status
+  if (config.enabled) {
+    console.log(`✅ Core AI Model initialized: ${config.model} at ${config.endpoint}`);
+  } else {
+    console.log('⚠️  Core AI Model disabled (LOCAL_AI_ENABLED=false or no endpoint)');
+  }
+  
   return coreModelInstance;
 }
 
@@ -236,5 +245,13 @@ export function initializeCoreModel(): CoreAIModel {
  */
 export function getCoreModel(): CoreAIModel | null {
   return coreModelInstance;
+}
+
+/**
+ * Auto-initialize on module load if enabled
+ */
+if (typeof window === 'undefined' && (process.env.LOCAL_AI_ENABLED === 'true' || process.env.LOCAL_AI_ENDPOINT)) {
+  // Server-side only - initialize on module load
+  initializeCoreModel();
 }
 

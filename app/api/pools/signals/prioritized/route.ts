@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Get pattern matches
-      let patternMatches = [];
+      let patternMatches: any[] = [];
       if (opp.steps.length > 0) {
         const pool = state.pools.find(p => p.id === opp.steps[0].pool.id);
         if (pool) {

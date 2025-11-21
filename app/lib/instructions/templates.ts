@@ -328,6 +328,116 @@ export const INSTRUCTION_TEMPLATES: InstructionTemplate[] = [
     ]
   },
 
+  // ===== FLASH LOANS =====
+  {
+    id: 'kamino_flash_loan',
+    programId: 'KLend2g3cP87fffoy8q1mQqGKjLj1d1M24gM4RdR7Kx',
+    name: 'Kamino Flash Loan',
+    description: 'Borrow tokens via Kamino flash loan (must be repaid in same transaction)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Kamino lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (destination)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to borrow' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'amount', type: 'u64', description: 'Amount to borrow (in token native units)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (kamino)', defaultValue: 'kamino' }
+    ]
+  },
+  {
+    id: 'kamino_flash_repay',
+    programId: 'KLend2g3cP87fffoy8q1mQqGKjLj1d1M24gM4RdR7Kx',
+    name: 'Kamino Flash Repay',
+    description: 'Repay Kamino flash loan (must be in same transaction as borrow)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Kamino lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (source)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to repay' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'repayAmount', type: 'u64', description: 'Amount to repay (loan + fee)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (kamino)', defaultValue: 'kamino' }
+    ]
+  },
+  {
+    id: 'solend_flash_loan',
+    programId: 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo',
+    name: 'Solend Flash Loan',
+    description: 'Borrow tokens via Solend flash loan (must be repaid in same transaction)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Solend lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (destination)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to borrow' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'amount', type: 'u64', description: 'Amount to borrow (in token native units)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (solend)', defaultValue: 'solend' }
+    ]
+  },
+  {
+    id: 'solend_flash_repay',
+    programId: 'So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo',
+    name: 'Solend Flash Repay',
+    description: 'Repay Solend flash loan (must be in same transaction as borrow)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Solend lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (source)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to repay' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'repayAmount', type: 'u64', description: 'Amount to repay (loan + fee)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (solend)', defaultValue: 'solend' }
+    ]
+  },
+  {
+    id: 'marginfi_flash_loan',
+    programId: 'MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FyN1mBwtbH4',
+    name: 'Marginfi Flash Loan',
+    description: 'Borrow tokens via Marginfi flash loan (must be repaid in same transaction)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Marginfi lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (destination)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to borrow' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'amount', type: 'u64', description: 'Amount to borrow (in token native units)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (marginfi)', defaultValue: 'marginfi' }
+    ]
+  },
+  {
+    id: 'marginfi_flash_repay',
+    programId: 'MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FyN1mBwtbH4',
+    name: 'Marginfi Flash Repay',
+    description: 'Repay Marginfi flash loan (must be in same transaction as borrow)',
+    category: 'defi',
+    accounts: [
+      { name: 'lendingPool', type: 'writable', description: 'Marginfi lending pool' },
+      { name: 'borrowerTokenAccount', type: 'writable', description: 'Borrower token account (source)' },
+      { name: 'borrower', type: 'signer', description: 'Borrower authority' },
+      { name: 'tokenMint', type: 'readonly', description: 'Token mint to repay' },
+      { name: 'tokenProgram', type: 'readonly', description: 'Token program', pubkey: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }
+    ],
+    args: [
+      { name: 'repayAmount', type: 'u64', description: 'Amount to repay (loan + fee)' },
+      { name: 'protocol', type: 'string', description: 'Lending protocol (marginfi)', defaultValue: 'marginfi' }
+    ]
+  },
+
   // ===== CUSTOM INSTRUCTIONS =====
   {
     id: 'custom_instruction',

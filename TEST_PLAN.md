@@ -161,6 +161,11 @@ This document outlines the test plan for all features in Sealevel Studio. Tests 
 - [ ] Transaction can be signed
 - [ ] Transaction can be sent
 
+### 6.3 Devnet Smoke Tests
+- [ ] Run `npm run test:devnet-tx -- --dry-run` to validate setup without network calls
+- [ ] Run `npm run test:devnet-tx -- --keypair <path-to-keypair>` to exercise live devnet transactions
+- [ ] Verify system transfer, mint creation, ATA creation, and SPL transfer succeed on explorer
+
 ---
 
 ## 7. Arbitrage Scanner Tests

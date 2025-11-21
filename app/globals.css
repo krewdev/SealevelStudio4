@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ensure background is always loaded */
+html, body {
+  background-color: #111827; /* bg-gray-900 */
+  min-height: 100vh;
+}
+
+body {
+  background-color: #111827 !important; /* bg-gray-900 */
+}
+
 /* Custom scrollbar for dark mode */
 ::-webkit-scrollbar {
   width: 12px;
@@ -34,6 +44,36 @@
 .markdown-content h2:first-child,
 .markdown-content h3:first-child {
   margin-top: 0;
+}
+
+/* Slide-in animation for buy notifications */
+@keyframes slideIn {
+  0% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out forwards;
+}
+
+/* Shimmer effect for progress bar */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
 }
 
 .markdown-content p {

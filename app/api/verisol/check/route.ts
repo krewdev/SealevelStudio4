@@ -5,8 +5,10 @@ import { validateSolanaAddress } from '@/app/lib/security/validation';
 
 export const dynamic = 'force-dynamic';
 
-// VeriSol Program ID
-const VERISOL_PROGRAM_ID = new PublicKey('mUQFmu8w9jf4RGd5cHE6Y54y1B7Bou5an5Rvezu9GY6');
+// Custom Attestation Program ID (replaces VeriSol)
+const ATTESTATION_PROGRAM_ID_VALUE = process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID 
+  ? new PublicKey(process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID)
+  : null;
 
 // Bubblegum Program ID
 const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCbk68f37Gc5o4tBzLb');
@@ -65,22 +67,26 @@ export async function GET(request: NextRequest) {
 
         if (!tx) continue;
 
-        // Check if this transaction involved the VeriSol program
+        // Check if this transaction involved the custom attestation program
         const accountKeys = tx.transaction.message.getAccountKeys();
+        
+        // Use custom program ID if available, otherwise skip
+        if (!ATTESTATION_PROGRAM_ID_VALUE) continue;
+        
         const programIndex = accountKeys.staticAccountKeys.findIndex(
-          (key) => key.toString() === VERISOL_PROGRAM_ID.toString()
+          (key) => key.toString() === ATTESTATION_PROGRAM_ID_VALUE!.toString()
         );
 
         if (programIndex !== -1) {
-          // Check if this transaction was a verifyAndMint or verifyProofOnly
+          // Check if this transaction was a mint_attestation or verify_proof_only
           // by checking the instruction data
           const instructions = tx.transaction.message.compiledInstructions || [];
           for (const ix of instructions) {
             const programIdIndex = ix.programIdIndex;
             const programId = accountKeys.get(programIdIndex);
             
-            // If this instruction is from VeriSol program, check if it's a mint
-            if (programId && programId.toString() === VERISOL_PROGRAM_ID.toString()) {
+            // If this instruction is from attestation program, check if it's a mint
+            if (programId && programId.toString() === ATTESTATION_PROGRAM_ID_VALUE!.toString()) {
               // Check if Bubblegum program was also involved (indicates cNFT mint)
               const hasBubblegum = accountKeys.staticAccountKeys.some(
                 (key) => key.toString() === BUBBLEGUM_PROGRAM_ID.toString()

@@ -24,6 +24,9 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { TelegramAdvertisingBot } from '../lib/advertising/telegram-bot';
 import { TwitterAdvertisingBot } from '../lib/advertising/twitter-bot';
 import { AdvertisingConfig } from '../lib/advertising/types';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface AdvertisingBotsProps {
   onBack?: () => void;
@@ -43,12 +46,45 @@ interface BotInstance {
 }
 
 export function AdvertisingBots({ onBack }: AdvertisingBotsProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('advertising-bots');
   const { publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<'telegram' | 'twitter' | 'dashboard'>('dashboard');
   const [bots, setBots] = useState<BotInstance[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Advertising Bots"
+        summary="These bots can syndicate token promotions across Telegram and Twitter. Confirm you will only promote compliant offerings, respect anti-spam law, and accept responsibility for campaign content."
+        bulletPoints={[
+          'Template-driven creatives with token metadata merge fields',
+          'Cadence throttles and per-day limits',
+          'Unified performance dashboard with error tracing',
+        ]}
+        costDetails={[
+          `Twitter: ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL monthly`,
+          `Telegram: ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_monthly.toLocaleString()} SEAL monthly`,
+        ]}
+        disclaimers={[
+          'Do not shill unvetted assets or violate securities/advertising laws.',
+          'We provide infrastructure only; you are accountable for disclosures.',
+        ]}
+        accent="red"
+        onAccept={accept}
+      />
+    );
+  }
 
   // Telegram Form State
   const [telegramConfig, setTelegramConfig] = useState({

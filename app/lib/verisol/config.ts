@@ -1,8 +1,22 @@
-// VeriSol Protocol Configuration
+// Custom Attestation Program Configuration
+// Replaces VeriSol with custom Anchor program
 import { PublicKey } from '@solana/web3.js';
 
-// Program ID from VeriSol protocol
+// Legacy VeriSol Program ID (deprecated, kept for backwards compatibility)
 export const VERISOL_PROGRAM_ID = new PublicKey('mUQFmu8w9jf4RGd5cHE6Y54y1B7Bou5an5Rvezu9GY6');
+
+// Custom Attestation Program ID (use this instead)
+export function getAttestationProgramId(): PublicKey | null {
+  const envProgramId = process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID;
+  if (envProgramId) {
+    try {
+      return new PublicKey(envProgramId);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 // Bubblegum Program IDs (Metaplex)
 export const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCbk68f37Gc5o4tBzLb');

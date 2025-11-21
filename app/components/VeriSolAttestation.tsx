@@ -20,13 +20,11 @@ import {
 import {
   mintVeriSolAttestation,
   checkVeriSolSetup,
-  serializeProofForSolana,
 } from '../lib/verisol';
 import {
-  generateBetaTesterAttestationProof,
   verifyUsageRequirements,
-  generateUsageProof,
 } from '../lib/verisol/beta-tester-proof';
+import { getTierForUsage, getTierInfo, TIER_CONFIG } from '../lib/attestation/client';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 
 interface VeriSolAttestationProps {
@@ -72,13 +70,14 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
       return;
     }
     
-    const minRequired = 10; // Minimum 10 feature uses to qualify as beta tester
     // Calculate total usage from features object
     const totalUsage = Object.values(stats.features).reduce((sum, count) => sum + count, 0);
+    const tier = getTierForUsage(totalUsage);
+    const minRequired = TIER_CONFIG[1].threshold; // Bronze tier minimum
     
     setUsageStats({
       totalUsage,
-      meetsRequirement: totalUsage >= minRequired,
+      meetsRequirement: tier > 0,
       minRequired,
     });
   }, [publicKey, getStats]);
@@ -112,13 +111,12 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
       return;
     }
     
-    const minRequired = 10;
     // Calculate total usage from features object
     const featuresTotal = Object.values(stats.features).reduce((sum, count) => sum + count, 0);
+    const tier = getTierForUsage(featuresTotal);
     
-    const usageCheck = verifyUsageRequirements(featuresTotal, minRequired);
-    if (!usageCheck.valid) {
-      setError(usageCheck.reason || 'Insufficient usage to qualify as beta tester');
+    if (tier === 0) {
+      setError(`Insufficient usage: ${featuresTotal} (minimum ${TIER_CONFIG[1].threshold} required for Bronze tier)`);
       return;
     }
 
@@ -129,48 +127,29 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
     setCNFTAddress(null);
 
     try {
-      // 2. Generate usage proof from actual usage data
-      // Calculate total usage from features object
+      // 2. Calculate total usage from features
       const featuresTotal = Object.values(stats.features).reduce((sum, count) => sum + count, 0);
-      const usageProof = generateUsageProof({
-        totalUsage: featuresTotal,
-        featuresUsed: stats.features,
-        walletAddress: publicKey.toString(),
-        timestamp: Date.now(),
-      });
 
-      // 3. Generate ZK proof for beta tester credential with usage verification
-      setError(null); // Clear previous errors
-      
-      const proofInput = {
-        walletAddress: publicKey.toString(),
-        actualUsage: featuresTotal,
-        minUsageThreshold: minRequired,
-        usageProof,
-      };
-
-      const { proof, publicSignals } = await generateBetaTesterAttestationProof(proofInput);
-
-      // 4. Serialize proof for Solana
-      const { proofBytes, publicInputBytes } = serializeProofForSolana(proof, publicSignals);
-
-      // 5. Mint cNFT using VeriSol protocol
-
+      // 3. Mint attestation with simple verification (no ZK proof needed)
+      // Just pass the usage count directly
+      const tierInfo = getTierInfo(tier);
       const signature = await mintVeriSolAttestation({
         connection,
         wallet,
-        proofBytes,
-        publicInputBytes,
+        usageCount: featuresTotal, // Pass usage count directly
         metadata: {
-          name: 'Sealevel Studio Beta Tester',
-          symbol: 'BETA',
-          uri: 'https://sealevel.studio/metadata/beta-tester.json',
+          name: `Sealevel Studio Beta Tester - ${tierInfo.name}`,
+          symbol: `BETA-${tierInfo.name.slice(0, 1)}`,
+          uri: `https://sealevel.studio/metadata/beta-tester-${tierInfo.name.toLowerCase()}.json`,
         },
       });
 
       setAttestationSignature(signature);
       setSuccess(true);
       setError(null);
+      
+      // Show tier in success message
+      console.log(`Minted ${tierInfo.name} tier attestation (${tierInfo.rarity})`);
 
       // Wait for confirmation
       await connection.confirmTransaction(signature, 'confirmed');
@@ -212,6 +191,73 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
         </div>
       </div>
 
+      {/* Tier Information */}
+      {usageStats && usageStats.totalUsage > 0 && (
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 border border-slate-700 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Sparkles size={20} />
+            Your Tier Status
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((tierNum) => {
+              const tierInfo = TIER_CONFIG[tierNum];
+              const currentTier = getTierForUsage(usageStats.totalUsage);
+              const isUnlocked = currentTier >= tierNum;
+              const isCurrent = currentTier === tierNum;
+              
+              return (
+                <div
+                  key={tierNum}
+                  className={`border-2 rounded-lg p-4 ${
+                    isCurrent
+                      ? 'bg-opacity-20'
+                      : isUnlocked
+                      ? 'border-slate-600 bg-slate-800/50'
+                      : 'border-slate-700 bg-slate-900/50 opacity-60'
+                  }`}
+                  style={{
+                    borderColor: isCurrent ? tierInfo.color : isUnlocked ? '#475569' : '#334155',
+                    backgroundColor: isCurrent ? `${tierInfo.color}20` : undefined,
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: isCurrent ? tierInfo.color : '#6B7280' }}
+                    >
+                      {tierInfo.name}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                        CURRENT
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-400 mb-2">{tierInfo.rarity}</div>
+                  <div className="text-sm text-slate-300">
+                    <div className="flex justify-between">
+                      <span>Threshold:</span>
+                      <span className="font-semibold">{tierInfo.threshold}+</span>
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span>Your Usage:</span>
+                      <span className={isUnlocked ? 'text-green-400' : 'text-slate-500'}>
+                        {usageStats.totalUsage}
+                      </span>
+                    </div>
+                    {!isUnlocked && (
+                      <div className="text-xs text-slate-500 mt-2">
+                        Need {tierInfo.threshold - usageStats.totalUsage} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4 mb-6">
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
@@ -233,9 +279,20 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
               <span className="text-slate-400">Verification:</span>
               <span className="text-green-400 flex items-center gap-1">
                 <CheckCircle size={14} />
-                ZK Proof Enabled
+                Simple Verification
               </span>
             </div>
+            {usageStats && usageStats.totalUsage > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Your Tier:</span>
+                <span
+                  className="font-semibold"
+                  style={{ color: getTierInfo(getTierForUsage(usageStats.totalUsage)).color }}
+                >
+                  {getTierInfo(getTierForUsage(usageStats.totalUsage)).name} ({getTierInfo(getTierForUsage(usageStats.totalUsage)).rarity})
+                </span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-slate-400">Format:</span>
               <span className="text-white">Compressed NFT (cNFT)</span>
@@ -253,12 +310,18 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
           </div>
         )}
 
-        {success && (
+        {success && usageStats && (
           <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <CheckCircle size={20} className="text-green-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h4 className="text-green-400 font-semibold mb-2">Attestation Created Successfully!</h4>
+                <h4 className="text-green-400 font-semibold mb-2">
+                  {(() => {
+                    const tier = getTierForUsage(usageStats.totalUsage);
+                    const tierInfo = getTierInfo(tier);
+                    return `Attestation Created Successfully! - ${tierInfo.name} Tier (${tierInfo.rarity})`;
+                  })()}
+                </h4>
                 {attestationSignature && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -346,11 +409,29 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
       <div className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 mb-6">
         <h4 className="text-sm font-semibold text-slate-300 mb-2">How It Works</h4>
         <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
-          <li>Generate a zero-knowledge proof of your beta tester status</li>
-          <li>Create a verifiable credential using VeriSol protocol</li>
-          <li>Mint a compressed NFT (cNFT) containing the attestation</li>
-          <li>Your credential is stored on-chain and can be verified privately</li>
+          <li>Your usage is tracked automatically as you use Sealevel Studio features</li>
+          <li>Attestations are minted based on your total usage count</li>
+          <li>Three tiers available: Bronze (10+), Silver (50+), Gold (250+)</li>
+          <li>Higher tiers receive rarer cNFTs with unique metadata</li>
+          <li>Your credential is stored on-chain as a compressed NFT</li>
         </ul>
+        <div className="mt-3 pt-3 border-t border-slate-700">
+          <h5 className="text-xs font-semibold text-slate-300 mb-2">Tier Requirements:</h5>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <span className="font-semibold" style={{ color: TIER_CONFIG[1].color }}>Bronze:</span>
+              <span className="text-slate-400 ml-1">{TIER_CONFIG[1].threshold}+ uses</span>
+            </div>
+            <div>
+              <span className="font-semibold" style={{ color: TIER_CONFIG[2].color }}>Silver:</span>
+              <span className="text-slate-400 ml-1">{TIER_CONFIG[2].threshold}+ uses</span>
+            </div>
+            <div>
+              <span className="font-semibold" style={{ color: TIER_CONFIG[3].color }}>Gold:</span>
+              <span className="text-slate-400 ml-1">{TIER_CONFIG[3].threshold}+ uses</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <button

@@ -1,0 +1,78 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sealevel-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=24h
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # NVIDIA GPU support
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp-server
+    container_name: sealevel-mcp-server
+    ports:
+      - "8000:8000"
+    environment:
+      - MCP_API_KEY=${MCP_API_KEY:-}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-info}
+      - NODE_ENV=production
+    volumes:
+      - mcp-data:/app/data
+      - ./app/lib/ai/mcp:/app/mcp:ro
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: sealevel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ollama-data:
+    driver: local
+  mcp-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  default:
+    name: sealevel-ai-network
+

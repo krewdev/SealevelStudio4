@@ -7,8 +7,10 @@ import { getBetaTesterMerkleTree, getBetaTesterCollectionId, BUBBLEGUM_PROGRAM_I
 
 export const dynamic = 'force-dynamic';
 
-// VeriSol Program ID
-const VERISOL_PROGRAM_ID = new PublicKey('mUQFmu8w9jf4RGd5cHE6Y54y1B7Bou5an5Rvezu9GY6');
+// Custom Attestation Program ID (replaces VeriSol)
+const ATTESTATION_PROGRAM_ID_VALUE = process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID 
+  ? new PublicKey(process.env.NEXT_PUBLIC_ATTESTATION_PROGRAM_ID)
+  : null;
 
 /**
  * Check if a wallet has a beta tester attestation cNFT in the beta tester merkle tree
@@ -166,9 +168,11 @@ export async function GET(request: NextRequest) {
 
             const accountKeys = tx.transaction.message.getAccountKeys();
             
-            // Check if this transaction involved VeriSol program and the beta tester tree
-            const hasVeriSol = accountKeys.staticAccountKeys.some(
-              (key) => key.toString() === VERISOL_PROGRAM_ID.toString()
+            // Check if this transaction involved custom attestation program and the beta tester tree
+            if (!ATTESTATION_PROGRAM_ID_VALUE) continue;
+            
+            const hasAttestationProgram = accountKeys.staticAccountKeys.some(
+              (key) => key.toString() === ATTESTATION_PROGRAM_ID_VALUE!.toString()
             );
             const hasTree = accountKeys.staticAccountKeys.some(
               (key) => key.toString() === betaTesterTree.toString()
@@ -177,7 +181,7 @@ export async function GET(request: NextRequest) {
               (key) => key.toString() === BUBBLEGUM_PROGRAM_ID.toString()
             );
 
-            if (hasVeriSol && hasTree && hasBubblegum) {
+            if (hasAttestationProgram && hasTree && hasBubblegum) {
               hasAttestation = true;
               attestationTxSignature = sigInfo.signature;
               attestationTimestamp = sigInfo.blockTime ? sigInfo.blockTime * 1000 : null;

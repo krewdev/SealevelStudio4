@@ -12,15 +12,33 @@ export const dynamic = 'force-dynamic';
  * Admin Analytics API
  * Returns analytics for all users
  * 
- * TODO: Add authentication/authorization to restrict access to admins only
+ * SECURITY: Requires admin authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add admin authentication check here
-    // const isAdmin = await checkAdminAuth(request);
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    // Check for admin authentication
+    const adminToken = request.headers.get('x-admin-token') || request.cookies.get('admin_token')?.value;
+    const expectedAdminToken = process.env.ADMIN_API_TOKEN;
+    
+    // If no admin token is configured, deny access in production
+    if (!expectedAdminToken) {
+      if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json(
+          { error: 'Admin access not configured. This endpoint is disabled in production.' },
+          { status: 503 }
+        );
+      }
+      // In development, allow access but log warning
+      console.warn('⚠️  WARNING: Admin analytics endpoint accessed without authentication in development mode');
+    } else {
+      // Verify admin token
+      if (!adminToken || adminToken !== expectedAdminToken) {
+        return NextResponse.json(
+          { error: 'Unauthorized. Admin authentication required.' },
+          { status: 401 }
+        );
+      }
+    }
 
     const searchParams = request.nextUrl.searchParams;
     const period = (searchParams.get('period') as 'daily' | 'weekly' | 'monthly' | 'all_time') || 'all_time';

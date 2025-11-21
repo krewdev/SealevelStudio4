@@ -61,30 +61,30 @@ export interface PresaleConfig {
  * Default Presale Configuration
  */
 export const DEFAULT_PRESALE_CONFIG: PresaleConfig = {
-  startTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // Starts in 24 hours
-  endTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Ends in 30 days
-  isActive: false,
-  
-  presaleSupply: 100_000_000, // 100M SEAL tokens (10% of total supply)
+  startTime: new Date(), // Starts immediately
+  endTime: new Date(Date.now() + 150 * 24 * 60 * 60 * 1000), // 5 months duration
+  isActive: true,
+
+  presaleSupply: 300_000_000, // 300M SEAL tokens for presale
   minPurchase: 0.1, // Minimum 0.1 SOL
-  maxPurchase: 100, // Maximum 100 SOL per wallet
-  totalRaiseCap: 1000, // Maximum 1000 SOL
-  
-  pricePerSeal: 0.00001, // 0.00001 SOL per SEAL (10,000 SEAL per SOL)
+  maxPurchase: 1000, // Maximum 1000 SOL per wallet
+  totalRaiseCap: 10_000, // Maximum 10,000 SOL total raise
+
+  pricePerSeal: 0.00002, // 0.00002 SOL per SEAL (50,000 SEAL per SOL)
   bonusTiers: [
-    { amount: 1, bonusPercent: 5 },    // 1+ SOL = 5% bonus
-    { amount: 5, bonusPercent: 10 },   // 5+ SOL = 10% bonus
-    { amount: 10, bonusPercent: 15 },  // 10+ SOL = 15% bonus
-    { amount: 25, bonusPercent: 20 }, // 25+ SOL = 20% bonus
-    { amount: 50, bonusPercent: 25 }, // 50+ SOL = 25% bonus
+    { amount: 1, bonusPercent: 10 },    // 1+ SOL = 10% bonus
+    { amount: 10, bonusPercent: 15 },   // 10+ SOL = 15% bonus
+    { amount: 50, bonusPercent: 20 },   // 50+ SOL = 20% bonus
+    { amount: 100, bonusPercent: 25 },  // 100+ SOL = 25% bonus
+    { amount: 500, bonusPercent: 30 },  // 500+ SOL = 30% bonus
   ],
-  
+
   whitelistEnabled: false,
   whitelist: new Set(),
-  
-  treasuryWallet: PublicKey.default, // Will be set to actual treasury
+
+  treasuryWallet: PublicKey.default, // Will be set to user's wallet
   sealMint: null,
-  
+
   totalRaised: 0,
   totalContributors: 0,
   contributions: new Map(),

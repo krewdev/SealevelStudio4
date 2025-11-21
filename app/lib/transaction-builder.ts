@@ -7,7 +7,8 @@ import {
   SYSVAR_RENT_PUBKEY,
   sendAndConfirmTransaction,
   Signer,
-  Keypair
+  Keypair,
+  LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -26,6 +27,14 @@ import {
   getAssociatedTokenAddress
 } from '@solana/spl-token';
 import { BuiltInstruction, TransactionDraft } from './instructions/types';
+
+// Platform fee configuration
+// 0.0002 SOL per transaction
+const PLATFORM_FEE_LAMPORTS = Math.floor(0.0002 * LAMPORTS_PER_SOL);
+
+// Environment variable for platform fee recipient
+// Should be a valid Solana address
+const PLATFORM_FEE_RECIPIENT_ENV = process.env.NEXT_PUBLIC_PLATFORM_FEE_ADDRESS || process.env.NEXT_PUBLIC_TREASURY_ADDRESS || '';
 
 export class TransactionBuilder {
   constructor(private connection: Connection) {}
@@ -66,6 +75,40 @@ export class TransactionBuilder {
     }
 
     return transaction;
+  }
+
+  /**
+   * Add a fixed platform fee transfer to the transaction, if a valid
+   * platform fee recipient is configured.
+   *
+   * This should be called after buildTransaction and before prepareTransaction.
+   */
+  addPlatformFee(transaction: Transaction, payer: PublicKey): void {
+    // If no recipient configured, skip adding the fee
+    if (!PLATFORM_FEE_RECIPIENT_ENV) {
+      return;
+    }
+
+    let recipient: PublicKey;
+    try {
+      recipient = new PublicKey(PLATFORM_FEE_RECIPIENT_ENV);
+    } catch {
+      // Invalid address configured - skip to avoid breaking transactions
+      console.warn('Invalid platform fee recipient address configured, skipping platform fee.');
+      return;
+    }
+
+    if (PLATFORM_FEE_LAMPORTS <= 0) {
+      return;
+    }
+
+    const feeIx = SystemProgram.transfer({
+      fromPubkey: payer,
+      toPubkey: recipient,
+      lamports: PLATFORM_FEE_LAMPORTS,
+    });
+
+    transaction.add(feeIx);
   }
 
   private async buildInstruction(builtInstruction: BuiltInstruction): Promise<TransactionInstruction> {
@@ -250,6 +293,7 @@ export class TransactionBuilder {
     // Metaplex Metadata
     const tokenName = args.tokenName || '';
     const tokenSymbol = args.tokenSymbol || '';
+    const tokenImage = args.tokenImage || ''; // Base64 data URI or URL
     const metadataURI = args.metadataURI || '';
     const sellerFeeBasisPoints = args.sellerFeeBasisPoints || 500;
     const creators = args.creators || '';
@@ -378,15 +422,18 @@ export class TransactionBuilder {
     }
     
     // 5. Create Metaplex Metadata (if provided)
-    if (tokenName || tokenSymbol || metadataURI) {
+    if (tokenName || tokenSymbol || metadataURI || tokenImage) {
       // This would create a Metaplex metadata account
       // For now, we'll add the instruction structure
       const metadataProgramId = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
       // Metadata PDA derivation would go here
       // Full implementation would use Metaplex SDK or manual instruction building
+      // If tokenImage is provided, it should be included in the metadata JSON
+      // The image can be a base64 data URI or a URL - if base64, it should be uploaded to IPFS/Arweave first
       console.log('Metaplex metadata would be created here with:', {
         name: tokenName,
         symbol: tokenSymbol,
+        image: tokenImage ? (tokenImage.startsWith('data:') ? '[Base64 Image]' : tokenImage) : undefined,
         uri: metadataURI,
         sellerFeeBasisPoints,
         creators,
@@ -548,26 +595,56 @@ export class TransactionBuilder {
     transaction.feePayer = payer;
   }
 
-  // Estimate transaction cost
+  // Estimate transaction cost with platform fee breakdown
   async estimateCost(transaction: Transaction): Promise<{
     lamports: number;
     sol: number;
+    platformFee: {
+      lamports: number;
+      sol: number;
+    };
+    total: {
+      lamports: number;
+      sol: number;
+    };
   }> {
-    const lamports = await transaction.getEstimatedFee(this.connection);
-    
+    const baseLamports = await transaction.getEstimatedFee(this.connection);
+
     // Handle case where fee estimation fails
-    if (lamports === null) {
+    if (baseLamports === null) {
       // Provide a reasonable fallback or throw an error
       // For now, we'll use a fallback estimate
+      const fallbackLamports = 5000; // ~0.000005 SOL fallback
+      const platformFeeLamports = PLATFORM_FEE_LAMPORTS;
+
       return {
-        lamports: 5000, // ~0.000005 SOL fallback
-        sol: 0.000005
+        lamports: fallbackLamports,
+        sol: fallbackLamports / 1e9,
+        platformFee: {
+          lamports: platformFeeLamports,
+          sol: platformFeeLamports / 1e9
+        },
+        total: {
+          lamports: fallbackLamports + platformFeeLamports,
+          sol: (fallbackLamports + platformFeeLamports) / 1e9
+        }
       };
     }
-    
+
+    const platformFeeLamports = PLATFORM_FEE_LAMPORTS;
+    const totalLamports = baseLamports + platformFeeLamports;
+
     return {
-      lamports,
-      sol: lamports / 1e9
+      lamports: baseLamports,
+      sol: baseLamports / 1e9,
+      platformFee: {
+        lamports: platformFeeLamports,
+        sol: platformFeeLamports / 1e9
+      },
+      total: {
+        lamports: totalLamports,
+        sol: totalLamports / 1e9
+      }
     };
   }
 }

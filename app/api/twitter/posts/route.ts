@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { TwitterApi } from 'twitter-api-v2';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,53 +59,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In production:
-    // 1. Get stored access tokens from session
-    // 2. Use Twitter API v2 to post tweet
-    // 3. Store post in database
-    // 4. If scheduled, add to scheduler queue
+    // Get access token from cookies
+    const accessToken = request.cookies.get('twitter_access_token')?.value;
 
-    const apiKey = process.env.TWITTER_API_KEY;
-    const apiSecret = process.env.TWITTER_API_SECRET;
-    const accessToken = process.env.TWITTER_ACCESS_TOKEN; // Would come from session
-    const accessTokenSecret = process.env.TWITTER_ACCESS_TOKEN_SECRET; // Would come from session
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'Not authenticated. Please log in to Twitter first.', success: false },
+        { status: 401 }
+      );
+    }
 
-    if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
-      // For development, return mock success
+    // If scheduled, store for later processing
+    if (scheduledFor) {
+      const scheduledDate = new Date(scheduledFor);
+      if (scheduledDate <= new Date()) {
+        return NextResponse.json(
+          { error: 'Scheduled time must be in the future', success: false },
+          { status: 400 }
+        );
+      }
+
+      // In production, store in database with scheduler
       const post: TwitterPost = {
         id: `post_${Date.now()}`,
         content,
-        status: scheduledFor ? 'scheduled' : 'posted',
-        scheduledFor: scheduledFor || undefined,
-        postedAt: scheduledFor ? undefined : new Date().toISOString(),
+        status: 'scheduled',
+        scheduledFor: scheduledFor,
       };
 
       return NextResponse.json({
         success: true,
         post,
-        message: scheduledFor ? 'Post scheduled successfully' : 'Post published successfully',
-        note: 'In production, this would post to Twitter using stored OAuth tokens',
+        message: 'Post scheduled successfully',
       });
     }
 
-    // Production: Post to Twitter API v2
-    // Using twitter-api-v2 package would be:
-    // const client = new TwitterApi({ appKey: apiKey, appSecret: apiSecret, accessToken, accessSecret });
-    // const tweet = await client.v2.tweet(content);
+    // Post immediately to Twitter
+    try {
+      const client = new TwitterApi(accessToken);
+      const tweet = await client.v2.tweet(content);
 
-    const post: TwitterPost = {
-      id: `post_${Date.now()}`,
-      content,
-      status: scheduledFor ? 'scheduled' : 'posted',
-      scheduledFor: scheduledFor || undefined,
-      postedAt: scheduledFor ? undefined : new Date().toISOString(),
-    };
+      const post: TwitterPost = {
+        id: tweet.data.id,
+        content,
+        status: 'posted',
+        postedAt: new Date().toISOString(),
+      };
 
-    return NextResponse.json({
-      success: true,
-      post,
-      message: scheduledFor ? 'Post scheduled successfully' : 'Post published successfully',
-    });
+      return NextResponse.json({
+        success: true,
+        post,
+        message: 'Post published successfully',
+        tweetId: tweet.data.id,
+      });
+    } catch (error) {
+      console.error('Twitter API error:', error);
+      return NextResponse.json(
+        {
+          error: error instanceof Error ? error.message : 'Failed to post to Twitter',
+          success: false,
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Create post error:', error);
     return NextResponse.json(

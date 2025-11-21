@@ -30,11 +30,10 @@ export const SEAL_TOKEN_CONFIG = {
   // Supply Configuration
   totalSupply: 1_000_000_000, // 1 billion SEAL tokens (1,000,000,000 with 9 decimals)
   initialDistribution: {
-    treasury: 400_000_000, // 40% - Treasury for operations and rewards
-    team: 200_000_000, // 20% - Team allocation (vested)
+    presale: 300_000_000, // 30% - Presale allocation
+    staffInsiders: 300_000_000, // 30% - Staff and insiders (vested)
     liquidity: 200_000_000, // 20% - Initial liquidity pools
-    community: 100_000_000, // 10% - Community rewards and airdrops
-    reserves: 100_000_000, // 10% - Reserves for future use
+    treasury: 200_000_000, // 20% - Treasury vault for operations
   },
   
   // Authority Configuration
@@ -43,13 +42,33 @@ export const SEAL_TOKEN_CONFIG = {
   
   // Token-2022 Features (optional, can be enabled later)
   useToken2022: false, // Start with standard SPL Token
+
+  // Tax Configuration (applied on every trade)
+  taxConfig: {
+    enabled: true,
+    initialTaxRate: 500, // 5% (basis points: 500/10000 = 0.05)
+    taxDecayRate: 10, // Tax decreases by 0.1% per day
+    minTaxRate: 100, // Minimum 1% tax rate
+    taxPools: {
+      treasury: 50, // 50% of tax goes to treasury
+      liquidity: 30, // 30% goes to liquidity pool
+      rewards: 20, // 20% goes to staking rewards
+    },
+  },
+
+  // Vesting Configuration for presale allocations
+  vestingPeriods: {
+    week1: { duration: 7 * 24 * 60 * 60 * 1000, label: '1 Week' },
+    week3: { duration: 21 * 24 * 60 * 60 * 1000, label: '3 Weeks' },
+    month1: { duration: 30 * 24 * 60 * 60 * 1000, label: '1 Month' },
+  },
   
   // Metaplex Metadata
   metadata: {
     name: 'Sealevel Studio Token',
     symbol: 'SEAL',
     description: 'The native utility token for Sealevel Studio - a comprehensive Solana transaction builder and R&D platform.',
-    image: 'https://sealevel.studio/logo.png', // Placeholder - update with actual logo URL
+    image: '/sea-level-logo.png', // Use the round Sealevel logo
     externalUrl: 'https://sealevel.studio',
     attributes: [
       { trait_type: 'Type', value: 'Utility Token' },

@@ -23,12 +23,16 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { buildMultiSendTransaction, estimateMultiSend } from '../lib/bundler/multi-send';
 import { MultiSendConfig, MultiSendRecipient } from '../lib/bundler/types';
 import { walletRegistry } from '../lib/wallet-manager';
+import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
+import { useRiskConsent } from '../hooks/useRiskConsent';
+import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
 
 interface TransactionBundlerProps {
   onBack?: () => void;
 }
 
 export function TransactionBundler({ onBack }: TransactionBundlerProps) {
+  const { hasConsent, initialized, accept } = useRiskConsent('bundler');
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const [recipients, setRecipients] = useState<MultiSendRecipient[]>([
@@ -198,10 +202,67 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     }
   };
 
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse text-sm uppercase tracking-[0.3em]">Preparing compliance checks...</div>
+      </div>
+    );
+  }
+
+  if (!hasConsent) {
+    return (
+      <RiskAcknowledgement
+        featureName="Transaction Bundler"
+        summary="This multi-send tool can move significant capital with one click. Please confirm you accept all risk, comply with local regulations, and double-check every recipient before executing."
+        bulletPoints={[
+          'Batch up to 50 recipients with automatic account creation',
+          'Priority fee controls + memo support',
+          'Wallet registry links new burner wallets for later audits',
+        ]}
+        costDetails={[
+          `Cost: ${SEAL_TOKEN_ECONOMICS.pricing.bundler_multi_send.toLocaleString()} SEAL per bundle`,
+          `${SEAL_TOKEN_ECONOMICS.pricing.bundler_recipient} SEAL for each additional recipient`,
+          `${SEAL_TOKEN_ECONOMICS.beta_tester.free_bundler_transactions} free beta transactions remain for testers`,
+        ]}
+        disclaimers={[
+          'Always respect KYC/AML obligations in your jurisdiction.',
+          'We provide tooling only. You are responsible for transaction intent and legality.',
+        ]}
+        accent="purple"
+        onAccept={accept}
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col h-full text-white relative" style={{
+      backgroundColor: '#0f172a', // slate-950
+      position: 'relative',
+    }}>
+      {/* Logo background layer - behind dot grid */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'url(/sea-level-logo.png)',
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.08, // Very subtle, opaque background
+          zIndex: 0,
+        }}
+      />
+      {/* Dot grid overlay */}
+      <div 
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'radial-gradient(#1e293b_1px, transparent_1px)',
+          backgroundSize: '16px 16px',
+          zIndex: 1,
+        }}
+      />
       {/* Header */}
-      <div className="border-b border-gray-700 p-6 bg-gray-800">
+      <div className="border-b border-gray-700 p-6 bg-gray-800/80 backdrop-blur-sm relative z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {onBack && (
@@ -230,7 +291,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
         </p>
       </div>
 
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex-1 overflow-hidden flex relative z-10">
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
           {/* Settings */}

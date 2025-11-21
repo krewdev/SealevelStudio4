@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       const price = Number(outAmount) / Number(inAmount);
       
       // Estimate fee (Jupiter aggregates, so fee varies)
-      const fee = data.routePlan?.[0]?.swapInfo?.feeMint || 30;
+      const fee = data.routePlan?.[0]?.swapInfo?.feeAmount || 30;
       
       return NextResponse.json({
         price,

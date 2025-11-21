@@ -1,88 +1,78 @@
+// Twitter OAuth 2.0 Initiation
+// Uses OAuth 2.0 which is simpler and more secure than OAuth 1.0a
+
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { TwitterApi } from 'twitter-api-v2';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Initiate Twitter OAuth 1.0a flow
- * Step 1: Request token
+ * Initiate Twitter OAuth 2.0 flow
+ * POST /api/twitter/auth/initiate
  */
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = process.env.TWITTER_API_KEY;
-    const apiSecret = process.env.TWITTER_API_SECRET;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
     const callbackUrl = process.env.TWITTER_CALLBACK_URL || 
                        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/twitter/auth/callback`;
 
-    if (!apiKey || !apiSecret) {
+    if (!clientId || !clientSecret) {
       return NextResponse.json(
-        { error: 'Twitter API credentials not configured' },
+        { 
+          error: 'Twitter API credentials not configured. Please set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET in your environment variables.',
+          success: false,
+        },
         { status: 500 }
       );
     }
 
-    // Generate OAuth 1.0a request token
-    const oauthParams = {
-      oauth_callback: callbackUrl,
-      oauth_consumer_key: apiKey,
-      oauth_nonce: crypto.randomBytes(16).toString('hex'),
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_version: '1.0',
-    };
-
-    // Create signature (simplified - full implementation would use proper OAuth signing)
-    const baseString = Object.keys(oauthParams)
-      .sort()
-      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key as keyof typeof oauthParams])}`)
-      .join('&');
-
-    const signatureKey = `${encodeURIComponent(apiSecret)}&`;
-    const signature = crypto
-      .createHmac('sha1', signatureKey)
-      .update(baseString)
-      .digest('base64');
-
-    // Request token from Twitter
-    const response = await fetch('https://api.twitter.com/oauth/request_token', {
-      method: 'POST',
-      headers: {
-        'Authorization': `OAuth ${Object.entries(oauthParams).map(([k, v]) => `${k}="${encodeURIComponent(v)}"`).join(', ')}, oauth_signature="${encodeURIComponent(signature)}"`,
-      },
+    // Create OAuth 2.0 client
+    const client = new TwitterApi({
+      clientId,
+      clientSecret,
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to get request token');
-    }
+    // Generate authorization URL
+    const { url, codeVerifier, state } = await client.generateOAuth2AuthLink(callbackUrl, {
+      scope: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+    });
 
-    const responseText = await response.text();
-    const params = new URLSearchParams(responseText);
-    const oauthToken = params.get('oauth_token');
-    const oauthTokenSecret = params.get('oauth_token_secret');
-
-    if (!oauthToken) {
-      throw new Error('No oauth token received');
-    }
-
-    // Store token secret in session (in production, use secure session storage)
-    // For now, we'll return it to be stored client-side temporarily
-    const authUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${oauthToken}`;
-
-    return NextResponse.json({
+    // Store codeVerifier and state in session/cookie
+    // In production, use secure session storage (Redis, database, etc.)
+    // For now, we'll return them to be stored client-side temporarily
+    const response = NextResponse.json({
       success: true,
-      authUrl,
-      oauthToken,
-      oauthTokenSecret, // In production, store securely server-side
+      authUrl: url,
+      state,
+      codeVerifier, // In production, store server-side
     });
+
+    // Set secure cookie for codeVerifier (httpOnly, secure in production)
+    response.cookies.set('twitter_code_verifier', codeVerifier, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutes
+    });
+
+    response.cookies.set('twitter_oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutes
+    });
+
+    return response;
   } catch (error) {
     console.error('Twitter OAuth initiation error:', error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Failed to initiate Twitter login',
         success: false,
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
       },
       { status: 500 }
     );
   }
 }
-

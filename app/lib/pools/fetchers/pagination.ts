@@ -36,6 +36,7 @@ export interface PaginationOptions {
 
 /**
  * Fetch all program accounts with pagination
+ * Uses Helius getProgramAccountsV2 method for efficient pagination
  */
 export async function fetchAllProgramAccountsV2(
   rpcUrl: string,
@@ -53,51 +54,53 @@ export async function fetchAllProgramAccountsV2(
   const allAccounts: PaginatedAccountsResponse['accounts'] = [];
   let paginationKey: string | null | undefined = null;
   let pageCount = 0;
-  const maxPages = 1000; // Safety limit to prevent infinite loops
+  // Reduced max pages to prevent excessive API calls (was 1000, now 50 = max 50,000 accounts per DEX)
+  const maxPages = 50; // Safety limit - 50 pages * 10000 limit = 500k accounts max per DEX
+  const REQUEST_DELAY = 100; // 100ms delay between requests to avoid rate limits
 
   do {
-    const params: any = {
-      encoding,
-      limit: Math.min(limit, 10000), // Helius max is 10000
+    // Helius getProgramAccountsV2 format:
+    // method: "getProgramAccountsV2"
+    // params: [programId, { encoding, limit, filters, paginationKey, ... }]
+    const requestBody = {
+      jsonrpc: '2.0' as const,
+      id: pageCount + 1,
+      method: 'getProgramAccountsV2',
+      params: [
+        programId,
+        {
+          encoding,
+          limit: Math.min(limit, 10000), // Helius max is 10000
+          ...(filters.length > 0 && { filters }),
+          ...(dataSlice && { dataSlice }),
+          ...(paginationKey && { paginationKey }),
+          ...(changedSinceSlot && { changedSinceSlot }),
+        },
+      ],
     };
-
-    if (paginationKey) {
-      params.paginationKey = paginationKey;
-    }
-
-    if (dataSlice) {
-      params.dataSlice = dataSlice;
-    }
-
-    if (filters.length > 0) {
-      params.filters = filters;
-    }
-
-    if (changedSinceSlot) {
-      params.changedSinceSlot = changedSinceSlot;
-    }
 
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: pageCount + 1,
-        method: 'getProgramAccountsV2',
-        params: [programId, params],
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`RPC request failed: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`RPC request failed: ${response.statusText}. Response: ${errorText}`);
     }
 
     const data = await response.json();
 
     if (data.error) {
-      throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+      const errorMsg = data.error.message || JSON.stringify(data.error);
+      // Check for method errors or stake-related errors
+      if (errorMsg.includes('method') || errorMsg.includes('not found') || errorMsg.includes('stake') || errorMsg.includes('invalid')) {
+        throw new Error(`RPC method error: ${errorMsg}. Make sure you're using the correct RPC endpoint and method.`);
+      }
+      throw new Error(`RPC error: ${errorMsg}`);
     }
 
     if (!data.result) {
@@ -174,9 +177,9 @@ export async function fetchAllProgramAccountsV2(
       break;
     }
 
-    // Small delay to avoid rate limiting
+    // Rate limiting: Add delay between pagination requests to avoid hitting Helius limits
     if (paginationKey) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY));
     }
   } while (paginationKey);
 
@@ -195,7 +198,8 @@ export async function fetchAllProgramAccountsV2WithProgress(
   const accounts: PaginatedAccountsResponse['accounts'] = [];
   let paginationKey: string | null | undefined = null;
   let pageCount = 0;
-  const maxPages = 1000;
+  const maxPages = 50; // Reduced to prevent excessive API calls
+  const REQUEST_DELAY = 100; // 100ms delay between requests
 
   const {
     limit = 1000,
@@ -206,48 +210,45 @@ export async function fetchAllProgramAccountsV2WithProgress(
   } = options;
 
   do {
-    const params: any = {
-      encoding,
-      limit: Math.min(limit, 10000),
+    // Helius getProgramAccountsV2 format
+    const requestBody = {
+      jsonrpc: '2.0' as const,
+      id: pageCount + 1,
+      method: 'getProgramAccountsV2',
+      params: [
+        programId,
+        {
+          encoding,
+          limit: Math.min(limit, 10000),
+          ...(filters.length > 0 && { filters }),
+          ...(dataSlice && { dataSlice }),
+          ...(paginationKey && { paginationKey }),
+          ...(changedSinceSlot && { changedSinceSlot }),
+        },
+      ],
     };
-
-    if (paginationKey) {
-      params.paginationKey = paginationKey;
-    }
-
-    if (dataSlice) {
-      params.dataSlice = dataSlice;
-    }
-
-    if (filters.length > 0) {
-      params.filters = filters;
-    }
-
-    if (changedSinceSlot) {
-      params.changedSinceSlot = changedSinceSlot;
-    }
 
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: pageCount + 1,
-        method: 'getProgramAccountsV2',
-        params: [programId, params],
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(`RPC request failed: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`RPC request failed: ${response.statusText}. Response: ${errorText}`);
     }
 
     const data = await response.json();
 
     if (data.error) {
-      throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+      const errorMsg = data.error.message || JSON.stringify(data.error);
+      if (errorMsg.includes('method') || errorMsg.includes('not found') || errorMsg.includes('stake') || errorMsg.includes('invalid')) {
+        throw new Error(`RPC method error: ${errorMsg}. Make sure you're using the correct RPC endpoint and method.`);
+      }
+      throw new Error(`RPC error: ${errorMsg}`);
     }
 
     if (!data.result) {
@@ -339,4 +340,3 @@ export async function fetchAllProgramAccountsV2WithProgress(
 
   return accounts;
 }
-

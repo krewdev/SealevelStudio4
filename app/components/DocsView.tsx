@@ -790,7 +790,22 @@ The model will continuously improve based on real-world usage and feedback.`
   // Authentication Required Screen
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col h-full bg-gray-900 text-white">
+      <div className="flex flex-col h-full bg-gray-900 text-white relative">
+        {/* Background Logo Placeholder */}
+        <img
+          src="/sea-level-logo.png"
+          alt="Sealevel Studio Background"
+          className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
+          style={{
+            objectPosition: 'center right',
+            transform: 'scale(0.6) rotate(-5deg)',
+            zIndex: 0
+          }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+        <div style={{ zIndex: 1, position: 'relative', height: '100%' }}>
         <div className="border-b border-gray-700 p-4 bg-gray-800">
           <div className="flex items-center gap-4">
             {onBack && (
@@ -903,13 +918,29 @@ The model will continuously improve based on real-world usage and feedback.`
             </div>
           </div>
         </div>
+        </div>
       </div>
     );
   }
 
   // Authenticated - Show Documentation
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col h-full bg-gray-900 text-white relative">
+      {/* Background Logo Placeholder */}
+      <img
+        src="/sea-level-logo.png"
+        alt="Sealevel Studio Background"
+        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
+        style={{
+          objectPosition: 'center right',
+          transform: 'scale(0.6) rotate(-5deg)',
+          zIndex: 0
+        }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+      <div style={{ zIndex: 1, position: 'relative', height: '100%' }}>
       {/* Header */}
       <div className="border-b border-gray-700 p-4 bg-gray-800">
         <div className="flex items-center justify-between mb-4">
@@ -993,10 +1024,9 @@ The model will continuously improve based on real-world usage and feedback.`
                 <div className="text-sm text-gray-400">{selectedDoc.category}</div>
               </div>
               <div className="prose prose-invert prose-lg max-w-none">
-                <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 markdown-content">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
-                    className="markdown-content"
                     components={{
                       h1: ({ node, ...props }) => (
                         <h1 className="text-3xl font-bold text-white mb-4 mt-6 first:mt-0 border-b border-gray-700 pb-2" {...props} />
@@ -1103,6 +1133,7 @@ The model will continuously improve based on real-world usage and feedback.`
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

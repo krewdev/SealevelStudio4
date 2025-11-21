@@ -7,13 +7,23 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
-    // In production, clear session/cookies/database tokens
-    // For now, just return success
-    
-    return NextResponse.json({
+    // Clear all Twitter auth cookies
+    const response = NextResponse.json({
       success: true,
       message: 'Logged out successfully',
     });
+
+    // Clear all Twitter-related cookies
+    response.cookies.delete('twitter_access_token');
+    response.cookies.delete('twitter_refresh_token');
+    response.cookies.delete('twitter_user_id');
+    response.cookies.delete('twitter_username');
+    response.cookies.delete('twitter_code_verifier');
+    response.cookies.delete('twitter_oauth_state');
+
+    // In production, also clear from database/session storage
+    
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
     return NextResponse.json(

@@ -21,35 +21,54 @@ export function ChartsView({ onBack }: ChartsViewProps) {
   const [priceData, setPriceData] = useState<any[]>([]);
   const [arbitrageOpportunities, setArbitrageOpportunities] = useState<any[]>([]);
   const [selectedOpportunity, setSelectedOpportunity] = useState<any>(null);
+  const [selectedToken, setSelectedToken] = useState<'sol' | 'dot'>('sol');
+  const [timeframe, setTimeframe] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [loading, setLoading] = useState(false);
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [priceChange24h, setPriceChange24h] = useState<number | null>(null);
 
-  // Generate sample price data
+  // Fetch real price data
   useEffect(() => {
-    const generatePriceData = () => {
-      const data = [];
-      const now = Date.now();
-      let price = 100;
-      
-      for (let i = 0; i < 24; i++) {
-        const timestamp = new Date(now - (23 - i) * 60 * 60 * 1000);
-        price += (Math.random() - 0.5) * 5;
-        const volume = Math.random() * 1000000;
+    const fetchPriceData = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/prices?token=${selectedToken}&timeframe=${timeframe}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch price data');
+        }
         
-        data.push({
-          timestamp,
-          price: Math.max(50, price),
-          volume,
-          high: price + Math.random() * 2,
-          low: price - Math.random() * 2,
-          open: price - (Math.random() - 0.5) * 1,
-          close: price,
-        });
+        const result = await response.json();
+        if (result.success && result.data) {
+          // Convert API data to chart format
+          const formattedData = result.data.map((point: any) => ({
+            timestamp: new Date(point.timestamp),
+            price: point.price,
+            volume: point.volume,
+            high: point.high,
+            low: point.low,
+            open: point.open,
+            close: point.close,
+          }));
+          
+          setPriceData(formattedData);
+          setCurrentPrice(result.currentPrice);
+          setPriceChange24h(result.priceChange24h);
+        }
+      } catch (error) {
+        console.error('Error fetching price data:', error);
+        // Fallback to empty data on error
+        setPriceData([]);
+      } finally {
+        setLoading(false);
       }
-      
-      setPriceData(data);
     };
 
-    generatePriceData();
-  }, []);
+    fetchPriceData();
+    
+    // Refresh every 60 seconds for real-time updates
+    const interval = setInterval(fetchPriceData, 60000);
+    return () => clearInterval(interval);
+  }, [selectedToken, timeframe]);
 
   // Fetch arbitrage opportunities
   useEffect(() => {
@@ -159,6 +178,20 @@ export function ChartsView({ onBack }: ChartsViewProps) {
 
   return (
     <div className="min-h-screen animated-bg text-white relative">
+      {/* Background Logo Placeholder */}
+      <img
+        src="/sea-level-logo.png"
+        alt="Sealevel Studio Background"
+        className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
+        style={{
+          objectPosition: 'center right',
+          transform: 'scale(0.6) rotate(-5deg)',
+          zIndex: 0
+        }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
       {/* Header */}
       <div className="relative z-10 border-b border-slate-800/50 glass p-6">
         <div className="max-w-7xl mx-auto flex items-center gap-4">
@@ -203,13 +236,99 @@ export function ChartsView({ onBack }: ChartsViewProps) {
 
         {/* Price Chart */}
         {activeChart === 'price' && (
-          <PriceChart
-            tokenPair="SOL/USDC"
-            data={priceData}
-            timeframe="24h"
-            showVolume={true}
-            height={500}
-          />
+          <div className="space-y-4">
+            {/* Token and Timeframe Selector */}
+            <div className="card-modern p-4">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-gray-300">Token:</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSelectedToken('sol')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedToken === 'sol'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      SOL (Solana)
+                    </button>
+                    <button
+                      onClick={() => setSelectedToken('dot')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        selectedToken === 'dot'
+                          ? 'bg-pink-600 text-white'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      DOT (Polkadot)
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-gray-300">Timeframe:</label>
+                  <div className="flex gap-2">
+                    {(['1h', '24h', '7d', '30d'] as const).map((tf) => (
+                      <button
+                        key={tf}
+                        onClick={() => setTimeframe(tf)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          timeframe === tf
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Info */}
+            {currentPrice !== null && (
+              <div className="card-modern p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Current Price</p>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                    </p>
+                  </div>
+                  {priceChange24h !== null && (
+                    <div className="text-right">
+                      <p className="text-sm text-gray-400">24h Change</p>
+                      <p className={`text-xl font-bold mt-1 ${priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Chart */}
+            {loading ? (
+              <div className="card-modern p-12 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-400">Loading price data...</p>
+              </div>
+            ) : priceData.length > 0 ? (
+              <PriceChart
+                tokenPair={`${selectedToken.toUpperCase()}/USD`}
+                data={priceData}
+                timeframe={timeframe}
+                showVolume={true}
+                height={500}
+              />
+            ) : (
+              <div className="card-modern p-12 text-center">
+                <p className="text-gray-400">No price data available</p>
+                <p className="text-sm text-gray-500 mt-2">Please try again later</p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Analytics Dashboard */}

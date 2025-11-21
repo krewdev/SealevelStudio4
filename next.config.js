@@ -4,6 +4,16 @@ const nextConfig = {
   experimental: {
     optimizeCss: false,
   },
+  // Enable standalone output for Docker deployments (only in production builds, not dev)
+  // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Allow ngrok and other dev origins for webhook testing
+  allowedDevOrigins: [
+    '*.ngrok-free.dev',
+    '*.ngrok.io',
+    '*.ngrok.app',
+    'localhost',
+    '127.0.0.1',
+  ],
   images: {
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
@@ -19,6 +29,21 @@ const nextConfig = {
         { file: /\.map$/ },
       ];
     }
+    
+    // Fix chunk loading issues in development
+    if (dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+          },
+        },
+      };
+    }
+    
     return config;
   },
 }

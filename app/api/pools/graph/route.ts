@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const startToken = searchParams.get('startToken') || 'So11111111111111111111111111111111111111112'; // SOL
   const maxHops = parseInt(searchParams.get('maxHops') || '5', 10);
-  const minProfit = parseFloat(searchParams.get('minProfit') || '0.1', 10);
+  const minProfit = parseFloat(searchParams.get('minProfit') || '0.1');
   
   try {
     const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
