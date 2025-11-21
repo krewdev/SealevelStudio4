@@ -42,6 +42,7 @@ import { SubstackBot } from './components/SubstackBot';
 import { TelegramBot } from './components/TelegramBot';
 import { ChartsView } from './components/ChartsView';
 import { DisclaimerAgreement } from './components/DisclaimerAgreement';
+import { DeveloperCommunity } from './components/DeveloperCommunity';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -1153,14 +1154,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   // Developer Community has its own full-screen layout
   if (activeView === 'freelance-devs') {
-    return (
-      <div className="min-h-screen bg-gray-900">
-        {/* Import the page component dynamically or create a wrapper */}
-        <div className="w-full">
-          {/* We'll need to import and render the FreelanceDevsPage component */}
-        </div>
-      </div>
-    );
+    return <DeveloperCommunity onBack={() => setActiveView('inspector')} />;
   }
 
   // Default single-column layout for other views
