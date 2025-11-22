@@ -39,9 +39,23 @@ export class RaydiumFetcher extends BasePoolFetcher {
         if (!heliusRpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
           // Extract just the API key if env var is accidentally set to full URL
           let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-          if (apiKey.includes('helius-rpc.com')) {
-            const match = apiKey.match(/[?&]api-key=([^&]+)/);
-            apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
+          try {
+            // Parse as URL and check hostname
+            const url = new URL(apiKey);
+            const hostname = url.hostname;
+            if (
+              hostname === 'helius-rpc.com' ||
+              hostname.endsWith('.helius-rpc.com')
+            ) {
+              // Only extract the API key if the host is a valid Helius RPC host
+              apiKey = url.searchParams.get('api-key') || apiKey;
+            }
+          } catch (e) {
+            // Not a valid URL; fallback to manual extraction
+            if (apiKey.includes('helius-rpc.com')) {
+              const match = apiKey.match(/[?&]api-key=([^&]+)/);
+              apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
+            }
           }
           
           const separator = heliusRpcUrl.includes('?') ? '&' : '?';
