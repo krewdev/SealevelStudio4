@@ -36,7 +36,16 @@ export async function GET(request: NextRequest) {
       'polkadot': 'polkadot',
     };
 
-    const coinId = tokenMap[token] || token;
+    const coinId = tokenMap[token];
+    if (!coinId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Unsupported token: ${token}`,
+        },
+        { status: 400 }
+      );
+    }
     const isSolana = token === 'sol' || token === 'solana';
     let birdeyePrice: number | null = null;
     
