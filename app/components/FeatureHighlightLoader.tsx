@@ -129,7 +129,7 @@ export function FeatureHighlightLoader({
   onAnimationComplete,
   onFeatureClick,
   onEnterApp,
-  currentFeature = 'transaction-builder'
+  currentFeature: currentFeatureId = 'transaction-builder'
 }: FeatureHighlightLoaderProps) {
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -188,7 +188,7 @@ export function FeatureHighlightLoader({
   if (!showLoader) return null;
 
   // Find the current feature being loaded
-  const currentFeature = FEATURES.find(f => f.id === currentFeature) || FEATURES[0];
+  const currentFeature = FEATURES.find(f => f.id === currentFeatureId) || FEATURES[0];
 
   return (
     <div
