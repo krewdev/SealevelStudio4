@@ -568,7 +568,7 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
                 </button>
                 {isValidSolanaAddress(accountId) && (
                   <a
-                    href={`https://solscan.io/account/${accountId}`}
+                    href={`https://solscan.io/account/${encodeURIComponent(accountId)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-1 hover:bg-gray-700 rounded"
