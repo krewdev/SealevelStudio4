@@ -230,7 +230,15 @@ export async function POST(request: NextRequest) {
         if (!rpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
           const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
           let heliusKey = apiKey;
-          if (apiKey.includes('helius-rpc.com')) {
+          let hostnameIsHelius = false;
+          try {
+            const urlObj = new URL(apiKey);
+            // Check for exact hostname match (optionally allow devnet prefix)
+            hostnameIsHelius = urlObj.hostname === 'helius-rpc.com' || urlObj.hostname === 'devnet.helius-rpc.com';
+          } catch (e) {
+            // Not a URL, ignore
+          }
+          if (hostnameIsHelius) {
             const match = apiKey.match(/[?&]api-key=([^&]+)/);
             heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
           }

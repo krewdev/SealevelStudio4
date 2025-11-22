@@ -8,6 +8,17 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
+
+/**
+ * Extract URLs from any text using regex.
+ * This will match http, https URLs appearing in the file.
+ */
+function extractUrlsFromText(text: string): string[] {
+  // This is a loose regex for matching URLs. You may refine as needed.
+  const urlRegex = /\bhttps?:\/\/[^\s'")]+/g;
+  return text.match(urlRegex) || [];
+}
+
 interface TestResult {
   category: string;
   feature: string;
@@ -136,7 +147,20 @@ test('Price API', 'Supports DOT token', () => {
 
 test('Price API', 'CoinGecko integration', () => {
   const content = readFile(join(process.cwd(), 'app/api/prices/route.ts'));
-  return content.includes('coingecko.com') || content.includes('COINGECKO_API');
+  // Extract URLs from the content
+  const urls = extractUrlsFromText(content);
+  // Check if any of the parsed URLs have host ending with 'coingecko.com'
+  const hasCoinGeckoReference = urls.some(urlStr => {
+    try {
+      const parsed = new URL(urlStr);
+      // CoinGecko host can be 'coingecko.com', 'www.coingecko.com', etc.
+      return parsed.hostname === 'coingecko.com' || parsed.hostname.endsWith('.coingecko.com');
+    } catch {
+      return false;
+    }
+  });
+  // Fallback: Also check for direct API variable usage (in case integration is via env var)
+  return hasCoinGeckoReference || content.includes('COINGECKO_API');
 });
 
 test('Price API', 'Birdeye fallback for Solana', () => {

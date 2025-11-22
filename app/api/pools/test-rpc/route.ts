@@ -19,7 +19,15 @@ export async function GET(request: NextRequest) {
     if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
       const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
       let heliusKey = apiKey;
-      if (apiKey.includes('helius-rpc.com')) {
+      let isHeliusHost = false;
+      try {
+        const apiKeyUrl = new URL(apiKey);
+        isHeliusHost = apiKeyUrl.hostname === 'mainnet.helius-rpc.com';
+      } catch {
+        // Not a URL, treat as raw API key
+        isHeliusHost = false;
+      }
+      if (isHeliusHost) {
         const match = apiKey.match(/[?&]api-key=([^&]+)/);
         heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
       }

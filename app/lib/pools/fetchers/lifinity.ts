@@ -33,9 +33,15 @@ export class LifinityFetcher extends BasePoolFetcher {
         if (!heliusRpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
           // Extract just the API key if env var is accidentally set to full URL
           let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-          if (apiKey.includes('helius-rpc.com')) {
-            const match = apiKey.match(/[?&]api-key=([^&]+)/);
-            apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
+          try {
+            // Parse if it's a URL and hostname is 'helius-rpc.com'
+            const apiKeyUrl = new URL(apiKey);
+            if (apiKeyUrl.hostname === 'helius-rpc.com') {
+              // Extract api-key query parameter, fallback to full apiKey if not present
+              apiKey = apiKeyUrl.searchParams.get('api-key') ?? apiKey;
+            }
+          } catch (e) {
+            // If apiKey is not a URL, keep as is
           }
           
           const separator = heliusRpcUrl.includes('?') ? '&' : '?';

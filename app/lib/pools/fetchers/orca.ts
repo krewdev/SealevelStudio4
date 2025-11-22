@@ -36,7 +36,18 @@ export class OrcaFetcher extends BasePoolFetcher {
         if (!heliusRpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
           // Extract just the API key if env var is accidentally set to full URL
           let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-          if (apiKey.includes('helius-rpc.com')) {
+          let isUrl = false;
+          try {
+            const urlObj = new URL(apiKey);
+            // Accept mainnet and devnet Helius endpoints
+            if (
+              urlObj.hostname === 'helius-rpc.com' ||
+              urlObj.hostname === 'devnet.helius-rpc.com'
+            ) {
+              isUrl = true;
+            }
+          } catch {} // Not a URL
+          if (isUrl) {
             // Extract API key from URL format: ...?api-key=KEY&...
             const match = apiKey.match(/[?&]api-key=([^&]+)/);
             apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;

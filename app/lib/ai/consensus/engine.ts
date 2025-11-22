@@ -14,6 +14,10 @@ import { providerRegistry } from './providers/registry';
 import { consensusCache } from './cache';
 import { consensusConfig } from './config';
 
+// Timeout limits in ms
+const MIN_TIMEOUT = 100;    // Do not allow less than 100ms
+const MAX_TIMEOUT = 30000;  // Do not allow more than 30 seconds
+
 /**
  * Calculate similarity between two responses
  * Uses simple string similarity (can be enhanced with semantic similarity)
@@ -98,8 +102,17 @@ export async function executeConsensus(
     timestamp: new Date(),
   };
 
+  // Build config and validate timeout
+  const safeConfig = { ...config };
+  if (typeof safeConfig.timeout === 'number') {
+    if (safeConfig.timeout < MIN_TIMEOUT) safeConfig.timeout = MIN_TIMEOUT;
+    if (safeConfig.timeout > MAX_TIMEOUT) safeConfig.timeout = MAX_TIMEOUT;
+  } else {
+    // Not a number, fallback to default
+    safeConfig.timeout = consensusConfig.timeout;
+  }
+  const finalConfig = { ...consensusConfig, ...safeConfig };
   // Check cache first
-  const finalConfig = { ...consensusConfig, ...config };
   if (finalConfig.cacheEnabled) {
     const cached = consensusCache.get(request);
     if (cached) {
