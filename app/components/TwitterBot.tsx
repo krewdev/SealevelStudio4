@@ -214,14 +214,18 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
     }
   };
 
-  const handleLogin = async () => {
+  const handleLogin = async (useDirectAuth = false) => {
     setIsAuthenticating(true);
     setError(null);
 
     try {
-      // Initiate OAuth flow
+      // Initiate OAuth flow or direct authentication
       const response = await fetch('/api/twitter/auth/initiate', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ useDirectAuth }),
       });
 
       if (!response.ok) {
@@ -455,25 +459,53 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
             <Twitter className="w-16 h-16 text-blue-400 mx-auto mb-6" />
             <h2 className="text-2xl font-bold mb-4">Connect Your Twitter Account</h2>
             <p className="text-gray-400 mb-8 max-w-md mx-auto">
-              Log in with Twitter to create and schedule posts. Your credentials are securely stored and never shared.
+              Choose your authentication method. OAuth is recommended for production, while direct access tokens are for development/testing.
             </p>
-            <button
-              onClick={handleLogin}
-              disabled={isAuthenticating}
-              className="btn-modern px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 flex items-center gap-3 mx-auto"
-            >
-              {isAuthenticating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  Login with Twitter
-                </>
-              )}
-            </button>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
+              {/* OAuth Login */}
+              <button
+                onClick={() => handleLogin(false)}
+                disabled={isAuthenticating}
+                className="btn-modern px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 flex items-center gap-3"
+              >
+                {isAuthenticating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    OAuth Login
+                  </>
+                )}
+              </button>
+
+              {/* Direct Access Token Login */}
+              <button
+                onClick={() => handleLogin(true)}
+                disabled={isAuthenticating}
+                className="btn-modern px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 flex items-center gap-3"
+              >
+                {isAuthenticating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-5 h-5" />
+                    Direct Token
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-500 max-w-lg mx-auto">
+              <p className="mb-2"><strong>OAuth Login:</strong> Secure, recommended for production</p>
+              <p><strong>Direct Token:</strong> For development/testing only. Configure TWITTER_ACCESS_TOKEN in .env.local</p>
+            </div>
           </div>
         ) : (
           <>
