@@ -39,9 +39,18 @@ export class MeteoraFetcher extends BasePoolFetcher {
           if (rpcUrl.includes('helius') && process.env.NEXT_PUBLIC_HELIUS_API_KEY && !rpcUrl.includes('api-key')) {
             // Extract just the API key if env var is accidentally set to full URL
             let apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-            if (apiKey.includes('helius-rpc.com')) {
-              const match = apiKey.match(/[?&]api-key=([^&]+)/);
-              apiKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
+            // If the API key env var looks like a Helius URL, extract the key more safely
+            try {
+              // Attempt to parse as a URL
+              const heliusUrl = new URL(apiKey);
+              // Accept only trusted Helius domains
+              const allowedHeliusHosts = ['rpc.helius.xyz', 'helius-rpc.com'];
+              if (allowedHeliusHosts.includes(heliusUrl.host)) {
+                // Extract api-key from query string or fallback
+                apiKey = heliusUrl.searchParams.get('api-key') || apiKey;
+              }
+            } catch (e) {
+              // Not a URL, assume the env var is just the API key
             }
             
             // Add API key to Helius URL if not present
