@@ -23,8 +23,8 @@ import {
 import { SEAL_TOKEN_CONFIG } from '../seal-token/config';
 
 // Constants
-const PLATFORM_TREASURY = new PublicKey('SeaLeveLStudiosTreasuryAddressPlacehoLder'); // Placeholder
-const RUGLESS_LAUNCH_PROGRAM_ID = new PublicKey('RugLessLaunchProgramIDPlaceholder1111111'); // Placeholder for the Anchor program
+const PLATFORM_TREASURY = new PublicKey('11111111111111111111111111111111'); // Placeholder: System Program
+const RUGLESS_LAUNCH_PROGRAM_ID = new PublicKey('11111111111111111111111111111111'); // Placeholder: System Program
 
 export interface RuglessLaunchConfig {
   // Token Details
@@ -180,7 +180,7 @@ export async function createRuglessLaunchTransaction(
 
   // 3b. Transfer SEAL Stake to Program Escrow
   // Assuming SEAL is a standard SPL Token (or Token-2022, checking config)
-  const sealMint = new PublicKey(SEAL_TOKEN_CONFIG.mintAddress || "SealTokenMintAddressPlaceholder"); // In real app, this comes from config
+  const sealMint = new PublicKey(SEAL_TOKEN_CONFIG.mintAddress || "So11111111111111111111111111111111111111112"); // Default to Wrapped SOL if not set
   const sealProgramId = SEAL_TOKEN_CONFIG.useToken2022 ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
   
   const payerSealAta = await getAssociatedTokenAddress(sealMint, payer, false, sealProgramId);
