@@ -19,6 +19,7 @@ import {
   RuglessLaunchConfig 
 } from '../lib/launch/rugless';
 import { SEAL_TOKEN_CONFIG } from '../lib/seal-token/config';
+import { TokenImageUploader } from './TokenImageUploader';
 
 interface RuglessLaunchpadProps {
   onBack?: () => void;
@@ -34,12 +35,16 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
   const [totalSupply, setTotalSupply] = useState(1000000000);
   const [solLockAmount, setSolLockAmount] = useState(10);
   const [sealLockAmount, setSealLockAmount] = useState(1000);
+  const [tokenImage, setTokenImage] = useState('');
+  const [tokenImageFile, setTokenImageFile] = useState<File | undefined>();
+  const [autoPostToSocial, setAutoPostToSocial] = useState(true);
   
   // Status State
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchStatus, setLaunchStatus] = useState<'idle' | 'building' | 'signing' | 'confirming' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [successTx, setSuccessTx] = useState('');
+  const [mintAddress, setMintAddress] = useState('');
 
   // Calculated Economics
   const economics = calculateLaunchEconomics({
@@ -95,8 +100,32 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
         throw new Error('Transaction failed to confirm');
       }
 
+      const newMintAddress = mintKeypair.publicKey.toBase58();
       setSuccessTx(signature);
+      setMintAddress(newMintAddress);
       setLaunchStatus('success');
+
+      // Auto-post to social media if enabled and image exists
+      if (autoPostToSocial && tokenImage) {
+        try {
+          await fetch('/api/social/post-token-launch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokenSymbol,
+              tokenName,
+              tokenMintAddress: newMintAddress,
+              imageUrl: tokenImage,
+              totalSupply,
+              liquidityAmount: economics.totalLiquiditySol,
+              platforms: ['twitter', 'telegram'],
+            }),
+          });
+        } catch (socialError) {
+          console.error('Social media post failed:', socialError);
+          // Don't fail the launch if social posting fails
+        }
+      }
 
     } catch (error) {
       console.error('Launch failed:', error);
@@ -119,7 +148,7 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
             Your token <span className="text-green-400 font-bold">{tokenName} ({tokenSymbol})</span> has been deployed with Rugless protection.
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
             <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
               <div className="text-sm text-gray-400 mb-1">Liquidity Locked</div>
               <div className="text-xl font-bold text-white">{(economics.totalLiquiditySol).toFixed(2)} SOL</div>
@@ -130,13 +159,39 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
               <div className="text-xl font-bold text-white">7 Days</div>
               <div className="text-xs text-yellow-400 mt-1">Cliff Unlock</div>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 mb-8 text-left">
+            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+              <div className="text-sm text-gray-400 mb-1">Mint Address</div>
+              <div className="text-sm font-mono text-blue-400 break-all cursor-pointer hover:underline" onClick={() => window.open(`https://solscan.io/token/${mintAddress}`, '_blank')}>
+                {mintAddress}
+              </div>
+            </div>
             <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
               <div className="text-sm text-gray-400 mb-1">Transaction</div>
               <div className="text-sm font-mono text-blue-400 break-all cursor-pointer hover:underline" onClick={() => window.open(`https://solscan.io/tx/${successTx}`, '_blank')}>
-                {successTx.slice(0, 8)}...{successTx.slice(-8)}
+                {successTx}
               </div>
             </div>
           </div>
+
+          {tokenImage && (
+            <div className="mb-8">
+              <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+                <div className="text-sm text-gray-400 mb-3">Token Image</div>
+                <div className="flex items-center space-x-4">
+                  <img src={tokenImage} alt={tokenName} className="w-20 h-20 rounded-lg border border-gray-600" />
+                  <div className="flex-1">
+                    <p className="text-sm text-green-400 mb-1">✓ Image saved for social media</p>
+                    <p className="text-xs text-gray-400">
+                      {autoPostToSocial ? 'Posted to Twitter & Telegram' : 'Ready for manual posting'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-center space-x-4">
             <button
@@ -235,6 +290,17 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
             </div>
           </div>
 
+          {/* Token Image Uploader */}
+          <TokenImageUploader
+            tokenSymbol={tokenSymbol}
+            tokenName={tokenName}
+            onImageChange={(imageUrl, imageFile) => {
+              setTokenImage(imageUrl);
+              setTokenImageFile(imageFile);
+            }}
+            currentImage={tokenImage}
+          />
+
           <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
             <h2 className="text-xl font-semibold text-white mb-6 flex items-center space-x-2">
               <Lock className="w-5 h-5 text-orange-400" />
@@ -329,6 +395,28 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
                 </div>
               </div>
             </div>
+
+            {/* Social Media Auto-Post Option */}
+            {tokenImage && (
+              <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-4 mb-6">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoPostToSocial}
+                    onChange={(e) => setAutoPostToSocial(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-purple-600 bg-gray-800 border-gray-600 rounded focus:ring-purple-500"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-purple-200">
+                      Auto-post launch announcement
+                    </div>
+                    <div className="text-xs text-purple-300/70 mt-1">
+                      Automatically share token launch with image on Twitter and Telegram
+                    </div>
+                  </div>
+                </label>
+              </div>
+            )}
 
             {/* Warning / Info Box */}
             <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-4 mb-6">

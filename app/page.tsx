@@ -46,6 +46,10 @@ import { DeveloperCommunity } from './components/DeveloperCommunity';
 import { DeveloperDashboard } from './components/DeveloperDashboard';
 import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
 import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
+import { UserProvider } from './contexts/UserContext';
+import { UserProfileWidget } from './components/UserProfileWidget';
+import { QuickLaunch } from './components/QuickLaunch';
+import { MarketingBot } from './components/MarketingBot';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -699,6 +703,7 @@ function Header({
         </div>
       </div>
       <div className="flex items-center space-x-4">
+        <UserProfileWidget />
         <button className="flex items-center space-x-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 transition-colors relative">
           <span>{networks[network].name}</span>
           <ChevronDown className="h-4 w-4" />
@@ -736,6 +741,8 @@ function Sidebar({
     { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
     { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
+    { id: 'quick-launch', label: 'Quick Launch', icon: <Rocket className="h-4 w-4" />, section: 'core', badge: 'New' },
+    { id: 'marketing-bot', label: 'Marketing Bot', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
     
     // Revenue
     { id: 'presale', label: 'SEAL Presale', icon: <TrendingUp className="h-4 w-4" />, section: 'revenue', badge: 'Hot' },
@@ -1056,6 +1063,26 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <TransactionBundler onBack={() => setActiveView('inspector')} />;
   }
 
+  // Quick Launch has its own layout
+  if (activeView === 'quick-launch') {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => setActiveView('inspector')} className="mb-4 text-gray-400 hover:text-white">← Back</button>
+        <QuickLaunch onSuccess={(mint) => console.log('Launched:', mint)} />
+      </div>
+    );
+  }
+
+  // Marketing Bot has its own layout
+  if (activeView === 'marketing-bot') {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => setActiveView('inspector')} className="mb-4 text-gray-400 hover:text-white">← Back</button>
+        <MarketingBot />
+      </div>
+    );
+  }
+
   // Advertising Bots has its own full-screen layout
   if (activeView === 'advertising') {
     return <AdvertisingBots onBack={() => setActiveView('premium')} />;
@@ -1285,6 +1312,14 @@ interface LoaderContextInfo {
 
 // Main App Component
 export default function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
+  );
+}
+
+function AppContent() {
   // ALL HOOKS MUST BE CALLED AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'disclaimer' | 'tutorial' | 'app'>('landing');
   const [isPageLoading, setIsPageLoading] = useState(false);

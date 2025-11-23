@@ -2,7 +2,128 @@
 
 ## Overview
 
-This document describes the enhanced API suite for pool monitoring, imbalance detection, MEV signals, and predictive analytics.
+This document describes the enhanced API suite for pool monitoring, imbalance detection, MEV signals, predictive analytics, and AI-powered token image generation.
+
+---
+
+## Token Image & Social Media APIs
+
+### 1. `/api/ai/image-gen`
+
+**Purpose:** AI-powered token logo generation using DALL-E 3
+
+**Method:** POST
+
+**Authentication:** None (rate-limited by IP)
+
+**Request Body:**
+```json
+{
+  "tokenSymbol": "SEAL",
+  "tokenName": "Sealevel Protocol",
+  "prompt": "optional custom prompt",
+  "size": "1024x1024",
+  "quality": "hd",
+  "style": "vivid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "imageUrl": "https://...",
+  "revisedPrompt": "A professional cryptocurrency logo featuring...",
+  "metadata": {
+    "tokenSymbol": "SEAL",
+    "tokenName": "Sealevel Protocol",
+    "size": "1024x1024",
+    "quality": "hd",
+    "style": "vivid",
+    "generatedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Rate Limits:** 10 requests per hour per IP
+
+---
+
+### 2. `/api/ai/image-upload`
+
+**Purpose:** Upload and process custom token images
+
+**Method:** POST
+
+**Content-Type:** multipart/form-data
+
+**Request Body:**
+- `image`: File (PNG, JPG, GIF, WEBP, max 5MB)
+- `tokenSymbol`: string
+- `tokenName`: string
+
+**Response:**
+```json
+{
+  "success": true,
+  "imageUrl": "data:image/png;base64,...",
+  "metadata": {
+    "tokenSymbol": "SEAL",
+    "tokenName": "Sealevel Protocol",
+    "fileType": "image/png",
+    "fileSize": 1234567,
+    "uploadedAt": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 3. `/api/social/post-token-launch`
+
+**Purpose:** Automatically post token launch announcements with images
+
+**Method:** POST
+
+**Authentication:** None (uses configured API keys)
+
+**Request Body:**
+```json
+{
+  "tokenSymbol": "SEAL",
+  "tokenName": "Sealevel Protocol",
+  "tokenMintAddress": "TokenMint123...",
+  "imageUrl": "https://...",
+  "totalSupply": 1000000000,
+  "liquidityAmount": 100,
+  "platforms": ["twitter", "telegram"],
+  "customMessage": "optional custom announcement"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Launch announcement posted successfully",
+  "results": {
+    "twitter": {
+      "success": true,
+      "tweetId": "1234567890",
+      "url": "https://twitter.com/..."
+    },
+    "telegram": {
+      "success": true,
+      "messageId": "123"
+    }
+  }
+}
+```
+
+**Required Environment Variables:**
+- `OPENAI_API_KEY`: For image generation
+- `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`: For Twitter posting
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHANNEL_ID`: For Telegram posting
 
 ---
 

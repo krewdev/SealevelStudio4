@@ -5,6 +5,23 @@ Project: Sealevel Studio
 Vision: The Interactive Transaction Simulator & Assembler for Solana.
 Contact: James Young 300jayblackout@gmail.com
 
+---
+
+## 🎨 NEW: AI-Powered Token Image Generator
+
+Sealevel Studio now includes an integrated **AI Token Image Generator** powered by OpenAI DALL-E 3!
+
+### Features:
+- 🤖 **AI Generation**: Automatically create professional token logos from symbol/name
+- 📤 **Manual Upload**: Upload custom images (PNG, JPG, GIF, WEBP)
+- 🚀 **Auto-Posting**: Automatically share launch announcements on Twitter & Telegram
+- 📊 **Image Gallery**: Manage all your token images in one place
+- 🎯 **Social Media Ready**: Optimized for Twitter and Telegram profile pictures
+
+**Documentation**: See [TOKEN_IMAGE_GENERATOR.md](./docs/TOKEN_IMAGE_GENERATOR.md) for full details.
+
+---
+
 1. Executive Summary
 
 Sealevel Studio is a web-based developer tool that solves the single biggest problem hindering Solana's developer adoption: the "black box" of transaction and instruction building. We are building the "Postman for Solana"—an interactive GUI that allows developers to visually assemble, simulate, debug, and export complex Solana transactions in real-time. This "glass box" approach will dramatically reduce the "glass-chewing" experience, accelerate developer onboarding, and reduce critical-error rates for protocols. We are seeking $150,000 in pre-seed/grant funding and strategic partnerships with key ecosystem players to build and launch our MVP.
