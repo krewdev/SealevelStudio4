@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MessageSquare, 
   Zap, 
@@ -13,7 +13,8 @@ import {
   DollarSign,
   Twitter,
   Send,
-  Loader2
+  Loader2,
+  Coins
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 
@@ -91,23 +92,8 @@ export function MarketingBot({ tokenSymbol = 'TOKEN', tokenName = 'My Token' }: 
     }
   }, [user]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isRunning) {
-      // Initial post
-      generateAndPost();
-
-      // Schedule subsequent posts
-      interval = setInterval(() => {
-        generateAndPost();
-      }, frequency * 60 * 1000); // Convert minutes to ms
-    }
-
-    return () => clearInterval(interval);
-  }, [isRunning, frequency]);
-
-  const generateAndPost = async () => {
+  // Memoize generateAndPost to ensure it always has the latest dependencies
+  const generateAndPost = useCallback(async () => {
     if (!user || user.credits < COST_PER_POST) {
       setIsRunning(false);
       alert("Insufficient credits! Please top up to continue campaign.");
@@ -185,7 +171,32 @@ export function MarketingBot({ tokenSymbol = 'TOKEN', tokenName = 'My Token' }: 
       console.error("Failed to generate marketing message:", error);
       setIsRunning(false);
     }
-  };
+  }, [
+    user,
+    selectedMood,
+    tokenSymbol,
+    tokenName,
+    twitterReady,
+    telegramReady,
+    telegramChatIds,
+    updateCredits
+  ]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isRunning) {
+      // Initial post
+      generateAndPost();
+
+      // Schedule subsequent posts
+      interval = setInterval(() => {
+        generateAndPost();
+      }, frequency * 60 * 1000); // Convert minutes to ms
+    }
+
+    return () => clearInterval(interval);
+  }, [isRunning, frequency, generateAndPost]);
 
   if (!user) {
     return (

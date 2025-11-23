@@ -159,13 +159,13 @@ async function postToTwitter(params: {
   }
 
   // Call existing Twitter API endpoint
-  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/twitter/tweet`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/twitter/posts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      text: message,
+      content: message,
       imageUrl,
       hashtags: ['Solana', 'DeFi', tokenSymbol],
     }),
@@ -205,15 +205,15 @@ async function postToTelegram(params: {
   }
 
   // Call existing Telegram API endpoint
-  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telegram/send-message`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telegram/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      message,
+      content: message,
       imageUrl,
-      channelId: telegramChannelId,
+      chatId: telegramChannelId,
     }),
   });
 
