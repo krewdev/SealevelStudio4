@@ -50,6 +50,7 @@ import { UserProvider } from './contexts/UserContext';
 import { UserProfileWidget } from './components/UserProfileWidget';
 import { QuickLaunch } from './components/QuickLaunch';
 import { MarketingBot } from './components/MarketingBot';
+import { RuglessLaunchpad } from './components/RuglessLaunchpad';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -1048,6 +1049,12 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   if (activeView === 'tools') {
     return <DeveloperDashboard onBack={() => setActiveView('inspector')} />;
   }
+
+  // Rugless Launchpad has its own full-screen layout
+  if (activeView === 'launchpad') {
+    return <RuglessLaunchpad onBack={() => setActiveView('inspector')} />;
+  }
+
   if (activeView === 'premium') {
     return <PremiumServices 
       onBack={() => setActiveView('inspector')} 
@@ -1437,7 +1444,7 @@ function AppContent() {
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {
