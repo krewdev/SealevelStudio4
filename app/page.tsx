@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -43,6 +43,7 @@ import { TelegramBot } from './components/TelegramBot';
 import { ChartsView } from './components/ChartsView';
 import { DisclaimerAgreement } from './components/DisclaimerAgreement';
 import { DeveloperCommunity } from './components/DeveloperCommunity';
+import { DeveloperDashboard } from './components/DeveloperDashboard';
 import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
 import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
 
@@ -745,7 +746,7 @@ function Sidebar({
     { id: 'cyber-playground', label: 'AI Cyber Playground', icon: <Brain className="h-4 w-4" />, section: 'ai' },
     
     // Tools Hub
-    { id: 'tools', label: 'Tools Hub', icon: <Code className="h-4 w-4" />, section: 'tools' },
+    { id: 'tools', label: 'Developer Dashboard', icon: <Code className="h-4 w-4" />, section: 'tools', badge: 'Pro' },
     { id: 'rent-reclaimer', label: 'Rent Reclaimer', icon: <Coins className="h-4 w-4" />, section: 'tools' },
     { id: 'faucet', label: 'Devnet Faucet', icon: <Droplet className="h-4 w-4" />, section: 'tools' },
     
@@ -1036,7 +1037,10 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <ArbitrageScanner onBuildTransaction={handleArbitrageBuild} onBack={() => setActiveView('inspector')} />;
   }
 
-  // Premium Services has its own full-screen layout
+  // Developer Dashboard has its own full-screen layout
+  if (activeView === 'tools') {
+    return <DeveloperDashboard onBack={() => setActiveView('inspector')} />;
+  }
   if (activeView === 'premium') {
     return <PremiumServices 
       onBack={() => setActiveView('inspector')} 
@@ -1130,7 +1134,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   }
 
   // Tools Hub has its own full-screen layout
-  if (activeView === 'tools') {
+  if (activeView === 'tools-hub') {
     return <ToolsHub onBack={() => setActiveView('inspector')} onNavigateToTool={(toolId) => setActiveView(toolId)} />;
   }
 
@@ -1398,7 +1402,7 @@ export default function App() {
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {

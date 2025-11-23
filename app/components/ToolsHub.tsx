@@ -15,6 +15,7 @@ import {
   Lock,
   FileText,
   Droplet,
+  Rocket,
 } from 'lucide-react';
 
 interface Tool {
@@ -78,6 +79,15 @@ export function ToolsHub({ onBack, onNavigateToTool }: ToolsHubProps) {
       icon: <Droplet className="w-6 h-6" />,
       category: 'development',
       onNavigate: () => onNavigateToTool?.('faucet'),
+    },
+    {
+      id: 'launchpad',
+      name: 'Rugless Launchpad',
+      description: 'Launch tokens with fair launch mechanics and matched liquidity',
+      icon: <Rocket className="w-6 h-6" />,
+      category: 'development',
+      onNavigate: () => onNavigateToTool?.('launchpad'),
+      badge: 'New',
     },
     {
       id: 'web2',
@@ -172,8 +182,8 @@ export function ToolsHub({ onBack, onNavigateToTool }: ToolsHubProps) {
               </button>
             )}
             <div>
-              <h1 className="text-3xl font-bold text-gradient-primary">Tools Hub</h1>
-              <p className="text-sm text-gray-400 mt-1">All utility tools in one place</p>
+              <h1 className="text-3xl font-bold text-gradient-primary">Developer Dashboard</h1>
+              <p className="text-sm text-gray-400 mt-1">All utility tools and launchpads in one place</p>
             </div>
           </div>
         </div>
