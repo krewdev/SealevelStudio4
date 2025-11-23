@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   Play,
   Pause,
+  Key,
 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
@@ -404,7 +405,7 @@ export function TwitterBot({ onBack }: TwitterBotProps) {
               </>
             ) : (
               <button
-                onClick={handleLogin}
+                onClick={() => handleLogin()}
                 disabled={isAuthenticating}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
               >

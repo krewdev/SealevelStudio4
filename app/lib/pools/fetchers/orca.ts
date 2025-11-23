@@ -120,7 +120,7 @@ export class OrcaFetcher extends BasePoolFetcher {
       }
 
       // Process all accounts
-      const accountsToProcess = accounts;
+      const accountsToProcess = accounts || [];
       
       for (const account of accountsToProcess) {
         try {

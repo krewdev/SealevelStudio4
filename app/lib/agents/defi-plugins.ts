@@ -141,7 +141,7 @@ export class PortfolioAnalyticsPlugin implements AgentPlugin {
 
     if (total === 0) return allocations;
 
-    for (const [mint, token] of portfolio.tokens.entries()) {
+    for (const [mint, token] of Array.from(portfolio.tokens.entries()) as Array<[string, { balance: bigint; value: number; price: number }]>) {
       allocations[mint] = (token.value / total) * 100;
     }
 

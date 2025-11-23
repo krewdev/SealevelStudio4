@@ -61,7 +61,11 @@ export async function getTokenImage(
     const db = await openImageDB();
     const transaction = db.transaction(['tokenImages'], 'readonly');
     const store = transaction.objectStore('tokenImages');
-    const result = await store.get(tokenSymbol);
+    const result = await new Promise<TokenImageMetadata | undefined>((resolve, reject) => {
+      const request = store.get(tokenSymbol);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
     return result || null;
   } catch (error) {
     console.error('Failed to retrieve token image:', error);
@@ -83,7 +87,11 @@ export async function getAllTokenImages(): Promise<TokenImageMetadata[]> {
     const db = await openImageDB();
     const transaction = db.transaction(['tokenImages'], 'readonly');
     const store = transaction.objectStore('tokenImages');
-    const allImages = await store.getAll();
+    const allImages = await new Promise<TokenImageMetadata[]>((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
     return allImages;
   } catch (error) {
     console.error('Failed to retrieve all token images:', error);

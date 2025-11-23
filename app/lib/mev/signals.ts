@@ -180,7 +180,7 @@ export class MEVSignalDetector {
    * Notify subscribers of new signal
    */
   private notifySubscribers(signal: MEVSignal): void {
-    for (const callback of this.signalCallbacks) {
+    for (const callback of Array.from(this.signalCallbacks)) {
       callback(signal);
     }
   }

@@ -180,7 +180,7 @@ export class EnhancedCache {
     let lruKey: string | null = null;
     let lruTime = Infinity;
 
-    for (const [key, entry] of this.pools.entries()) {
+    for (const [key, entry] of Array.from(this.pools.entries())) {
       if (entry.lastAccess < lruTime) {
         lruTime = entry.lastAccess;
         lruKey = key;
@@ -200,7 +200,7 @@ export class EnhancedCache {
     let lruKey: string | null = null;
     let lruTime = Infinity;
 
-    for (const [key, entry] of this.opportunities.entries()) {
+    for (const [key, entry] of Array.from(this.opportunities.entries())) {
       if (entry.lastAccess < lruTime) {
         lruTime = entry.lastAccess;
         lruKey = key;

@@ -168,10 +168,10 @@ export class WhaleTracker {
     }
 
     // Generate opportunity if high confidence
-    let opportunity;
+    let opportunity: { type: 'follow_whale' | 'frontrun_whale' | 'backrun_whale'; estimatedProfit: number; timeWindow: number } | undefined;
     if (confidence > 0.6 && predictedAction !== 'hold') {
       opportunity = {
-        type: predictedAction === 'buy' ? 'follow_whale' : 'frontrun_whale' as const,
+        type: (predictedAction === 'buy' ? 'follow_whale' : 'frontrun_whale') as 'follow_whale' | 'frontrun_whale',
         estimatedProfit: whale.successRate * 0.05, // Estimate based on success rate
         timeWindow: 60, // 1 minute window
       };

@@ -39,26 +39,26 @@ Vercel is the easiest and most optimized platform for Next.js applications.
    - Go to your project on [vercel.com](https://vercel.com)
    - Navigate to **Settings** → **Domains**
    - Click **Add Domain**
-   - Enter your custom domain (e.g., `sealevelstudio.com`)
+   - Enter your custom domain (e.g., `sealevelstudio.xyz`)
    - Follow DNS configuration instructions
 
 2. **Via CLI**:
    ```bash
-   vercel domains add sealevelstudio.com
+   vercel domains add sealevelstudio.xyz
    ```
 
 ### Step 3: Configure DNS
 
 Add these DNS records to your domain provider:
 
-**For Root Domain (sealevelstudio.com):**
+**For Root Domain (sealevelstudio.xyz):**
 ```
 Type: A
 Name: @
 Value: 76.76.21.21
 ```
 
-**For WWW Subdomain (www.sealevelstudio.com):**
+**For WWW Subdomain (www.sealevelstudio.xyz):**
 ```
 Type: CNAME
 Name: www
@@ -93,7 +93,8 @@ GEMINI_API_KEY=your_gemini_key
 NEXT_PUBLIC_ATTESTATION_PROGRAM_ID=AeK2u45NkNvAcgZuYyCWqmRuCsnXPvcutR3pziXF1cDw
 
 # App URL
-NEXT_PUBLIC_APP_URL=https://sealevelstudio.com
+NEXT_PUBLIC_APP_URL=https://sealevelstudio.xyz
+NEXT_PUBLIC_BASE_URL=https://sealevelstudio.xyz
 
 # Webhook Secret (if using Helius webhooks)
 HELIUS_WEBHOOK_SECRET=your_webhook_secret
@@ -109,7 +110,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_token
 
 If you're using Helius webhooks, update the webhook URL in Helius dashboard:
 - Old: `https://abc123.ngrok.io/api/webhooks/helius`
-- New: `https://sealevelstudio.com/api/webhooks/helius`
+- New: `https://sealevelstudio.xyz/api/webhooks/helius`
 
 ---
 
@@ -133,12 +134,116 @@ If you're using Helius webhooks, update the webhook URL in Helius dashboard:
    railway up
    ```
 
+   Or deploy via Railway dashboard:
+   - Connect your GitHub repository
+   - Railway will auto-detect Next.js
+   - Deploy automatically on push
+
 ### Step 2: Add Custom Domain
 
-1. In Railway dashboard → **Settings** → **Networking**
-2. Click **Generate Domain** or **Add Custom Domain**
-3. Enter your domain
-4. Configure DNS as instructed by Railway
+1. **Via Railway Dashboard**:
+   - Go to your project on [railway.app](https://railway.app)
+   - Navigate to **Settings** → **Networking**
+   - Click **Custom Domain** or **Add Domain**
+   - Enter: `sealevelstudio.xyz`
+   - Railway will provide DNS configuration instructions
+
+2. **Via Railway CLI**:
+   ```bash
+   railway domain add sealevelstudio.xyz
+   ```
+
+### Step 3: Configure DNS Records
+
+Railway will provide specific DNS values. Typically, you'll add:
+
+**For Root Domain (sealevelstudio.xyz):**
+```
+Type: CNAME
+Name: @
+Value: [Railway-provided CNAME value]
+```
+
+**For WWW Subdomain (www.sealevelstudio.xyz):**
+```
+Type: CNAME
+Name: www
+Value: [Railway-provided CNAME value]
+```
+
+**Note:** Railway provides the exact CNAME value in the dashboard after adding the domain.
+
+### Step 4: Configure Environment Variables
+
+In Railway Dashboard → **Variables**, add:
+
+```env
+# App URL (IMPORTANT!)
+NEXT_PUBLIC_APP_URL=https://sealevelstudio.xyz
+NEXT_PUBLIC_BASE_URL=https://sealevelstudio.xyz
+
+# Solana RPC
+NEXT_PUBLIC_SOLANA_RPC_MAINNET=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+NEXT_PUBLIC_SOLANA_RPC_DEVNET=https://devnet.helius-rpc.com/?api-key=YOUR_KEY
+NEXT_PUBLIC_HELIUS_API_KEY=your_helius_api_key
+
+# AI Configuration
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+GEMINI_API_KEY=your_gemini_key
+
+# Twitter OAuth
+TWITTER_CLIENT_ID=your_twitter_client_id
+TWITTER_CLIENT_SECRET=your_twitter_client_secret
+
+# Other API keys...
+BIRDEYE_API_KEY=your_birdeye_key
+JUPITER_API_KEY=your_jupiter_key
+TELEGRAM_BOT_TOKEN=your_telegram_token
+```
+
+**To add variables via CLI:**
+```bash
+railway variables set NEXT_PUBLIC_APP_URL=https://sealevelstudio.xyz
+railway variables set NEXT_PUBLIC_BASE_URL=https://sealevelstudio.xyz
+# ... add other variables
+```
+
+### Step 5: Update Twitter OAuth Callback
+
+1. Go to [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
+2. Open your app → **Settings** → **User authentication settings**
+3. Update **Callback URI / Redirect URL** to:
+   ```
+   https://sealevelstudio.xyz/api/auth/twitter/callback
+   ```
+4. Save changes
+
+### Step 6: Update Helius Webhooks (if using)
+
+1. Go to [Helius Dashboard](https://dashboard.helius.dev)
+2. Navigate to **Webhooks**
+3. Update webhook URL to:
+   ```
+   https://sealevelstudio.xyz/api/webhooks/helius
+   ```
+
+### Step 7: Redeploy
+
+After adding environment variables, trigger a redeploy:
+
+```bash
+railway up
+```
+
+Or push a commit to trigger automatic deployment.
+
+### Railway-Specific Notes
+
+- **Automatic SSL**: Railway automatically provisions SSL certificates for custom domains
+- **Port Configuration**: Railway auto-detects Next.js and sets PORT automatically
+- **Build Settings**: Railway auto-detects `npm run build` and `npm start`
+- **Environment**: Variables are encrypted and secure in Railway dashboard
 
 ---
 
@@ -210,7 +315,8 @@ docker build -f Dockerfile.prod -t sealevel-studio .
 
 # Run container
 docker run -p 3000:3000 \
-  -e NEXT_PUBLIC_APP_URL=https://sealevelstudio.com \
+  -e NEXT_PUBLIC_APP_URL=https://sealevelstudio.xyz \
+  -e NEXT_PUBLIC_BASE_URL=https://sealevelstudio.xyz \
   -e NEXT_PUBLIC_SOLANA_RPC_MAINNET=... \
   # ... other env vars
   sealevel-studio
@@ -218,12 +324,12 @@ docker run -p 3000:3000 \
 
 ### Step 4: Configure Nginx Reverse Proxy
 
-Create `/etc/nginx/sites-available/sealevelstudio.com`:
+Create `/etc/nginx/sites-available/sealevelstudio.xyz`:
 
 ```nginx
 server {
     listen 80;
-    server_name sealevelstudio.com www.sealevelstudio.com;
+    server_name sealevelstudio.xyz www.sealevelstudio.xyz;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -241,7 +347,7 @@ server {
 
 Enable site:
 ```bash
-sudo ln -s /etc/nginx/sites-available/sealevelstudio.com /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/sealevelstudio.xyz /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -250,7 +356,7 @@ sudo systemctl reload nginx
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d sealevelstudio.com -d www.sealevelstudio.com
+sudo certbot --nginx -d sealevelstudio.xyz -d www.sealevelstudio.xyz
 ```
 
 ---
