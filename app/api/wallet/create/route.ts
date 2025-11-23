@@ -10,7 +10,11 @@ export const dynamic = 'force-dynamic';
  * POST /api/wallet/create
  * Body: { userId?: string, sessionId?: string }
  * 
- * Returns: { walletAddress, encryptedKeypair (for server storage) }
+ * Returns: { wallet: { address, walletId, createdAt } }
+ * 
+ * SECURITY: The secret key is NEVER returned to the client.
+ * It is stored server-side only (in httpOnly cookies or database).
+ * All signing operations must go through server-side API endpoints.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,6 +37,8 @@ export async function POST(request: NextRequest) {
     // For now, we'll return it to be stored client-side in a secure cookie
     
     // Store wallet mapping in a cookie (in production, use database)
+    // SECURITY: Never send the secret key to the client, even encoded
+    // The secret key is stored server-side only (in cookies/database)
     const response = NextResponse.json({
       success: true,
       wallet: {
@@ -40,9 +46,8 @@ export async function POST(request: NextRequest) {
         walletId,
         createdAt: new Date().toISOString(),
       },
-      // In production, don't send the encrypted key to client
-      // Instead, store it server-side and use it for signing transactions
-      encryptedKey, // TEMPORARY - for development only
+      // encryptedKey is NOT returned - it's stored server-side only
+      // All signing operations must go through server-side API endpoints
     });
 
     // Store wallet ID in a secure cookie

@@ -177,7 +177,7 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
     } catch (error) {
       console.error('[PumpFun Sniper] Analysis error:', error);
     }
-  }, [config]);
+  }, [config, executeSnipe]);
 
   /**
    * Check if token passes filters
