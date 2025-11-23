@@ -55,8 +55,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       if (storedProfile && storedWalletId) {
         const profile = JSON.parse(storedProfile);
         setUser(profile);
-        // Refresh balance
-        await refreshBalance();
+        // Refresh balance - pass walletAddress directly to avoid state timing issue
+        await refreshBalance(profile.walletAddress);
       } else {
         // Create a new wallet
         await createWallet();
@@ -118,17 +118,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUser(profile);
   };
 
-  const refreshBalance = async () => {
-    if (!user) return;
+  const refreshBalance = async (walletAddress?: string) => {
+    // Use provided walletAddress or fall back to user state
+    const address = walletAddress || user?.walletAddress;
+    if (!address) return;
     
     try {
-      const response = await fetch(`/api/wallet/info?address=${user.walletAddress}`);
+      const response = await fetch(`/api/wallet/info?address=${address}`);
       const data = await response.json();
       
       if (data.success && data.wallet) {
-        const updated = { ...user, balance: data.wallet.balance };
-        setUser(updated);
-        saveProfile(updated);
+        // If we have a user state, update it; otherwise just return the balance
+        if (user) {
+          const updated = { ...user, balance: data.wallet.balance };
+          setUser(updated);
+          saveProfile(updated);
+        } else {
+          // If called during initialization, we'll need to update the profile that was just loaded
+          // This will be handled by the caller
+          return data.wallet.balance;
+        }
       }
     } catch (error) {
       console.error('Failed to refresh balance:', error);

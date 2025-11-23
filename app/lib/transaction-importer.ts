@@ -126,16 +126,22 @@ export async function importTransaction(
       
       if (baseTemplate) {
         const accounts: Record<string, string> = {};
-        const dynamicAccounts = [];
+        const dynamicAccounts: Array<{ name: string; type: 'signer' | 'writable' | 'readonly'; description: string }> = [];
         
         if (!isParsedInstruction(ix)) {
-           // Compiled instruction
+           // Compiled instruction - match accounts with transaction account keys for metadata
+           const accountKeys = tx.transaction.message.accountKeys;
            ix.accounts.forEach((acc, i) => {
              const name = `Account ${i + 1}`;
              accounts[name] = acc.toBase58();
+             // Find matching account key to get signer/writable info
+             const accountKey = accountKeys.find(ak => ak.pubkey.equals(acc));
+             const type = accountKey 
+               ? (accountKey.signer ? 'signer' : (accountKey.writable ? 'writable' : 'readonly'))
+               : 'readonly';
              dynamicAccounts.push({
                name,
-               type: acc.isSigner ? 'signer' : (acc.isWritable ? 'writable' : 'readonly'),
+               type,
                description: `Imported Account ${i+1}`
              });
            });

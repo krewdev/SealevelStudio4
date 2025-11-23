@@ -73,7 +73,7 @@ export function ServiceBot({ onBack, context }: ServiceBotProps) {
           'Do not paste production secrets unless you own the environment.',
           'Comply with GDPR/CCPA and local privacy regulations when handling PII.',
         ]}
-        accent="emerald"
+        accent="teal"
         onAccept={accept}
       />
     );

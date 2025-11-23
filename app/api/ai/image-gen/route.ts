@@ -162,4 +162,3 @@ async function checkRateLimit(request: NextRequest): Promise<number> {
   existing.count++;
   return existing.count;
 }
-

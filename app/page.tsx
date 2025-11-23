@@ -52,6 +52,8 @@ import { SocialConnectButton } from './components/SocialConnectButton';
 import { QuickLaunch } from './components/QuickLaunch';
 import { MarketingBot } from './components/MarketingBot';
 import { RuglessLaunchpad } from './components/RuglessLaunchpad';
+import { PumpFunSniper } from './components/PumpFunSniper';
+import { BleedingEdgeWrapper } from './components/BleedingEdgeWrapper';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -678,7 +680,7 @@ function Header({
   onBackToLanding?: () => void;
 }) {
   return (
-    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700 px-6 shrink-0">
+    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-xl px-6 shrink-0 shadow-lg shadow-purple-500/5">
       <div className="flex items-center space-x-4">
         {onBackToLanding && (
           <button
@@ -689,27 +691,35 @@ function Header({
           </button>
         )}
         {/* Logo */}
-        <img
-          src="/sea-level-logo.png"
-          alt="Sealevel Studio"
-          className="h-10 w-auto"
-          style={{ maxHeight: '40px' }}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-        <div className="text-xl font-bold tracking-tighter">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
-            Sealevel Studio
-          </span>
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <img
+              src="/sea-level-logo.png"
+              alt="Sealevel Studio"
+              className="h-10 w-auto"
+              style={{ maxHeight: '40px' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900 animate-pulse"></div>
+          </div>
+          <div className="text-xl font-bold tracking-tighter">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 animate-gradient">
+              Sealevel Studio
+            </span>
+          </div>
         </div>
       </div>
-      <div className="flex items-center space-x-4">
-        <UserProfileWidget />
+      <div className="flex items-center space-x-3">
+        {/* Social Connect - Compact */}
         <SocialConnectButton />
-        <button className="flex items-center space-x-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 transition-colors relative">
+        
+        {/* Network Selector - Enhanced */}
+        <button className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-700/50 px-4 py-2 text-sm font-medium text-gray-200 hover:from-gray-700 hover:to-gray-600/50 transition-all border border-gray-600/50 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/20 relative group">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span>{networks[network].name}</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 group-hover:text-purple-400 transition-colors" />
           <select
             value={network}
             onChange={(e) => setNetwork(e.target.value as keyof typeof NETWORKS)}
@@ -722,7 +732,14 @@ function Header({
             ))}
           </select>
         </button>
-        {wallet}
+        
+        {/* Wallet Button */}
+        <div className="flex items-center">
+          {wallet}
+        </div>
+        
+        {/* User Profile - Compact Dropdown */}
+        <UserProfileWidget />
       </div>
     </header>
   );
@@ -745,6 +762,7 @@ function Sidebar({
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
     { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
     { id: 'quick-launch', label: 'Quick Launch', icon: <Rocket className="h-4 w-4" />, section: 'core', badge: 'New' },
+    { id: 'pumpfun-sniper', label: 'Pump.fun Sniper', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
     { id: 'marketing-bot', label: 'Marketing Bot', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
     
     // Revenue
@@ -1055,6 +1073,11 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Rugless Launchpad has its own full-screen layout
   if (activeView === 'launchpad') {
     return <RuglessLaunchpad onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Pump.fun AI Sniper has its own full-screen layout
+  if (activeView === 'pumpfun-sniper') {
+    return <PumpFunSniper onBack={() => setActiveView('inspector')} />;
   }
 
   if (activeView === 'premium') {
@@ -1446,7 +1469,7 @@ function AppContent() {
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'pumpfun-sniper' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {
@@ -1605,6 +1628,18 @@ function AppContent() {
           ],
           cost: 'Platform fee + network transaction costs',
           disclaimer: 'Ensure you have proper authority and comply with local regulations.',
+        },
+        'pumpfun-sniper': {
+          featureName: 'Pump.fun AI Sniper',
+          description: 'Real-time token launch detection with AI-powered analysis and automated sniping.',
+          directions: [
+            'Start the stream to detect new token launches',
+            'AI analyzes each token for sniping opportunities',
+            'Configure auto-snipe settings or manually snipe tokens',
+            'Monitor sniped tokens and track performance',
+          ],
+          cost: 'Transaction fees only (gas costs for snipes)',
+          disclaimer: 'Sniping involves risk. Only invest what you can afford to lose. AI analysis is not financial advice.',
         },
         tools: {
           featureName: 'Developer Dashboard',
@@ -1884,34 +1919,36 @@ function AppContent() {
           }}
         />
         
-        <div className="h-screen flex flex-col bg-gray-900">
-          {!isFullScreenView && (
-            <Header 
-              network={network} 
-              setNetwork={setNetwork} 
-              networks={NETWORKS} 
-              wallet={<WalletButton />}
-              onBackToLanding={handleBackToLanding}
-            />
-          )}
-          
-          <div className="flex-1 flex overflow-hidden">
+        <BleedingEdgeWrapper enabled={true}>
+          <div className="h-screen flex flex-col bg-gray-900">
             {!isFullScreenView && (
-              <Sidebar 
-                activeView={activeView} 
-                setActiveView={setActiveView}
-                onViewChange={() => setIsPageLoading(true)}
+              <Header 
+                network={network} 
+                setNetwork={setNetwork} 
+                networks={NETWORKS} 
+                wallet={<WalletButton />}
+                onBackToLanding={handleBackToLanding}
               />
             )}
-            <MainContent 
-              activeView={activeView}
-              setActiveView={setActiveView}
-              connection={connection} 
-              network={network} 
-              publicKey={publicKey} 
-            />
+            
+            <div className="flex-1 flex overflow-hidden">
+              {!isFullScreenView && (
+                <Sidebar 
+                  activeView={activeView} 
+                  setActiveView={setActiveView}
+                  onViewChange={() => setIsPageLoading(true)}
+                />
+              )}
+              <MainContent 
+                activeView={activeView}
+                setActiveView={setActiveView}
+                connection={connection} 
+                network={network} 
+                publicKey={publicKey} 
+              />
+            </div>
           </div>
-        </div>
+        </BleedingEdgeWrapper>
         
         {/* R&D Console - Floating (always available) */}
         <AdvancedRAndDConsole 

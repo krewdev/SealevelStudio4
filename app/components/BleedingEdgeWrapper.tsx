@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import WebGPUScene from "./WebGPUScene";
-import CommandBar from "./CommandBar";
+import { CommandBar } from "./CommandBar";
 import { GenerativeUI } from "./GenerativeUI";
 
 interface UIComponent {

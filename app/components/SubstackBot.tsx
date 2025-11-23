@@ -85,7 +85,7 @@ export function SubstackBot({ onBack }: SubstackBotProps) {
           'Content must not be misleading financial advice.',
           'You remain responsible for CAN-SPAM/GDPR compliance.',
         ]}
-        accent="amber"
+        accent="orange"
         onAccept={accept}
       />
     );

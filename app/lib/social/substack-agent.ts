@@ -30,7 +30,7 @@ export interface SubstackComment {
 
 export interface AgentActivity {
   id: string;
-  type: 'post' | 'comment_reply' | 'error';
+  type: 'post' | 'comment_reply' | 'error' | 'agent_start' | 'agent_stop' | 'comment_check';
   message: string;
   timestamp: Date;
   success: boolean;

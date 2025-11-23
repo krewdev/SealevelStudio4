@@ -27,11 +27,11 @@ export default function WebGPUScene({
   useEffect(() => {
     if (!mountRef.current) return;
 
-    // Check WebGPU support
-    if (!navigator.gpu) {
-      console.warn("WebGPU not supported, falling back to WebGL");
-      setIsSupported(false);
-    }
+            // Check WebGPU support
+            if (!('gpu' in navigator)) {
+              console.warn("WebGPU not supported, falling back to WebGL");
+              setIsSupported(false);
+            }
 
     // Initialize Three.js scene
     const scene = new THREE.Scene();

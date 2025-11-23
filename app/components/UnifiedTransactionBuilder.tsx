@@ -1428,22 +1428,37 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                                     step="any"
                                     placeholder="0.0"
                                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-teal-500 focus:outline-none transition-colors"
-                                    value={value && !isNaN(Number(value)) ? (Number(value) / 1000000000).toString() : ''}
+                                    value={
+                                      // Only apply lamports conversion for fields that are stored in lamports
+                                      // Fields like 'initialSupply' are stored in SOL, so don't divide
+                                      (value && !isNaN(Number(value)) && (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount'))
+                                        ? (Number(value) / 1000000000).toString()
+                                        : (value && !isNaN(Number(value)) ? value : '')
+                                    }
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         if (val === '') {
                                             updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: '' });
                                             return;
                                         }
-                                        const lamports = Math.floor(parseFloat(val) * 1000000000);
-                                        if (!isNaN(lamports)) {
+                                        // Only convert to lamports for fields that should be stored in lamports
+                                        // Fields like 'initialSupply' and 'supplyCap' are stored in SOL
+                                        if (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount') {
+                                          const lamports = Math.floor(parseFloat(val) * 1000000000);
+                                          if (!isNaN(lamports)) {
                                             updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: lamports.toString() });
+                                          }
+                                        } else {
+                                          // For fields like initialSupply, store as SOL (no conversion)
+                                          updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: val });
                                         }
                                     }}
                                 />
                              </div>
                              <div className="relative group">
-                                <label className="absolute -top-3.5 left-0 text-[9px] text-slate-500 font-mono uppercase tracking-wider">Amount (Lamports)</label>
+                                <label className="absolute -top-3.5 left-0 text-[9px] text-slate-500 font-mono uppercase tracking-wider">
+                                  {key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount' ? 'Amount (Lamports)' : 'Amount (Raw)'}
+                                </label>
                                 <input
                                     type="number"
                                     placeholder="0"
@@ -1454,7 +1469,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                              </div>
                              <div className="flex items-center gap-1.5 text-[10px] text-teal-400/80 bg-teal-900/20 p-1.5 rounded border border-teal-900/30">
                                 <Zap size={10} />
-                                <span>AI Tip: 1 SOL = 10^9 Lamports. Use Lamports for exact precision.</span>
+                                <span>
+                                  {key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount'
+                                    ? 'AI Tip: 1 SOL = 10^9 Lamports. Use Lamports for exact precision.'
+                                    : key === 'initialSupply'
+                                    ? 'AI Tip: Enter supply in SOL units (e.g., 1.00 for 1 SOL worth of tokens).'
+                                    : 'AI Tip: Enter the amount in the appropriate unit.'}
+                                </span>
                              </div>
                           </div>
                         ) : (
@@ -1465,15 +1486,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                             onBlur={() => setTimeout(() => setFocusedInputField(null), 200)}
                             onChange={(e) => {
                               let newValue = e.target.value;
-                              // Auto-convert SOL to lamports for amount fields (hidden conversion)
-                              if (isAmountField && key === 'amount' && newValue.includes('.')) {
+                              // Auto-convert SOL to lamports only for fields that should be stored in lamports
+                              // Fields like 'initialSupply' and 'supplyCap' are stored in SOL units
+                              if (isAmountField && (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount') && newValue.includes('.')) {
                                 // User entered SOL, convert to lamports behind the scenes
                                 newValue = convertSolToLamports(newValue);
                               }
-                              if (isAmountField && key === 'initialSupply' && newValue.includes('.')) {
-                                // User entered SOL, convert to lamports behind the scenes
-                                newValue = convertSolToLamports(newValue);
-                              }
+                              // For initialSupply and supplyCap, keep as SOL (no conversion)
                               updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: newValue });
                             }}
                             className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 pr-10 text-sm text-white focus:border-teal-500 focus:outline-none transition-colors"
