@@ -42,7 +42,8 @@ export function BleedingEdgeWrapper({ children, enabled = true }: BleedingEdgeWr
       componentType = "transaction_builder";
       config = { type: "Transfer" };
     } else if (lowerCommand.includes("dashboard")) {
-      componentType = "dashboard";
+      // Old dashboard component removed - redirect to other components
+      componentType = "wallet_balance";
     }
 
     // Add new component

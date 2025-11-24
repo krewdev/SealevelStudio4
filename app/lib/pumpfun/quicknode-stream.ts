@@ -6,6 +6,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { QuickNodeStreamManager, QuickNodeStreamEvent } from '../quicknode/stream';
 import { PumpFunToken, PumpFunStreamEvent } from './stream';
+import { PumpFunFilter, processPumpFunFilter, PumpFunFilterResult } from './quicknode-filter';
 
 // Pump.fun Program ID (update with actual program ID)
 const PUMPFUN_PROGRAM_ID = '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P'; // Example - update with actual
@@ -370,6 +371,8 @@ export class PumpFunQuickNodeStream {
     };
   }
 }
+
+
 
 
 

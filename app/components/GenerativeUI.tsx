@@ -47,7 +47,8 @@ function GeneratedComponent({ component, onClose }: { component: UIComponent; on
           />
         );
       case "dashboard":
-        return <DashboardCard config={component.config} />;
+        // Old dashboard component removed - no longer supported
+        return null;
       case "wallet_balance":
         return <WalletBalanceCard />;
       case "transaction_builder":
@@ -64,7 +65,7 @@ function GeneratedComponent({ component, onClose }: { component: UIComponent; on
 
   return (
     <div
-      className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 transition-all duration-500 ${
+      className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-500 ${
         isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
       }`}
     >
@@ -114,29 +115,7 @@ function SwapCard({ tokens, amount }: { tokens: string[]; amount: number }) {
   );
 }
 
-function DashboardCard({ config }: { config: any }) {
-  return (
-    <div className="p-6 bg-black/80 backdrop-blur-2xl border border-white/20 rounded-2xl w-96 animate-in fade-in zoom-in shadow-2xl">
-      <h3 className="text-lg font-bold text-white mb-4">Dashboard</h3>
-      <div className="space-y-3">
-        <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-          <div className="text-xs text-gray-400">Total Value</div>
-          <div className="text-2xl font-bold text-white">$12,450.00</div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-            <div className="text-xs text-gray-400">Active Launches</div>
-            <div className="text-xl font-bold text-green-400">3</div>
-          </div>
-          <div className="p-3 bg-gray-900/50 rounded-lg border border-gray-700">
-            <div className="text-xs text-gray-400">Campaigns</div>
-            <div className="text-xl font-bold text-purple-400">7</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// DashboardCard component removed - old AI dashboard no longer supported
 
 function WalletBalanceCard() {
   return (

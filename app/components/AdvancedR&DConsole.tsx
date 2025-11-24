@@ -637,7 +637,7 @@ export function AdvancedRAndDConsole({ initialMinimized = false, onToggle }: Adv
 
   if (!hasConsent) {
     return (
-      <div className="fixed bottom-6 right-6 max-w-md w-[calc(100vw-2rem)] z-40">
+      <div className="fixed bottom-6 right-6 max-w-md w-[calc(100vw-2rem)] z-50">
         <RiskAcknowledgement
           featureName="Advanced R&D Console"
           summary="This console can decode keys, decrypt payloads, and run vulnerability scanners. Confirm you have authorization to inspect any data you load and that you accept all risk."

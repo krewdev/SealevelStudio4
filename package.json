@@ -19,7 +19,8 @@
     "test:social-bots": "ts-node --project tsconfig.scripts.json scripts/test-social-media-bots.ts",
     "train:solana-ai": "ts-node scripts/train-solana-ai.ts",
     "setup:merkle-tree": "ts-node scripts/setup-merkle-tree.ts",
-    "verify:merkle-tree": "ts-node scripts/verify-merkle-tree.ts"
+    "verify:merkle-tree": "ts-node scripts/verify-merkle-tree.ts",
+    "webhook:server": "node scripts/webhook-server.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",
@@ -49,7 +50,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
     "@types/bs58": "^4.0.4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.19.25",
     "@types/node-fetch": "^2.6.13",
     "@types/react": "^18",
@@ -59,8 +63,11 @@
     "autoprefixer": "^10.4.22",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.0",
+    "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

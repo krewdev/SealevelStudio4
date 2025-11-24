@@ -137,49 +137,6 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
   }, [stream, isStreaming, config.enabled]);
 
   /**
-   * Analyze token with AI
-   */
-  const analyzeToken = useCallback(async (token: PumpFunToken) => {
-    try {
-      // Apply filters first
-      if (!passesFilters(token, config.filters)) {
-        return;
-      }
-
-      setStats(prev => ({
-        ...prev,
-        tokensAnalyzed: prev.tokensAnalyzed + 1,
-      }));
-
-      const response = await fetch('/api/pumpfun/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Analysis failed');
-      }
-
-      const data = await response.json();
-      const analysis = data.analysis as SnipingAnalysis;
-
-      setAnalyses(prev => {
-        const updated = new Map(prev);
-        updated.set(token.mint, analysis);
-        return updated;
-      });
-
-      // Auto-snipe if enabled and conditions met
-      if (config.autoSnipe && shouldAutoSnipe(analysis, config)) {
-        await executeSnipe(token, analysis);
-      }
-    } catch (error) {
-      console.error('[PumpFun Sniper] Analysis error:', error);
-    }
-  }, [config, executeSnipe]);
-
-  /**
    * Check if token passes filters
    */
   const passesFilters = (token: PumpFunToken, filters: SnipingConfig['filters']): boolean => {
@@ -276,6 +233,49 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
       }));
     }
   }, [publicKey, sendTransaction, connection, config]);
+
+  /**
+   * Analyze token with AI
+   */
+  const analyzeToken = useCallback(async (token: PumpFunToken) => {
+    try {
+      // Apply filters first
+      if (!passesFilters(token, config.filters)) {
+        return;
+      }
+
+      setStats(prev => ({
+        ...prev,
+        tokensAnalyzed: prev.tokensAnalyzed + 1,
+      }));
+
+      const response = await fetch('/api/pumpfun/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Analysis failed');
+      }
+
+      const data = await response.json();
+      const analysis = data.analysis as SnipingAnalysis;
+
+      setAnalyses(prev => {
+        const updated = new Map(prev);
+        updated.set(token.mint, analysis);
+        return updated;
+      });
+
+      // Auto-snipe if enabled and conditions met
+      if (config.autoSnipe && shouldAutoSnipe(analysis, config)) {
+        await executeSnipe(token, analysis);
+      }
+    } catch (error) {
+      console.error('[PumpFun Sniper] Analysis error:', error);
+    }
+  }, [config, executeSnipe]);
 
   /**
    * Toggle stream

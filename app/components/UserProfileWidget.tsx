@@ -49,7 +49,7 @@ export function UserProfileWidget() {
 
     setIsCreatingWallet(true);
     try {
-      await createWallet(email);
+      await createWallet();
       setShowEmailModal(false);
       setEmail('');
     } catch (error) {
