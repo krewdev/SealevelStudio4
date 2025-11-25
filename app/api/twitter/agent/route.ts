@@ -108,6 +108,11 @@ export async function POST(request: NextRequest) {
       state.isRunning = true;
       
       // Create Twitter client
+      // Validate token before creating client
+      if (!accessToken || accessToken.length < 10) {
+        throw new Error('Invalid access token');
+      }
+      
       const client = new TwitterApi(accessToken);
       
       // Start periodic posting
@@ -186,10 +191,24 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Agent control error:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to control agent';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      // Check for common Twitter API errors
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        errorMessage = 'Twitter authentication expired. Please log in again.';
+      } else if (error.message.includes('Invalid access token')) {
+        errorMessage = 'Invalid Twitter access token. Please log in again.';
+      }
+    }
+    
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to control agent',
+        error: errorMessage,
         success: false,
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined,
       },
       { status: 500 }
     );
@@ -236,13 +255,21 @@ async function checkMentions(client: TwitterApi, userId: string, state: any) {
   const now = Date.now();
   
   try {
-    // Get recent mentions
-    const mentions = await client.v2.search(`@${userId}`, {
+    // Get current user info to get username
+    const me = await client.v2.me({
+      'user.fields': ['username'],
+    });
+    const username = me.data.username;
+
+    // Get recent mentions using search API
+    // Search for tweets mentioning the user
+    const mentions = await client.v2.search({
+      query: `@${username} -is:retweet`,
       max_results: 10,
-      'tweet.fields': ['created_at', 'author_id', 'in_reply_to_user_id'],
+      'tweet.fields': ['created_at', 'author_id', 'in_reply_to_user_id', 'text'],
     });
 
-    if (mentions.data?.data) {
+    if (mentions.data?.data && mentions.data.data.length > 0) {
       for (const mention of mentions.data.data) {
         // Skip if we already replied (in production, track replied mentions)
         // For now, reply to all new mentions
@@ -250,6 +277,7 @@ async function checkMentions(client: TwitterApi, userId: string, state: any) {
         const replyText = generateReply(mention.text || '');
         
         try {
+          // Reply to tweet using correct Twitter API v2 format
           await client.v2.tweet({
             text: replyText,
             reply: {
@@ -267,7 +295,9 @@ async function checkMentions(client: TwitterApi, userId: string, state: any) {
     state.lastMentionCheck = now;
   } catch (error) {
     console.error('Check mentions error:', error);
+    // Don't fail completely - just log the error
     addActivity(state, 'mention_reply', 'Error checking mentions', false, error instanceof Error ? error.message : 'Unknown error');
+    state.lastMentionCheck = now; // Still update timestamp to avoid spamming
   }
 }
 
