@@ -61,7 +61,7 @@ export interface PresaleConfig {
  * Default Presale Configuration
  */
 export const DEFAULT_PRESALE_CONFIG: PresaleConfig = {
-  startTime: new Date(), // Starts immediately
+  startTime: new Date('2025-12-02T00:00:00Z'), // Starts Dec 2, 2025 (One week from now)
   endTime: new Date(Date.now() + 150 * 24 * 60 * 60 * 1000), // 5 months duration
   isActive: true,
 
