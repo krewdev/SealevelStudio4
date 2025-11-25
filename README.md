@@ -7,6 +7,21 @@ Contact: James Young 300jayblackout@gmail.com
 
 ---
 
+## 🚀 Going Live?
+
+**Don't have all the API keys yet?** No problem! The app works with minimal configuration.
+
+**Minimum Required**: Just set `NEXT_PUBLIC_APP_URL` to your domain and you're ready to deploy.
+
+- ✅ Core features work without API keys
+- ✅ Features without keys show helpful messages (not errors)
+- ✅ Add more variables later without breaking anything
+- ✅ Check `/api/health/config` to see what's configured
+
+**See [GOING_LIVE.md](./docs/GOING_LIVE.md) for the complete guide.**
+
+---
+
 ## 🎨 NEW: AI-Powered Token Image Generator
 
 Sealevel Studio now includes an integrated **AI Token Image Generator** powered by OpenAI DALL-E 3!
