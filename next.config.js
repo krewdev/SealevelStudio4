@@ -5,7 +5,7 @@ const nextConfig = {
     optimizeCss: false,
   },
   // Enable standalone output for Docker deployments (only in production builds, not dev)
-  // output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Allow ngrok and other dev origins for webhook testing
   allowedDevOrigins: [
     '*.ngrok-free.dev',
