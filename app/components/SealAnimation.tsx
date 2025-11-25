@@ -214,12 +214,18 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
     );
   }
 
-  // No fallback - only MP4 video allowed
-  console.warn('Sea lion MP4 animation not available');
+  // No fallback - use canvas animation
   return (
-    <div className={`flex items-center justify-center ${className}`}
+    <div className={`relative flex items-center justify-center ${className}`}
          style={{ width: size, height: size }}>
-      <div className="text-gray-400 text-sm">Loading...</div>
+      <canvas
+        ref={canvasRef}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          display: 'block'
+        }}
+      />
     </div>
   );
 }

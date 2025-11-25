@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
 import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket } from 'lucide-react';
@@ -1868,8 +1868,28 @@ function AppContent() {
       return contextMap[activeView] ?? baseContext;
     };
 
-    // Map activeView to feature ID for loading screen
-    const getCurrentFeatureId = (view: string): string => {
+  // Stable callbacks for loader to prevent re-renders
+  const handleLoaderComplete = useCallback(() => {
+    setIsPageLoading(false);
+  }, []);
+
+  const handleLoaderEnter = useCallback(() => {
+    // Stay on current view when entering
+    setIsPageLoading(false);
+  }, []);
+
+  // Stable callbacks for loader to prevent re-renders
+  const handleLoaderComplete = useCallback(() => {
+    setIsPageLoading(false);
+  }, []);
+
+  const handleLoaderEnter = useCallback(() => {
+    // Stay on current view when entering
+    setIsPageLoading(false);
+  }, []);
+
+  // Map activeView to feature ID for loading screen
+  const getCurrentFeatureId = (view: string): string => {
       switch (view) {
         case 'builder':
           return 'transaction-builder';
@@ -1897,7 +1917,7 @@ function AppContent() {
         <FeatureHighlightLoader
           isLoading={isPageLoading}
           duration={4000}
-          onAnimationComplete={() => setIsPageLoading(false)}
+          onAnimationComplete={handleLoaderComplete}
           currentFeature={getCurrentFeatureId(activeView)}
           context={getLoadingContext()}
           onFeatureClick={(featureId) => {
@@ -1915,10 +1935,7 @@ function AppContent() {
               setActiveView('twitter-bot'); // Start with Twitter bot
             }
           }}
-          onEnterApp={() => {
-            // Stay on current view when entering
-            setIsPageLoading(false);
-          }}
+          onEnterApp={handleLoaderEnter}
         />
         
         <BleedingEdgeWrapper enabled={true}>
