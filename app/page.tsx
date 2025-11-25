@@ -54,6 +54,7 @@ import { MarketingBot } from './components/MarketingBot';
 import { RuglessLaunchpad } from './components/RuglessLaunchpad';
 import { PumpFunSniper } from './components/PumpFunSniper';
 import { BleedingEdgeWrapper } from './components/BleedingEdgeWrapper';
+import { PricingBanner } from './components/PricingBanner';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -1225,6 +1226,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Default single-column layout for other views
   return (
     <>
+      <PricingBanner onNavigateToPricing={() => setActiveView('revenue')} />
       <FreeTrialBanner />
       <main className="flex-1 overflow-y-auto p-6 md:p-8">
         {activeView === 'inspector' && <AccountInspectorView connection={connection} network={network} publicKey={publicKey} />}
