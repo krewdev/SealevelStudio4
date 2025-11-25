@@ -16,8 +16,12 @@ export async function POST(request: NextRequest) {
     
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
+        { 
+          error: 'OpenAI API key not configured. Image generation requires DALL-E 3 API access.',
+          suggestion: 'Please set OPENAI_API_KEY in your environment variables, or use manual image upload instead.',
+          requiresApiKey: true
+        },
+        { status: 503 } // Service Unavailable
       );
     }
 

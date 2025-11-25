@@ -239,7 +239,7 @@ export function MarketingBot({ tokenSymbol = 'TOKEN', tokenName = 'My Token' }: 
   }
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700 rounded-2xl overflow-hidden">
+    <div className="bg-gray-800/50 border border-gray-700 rounded-2xl">
       {/* Header */}
       <div className="p-6 border-b border-gray-700 bg-gray-900/30 flex justify-between items-center">
         <div>

@@ -1108,7 +1108,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Marketing Bot has its own layout
   if (activeView === 'marketing-bot') {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto px-4 py-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
         <button onClick={() => setActiveView('inspector')} className="mb-4 text-gray-400 hover:text-white">← Back</button>
         <MarketingBot />
       </div>

@@ -1,10 +1,10 @@
 #!/usr/bin/env ts-node
 /**
- * Script to set up merkle tree for beta tester attestations
+ * Script to set up merkle tree for SEAL presale attestations
  * 
  * Usage:
- *   ts-node scripts/setup-merkle-tree.ts --network devnet
- *   ts-node scripts/setup-merkle-tree.ts --network mainnet
+ *   ts-node scripts/setup-presale-merkle-tree.ts --network devnet
+ *   ts-node scripts/setup-presale-merkle-tree.ts --network mainnet
  */
 
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
@@ -37,9 +37,9 @@ function deriveTreeAuthority(merkleTree: PublicKey): PublicKey {
 }
 
 /**
- * Create merkle tree using Metaplex Bubblegum SDK
+ * Create merkle tree using Metaplex Bubblegum SDK for presale attestations
  */
-async function createMerkleTree(
+async function createPresaleMerkleTree(
   connection: Connection,
   keypair: Keypair,
   options: SetupOptions
@@ -48,7 +48,7 @@ async function createMerkleTree(
   treeAuthority: PublicKey;
   signature: string;
 }> {
-  console.log('Setting up Metaplex UMI...');
+  console.log('Setting up Metaplex UMI for presale attestations...');
   
   // Create UMI instance with Bubblegum plugin
   const umi = createUmi(connection.rpcEndpoint).use(mplBubblegum());
@@ -59,17 +59,17 @@ async function createMerkleTree(
   umi.use(signerIdentity(signer));
   
   // Generate merkle tree signer (UMI will handle keypair generation)
-  console.log('Generating merkle tree keypair...');
+  console.log('Generating presale merkle tree keypair...');
   const merkleTree = generateSigner(umi);
   const merkleTreePublicKey = new PublicKey(merkleTree.publicKey);
   const treeAuthority = deriveTreeAuthority(merkleTreePublicKey);
   
-  console.log(`Merkle Tree Address: ${merkleTreePublicKey.toString()}`);
+  console.log(`Presale Merkle Tree Address: ${merkleTreePublicKey.toString()}`);
   console.log(`Tree Authority: ${treeAuthority.toString()}`);
   console.log(`Max Depth: ${options.maxDepth || 14}`);
   console.log(`Max Buffer Size: ${options.maxBufferSize || 64}`);
   console.log('');
-  console.log('Creating merkle tree on-chain (this may take a moment)...');
+  console.log('Creating presale merkle tree on-chain (this may take a moment)...');
   
   // Create the tree
   const builder = await createTree(umi, {
@@ -112,8 +112,8 @@ async function main() {
     ? args[args.indexOf('--keypair') + 1]
     : undefined;
 
-  console.log('🌳 Merkle Tree Setup for Beta Tester Attestations');
-  console.log('==================================================');
+  console.log('🌳 Presale Attestation Merkle Tree Setup');
+  console.log('==========================================');
   console.log(`Network: ${network}`);
   console.log(`Max Depth: ${maxDepth}`);
   console.log(`Max Buffer Size: ${maxBufferSize}`);
@@ -157,8 +157,8 @@ async function main() {
       console.log('');
     }
     
-    // Create merkle tree
-    const { merkleTree, treeAuthority, signature } = await createMerkleTree(connection, keypair, {
+    // Create presale merkle tree
+    const { merkleTree, treeAuthority, signature } = await createPresaleMerkleTree(connection, keypair, {
       network,
       maxDepth,
       maxBufferSize,
@@ -166,37 +166,38 @@ async function main() {
     });
 
     console.log('');
-    console.log('✅ Merkle Tree Created!');
-    console.log('======================');
+    console.log('✅ Presale Merkle Tree Created!');
+    console.log('==============================');
     console.log(`Merkle Tree: ${merkleTree.toString()}`);
     console.log(`Tree Authority: ${treeAuthority.toString()}`);
     console.log(`Transaction: ${signature}`);
     console.log('');
 
     // Generate environment variable file
-    const envContent = `# Beta Tester Merkle Tree Configuration
+    const envContent = `# SEAL Presale Attestation Merkle Tree Configuration
 # Generated on ${new Date().toISOString()}
 # Network: ${network}
 
-NEXT_PUBLIC_BETA_TESTER_MERKLE_TREE=${merkleTree.toString()}
-NEXT_PUBLIC_VERISOL_TREE_AUTHORITY=${treeAuthority.toString()}
+NEXT_PUBLIC_PRESALE_MERKLE_TREE=${merkleTree.toString()}
+NEXT_PUBLIC_PRESALE_TREE_AUTHORITY=${treeAuthority.toString()}
 
 # Optional: Collection ID (set after creating collection)
-# NEXT_PUBLIC_BETA_TESTER_COLLECTION_ID=<collection_id>
+# NEXT_PUBLIC_PRESALE_COLLECTION_ID=<collection_id>
 `;
 
-    const envPath = path.join(process.cwd(), `.env.merkle-tree.${network}`);
+    const envPath = path.join(process.cwd(), `.env.presale-merkle-tree.${network}`);
     fs.writeFileSync(envPath, envContent);
     console.log(`📝 Environment variables saved to: ${envPath}`);
     console.log('');
     console.log('Next steps:');
     console.log('1. Copy these variables to your .env.local file');
-    console.log('2. Restart your Next.js dev server');
-    console.log('3. Test minting an attestation');
+    console.log('2. Initialize the presale registry in the attestation program');
+    console.log('3. Restart your Next.js dev server');
+    console.log('4. Users can now mint presale attestations');
     console.log('');
 
   } catch (error) {
-    console.error('❌ Error creating merkle tree:', error);
+    console.error('❌ Error creating presale merkle tree:', error);
     process.exit(1);
   }
 }
@@ -204,5 +205,5 @@ NEXT_PUBLIC_VERISOL_TREE_AUTHORITY=${treeAuthority.toString()}
 // Run if executed directly
 main().catch(console.error);
 
-export { createMerkleTree, deriveTreeAuthority };
+export { createPresaleMerkleTree, deriveTreeAuthority };
 

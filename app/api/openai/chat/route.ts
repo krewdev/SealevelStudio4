@@ -17,11 +17,41 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 export async function POST(request: NextRequest) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
+    const localAiEndpoint = process.env.LOCAL_AI_ENDPOINT;
     
+    if (!apiKey && !localAiEndpoint) {
+      return NextResponse.json(
+        { 
+          error: 'No AI provider configured',
+          suggestion: 'Please set either OPENAI_API_KEY or LOCAL_AI_ENDPOINT in your environment variables',
+          requiresConfiguration: true
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+
+    // If no OpenAI key but local AI is available, suggest using local AI endpoint
+    if (!apiKey && localAiEndpoint) {
+      return NextResponse.json(
+        { 
+          error: 'OpenAI API key not configured',
+          suggestion: `Local AI is available at ${localAiEndpoint}. Consider using the local AI endpoint instead, or set OPENAI_API_KEY for OpenAI support.`,
+          localAiAvailable: true,
+          localAiEndpoint,
+          requiresConfiguration: true
+        },
+        { status: 503 }
+      );
+    }
+
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
+        { 
+          error: 'OpenAI API key not configured',
+          suggestion: 'Please set OPENAI_API_KEY in your environment variables, or configure LOCAL_AI_ENDPOINT for local AI support',
+          requiresConfiguration: true
+        },
+        { status: 503 }
       );
     }
 

@@ -19,11 +19,16 @@
     "test:social-bots": "ts-node --project tsconfig.scripts.json scripts/test-social-media-bots.ts",
     "train:solana-ai": "ts-node scripts/train-solana-ai.ts",
     "setup:merkle-tree": "ts-node scripts/setup-merkle-tree.ts",
+    "setup:presale-merkle-tree": "ts-node scripts/setup-presale-merkle-tree.ts",
     "verify:merkle-tree": "ts-node scripts/verify-merkle-tree.ts",
     "webhook:server": "node scripts/webhook-server.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",
+    "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
+    "@metaplex-foundation/umi": "^1.4.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@metaplex-foundation/umi-web3js-adapters": "^1.4.1",
     "@mlc-ai/web-llm": "^0.2.79",
     "@solana/spl-token": "^0.3.8",
     "@solana/wallet-adapter-base": "^0.9.23",

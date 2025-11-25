@@ -163,7 +163,7 @@ export function SecurityAI({ onBack }: SecurityAIProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col min-h-full bg-gray-900 text-white">
       {/* Header */}
       <div className="border-b border-gray-700 p-4 bg-gray-800">
         <div className="flex items-center justify-between">
@@ -231,7 +231,7 @@ export function SecurityAI({ onBack }: SecurityAIProps) {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         {!report ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Shield className="text-blue-400 mb-4" size={64} />
