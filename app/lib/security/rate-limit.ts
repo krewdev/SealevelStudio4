@@ -59,12 +59,12 @@ export function rateLimitByWallet(wallet: string, config: RateLimitConfig = { li
 setInterval(() => {
   const now = Date.now();
   [ipRateLimit, walletRateLimit].forEach(store => {
-    for (const [key, record] of store.entries()) {
+    // Convert Map entries to array for iteration
+    Array.from(store.entries()).forEach(([key, record]) => {
       if (now > record.resetTime) {
         store.delete(key);
       }
-    }
+    });
   });
 }, 60000); // Run every minute
-
 

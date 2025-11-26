@@ -1226,8 +1226,55 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Default single-column layout for other views
   return (
     <>
+      {/* Video Placeholder Section - Shown after disclaimer/loader completes */}
+      <section className="w-full bg-gray-800/30 border-b border-gray-700/50 py-8 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="relative w-full rounded-xl overflow-hidden bg-gray-900/50 border border-gray-700/50 shadow-2xl" style={{ aspectRatio: '16/9', minHeight: '400px' }}>
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              className="w-full h-full object-cover"
+              style={{ display: 'block' }}
+              onError={(e) => {
+                console.error('App video failed to load, showing placeholder');
+                const videoElement = e.currentTarget as HTMLVideoElement;
+                videoElement.style.display = 'none';
+                // Show placeholder message
+                const placeholder = videoElement.nextElementSibling as HTMLElement;
+                if (placeholder) {
+                  placeholder.style.display = 'flex';
+                }
+              }}
+              onLoadedData={() => {
+                console.log('App video loaded successfully');
+              }}
+            >
+              <source src="/app-video-placeholder.mp4" type="video/mp4" />
+              <source src="/app-video-placeholder.webm" type="video/webm" />
+              Your browser does not support the video tag.
+            </video>
+            {/* Placeholder when video is missing */}
+            <div 
+              className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 bg-gray-900/80 border-2 border-dashed border-gray-700"
+              style={{ display: 'none' }}
+            >
+              <svg className="w-16 h-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <p className="text-lg font-medium mb-2">Video Placeholder</p>
+              <p className="text-sm text-gray-400">Place your video file at: <code className="bg-gray-800 px-2 py-1 rounded">/public/app-video-placeholder.mp4</code></p>
+              <p className="text-xs text-gray-500 mt-2">Or update the video source in page.tsx</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <PricingBanner onNavigateToPricing={() => setActiveView('revenue')} />
       <FreeTrialBanner />
+      
       <main className="flex-1 overflow-y-auto p-6 md:p-8">
         {activeView === 'inspector' && <AccountInspectorView connection={connection} network={network} publicKey={publicKey} />}
         {activeView === 'simulation' && <SimulationView transactionDraft={transactionPreview?.transaction} />}
@@ -1453,6 +1500,417 @@ function AppContent() {
     setCurrentScreen('landing');
   };
 
+  // Stable callbacks for loader to prevent re-renders - MUST BE BEFORE CONDITIONAL RETURNS
+  const handleLoaderComplete = useCallback(() => {
+    setIsPageLoading(false);
+  }, []);
+
+  const handleLoaderEnter = useCallback(() => {
+    // Stay on current view when entering
+    setIsPageLoading(false);
+  }, []);
+
+  // Map activeView to feature ID for loading screen
+  const getCurrentFeatureId = useCallback((view: string): string => {
+    switch (view) {
+      case 'builder':
+        return 'transaction-builder';
+      case 'ai-agents':
+        return 'ai-agents';
+      case 'charts':
+        return 'market-analytics';
+      case 'cybersecurity':
+      case 'cyber-playground':
+        return 'security-tools';
+      case 'twitter-bot':
+      case 'telegram-bot':
+      case 'substack-bot':
+      case 'social':
+        return 'social-features';
+      case 'inspector':
+      default:
+        return 'transaction-builder'; // Default to transaction builder
+    }
+  }, []);
+
+  // Get loading context - must be before conditional returns
+  const getLoadingContext = useCallback((): LoaderContextInfo => {
+    const bundlerCost = `${SEAL_TOKEN_ECONOMICS.pricing.bundler_multi_send.toLocaleString()} SEAL per bundle + ${SEAL_TOKEN_ECONOMICS.pricing.bundler_recipient} SEAL per recipient`;
+    const twitterCost = `${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL monthly`;
+    const telegramCost = `${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_monthly.toLocaleString()} SEAL monthly`;
+    const builderCost = `${SEAL_TOKEN_ECONOMICS.pricing.advanced_transaction.toLocaleString()} SEAL per advanced build`;
+    const scannerCost = `${SEAL_TOKEN_ECONOMICS.pricing.scanner_scan.toLocaleString()} SEAL per scan`;
+
+    const baseContext: LoaderContextInfo = {
+      featureName: 'Sealevel Studio',
+      description: 'Spinning up your workspace with wallet, network, and AI assistants.',
+      directions: [
+        'Connect a wallet or stay in read-only mode',
+        'Select Devnet or Mainnet RPC access',
+      ],
+      cost: 'Free tier usage (limits apply)',
+      disclaimer: 'Experimental tooling. Verify all addresses before signing.',
+    };
+
+    const contextMap: Record<string, LoaderContextInfo> = {
+      inspector: {
+        featureName: 'Account Inspector',
+        description: 'Fetching account data, lamport balances, and token state.',
+        directions: [
+          'Paste or select an address',
+          'Use history panel to compare snapshots',
+        ],
+        disclaimer: 'Data is fetched directly from Solana RPC endpoints.',
+      },
+      builder: {
+        featureName: 'Instruction Builder',
+        description: 'Preparing programmable transaction templates with guardrails.',
+        directions: [
+          'Select a program + instruction',
+          'Fill required accounts & args, then export or simulate',
+        ],
+        cost: builderCost,
+        disclaimer: 'Transactions execute on-chain; double check keys before sending.',
+      },
+      scanner: {
+        featureName: 'Arbitrage Scanner',
+        description: 'Booting price oracles, MEV defenses, and liquidity watchers.',
+        directions: [
+          'Select pools or let AI suggest routes',
+          'Configure alert thresholds & auto-trading rules',
+        ],
+        cost: scannerCost,
+        disclaimer: 'Signals are informational, not trading advice.',
+      },
+      bundler: {
+        featureName: 'Transaction Bundler',
+        description: 'Loading multi-send builder with size estimator and wallet registry.',
+        directions: [
+          'Connect wallet & paste recipient list',
+          'Estimate size before broadcast',
+        ],
+        cost: bundlerCost,
+        disclaimer: 'Multi-sends are irreversible. Ensure you comply with sanctions & AML laws.',
+      },
+      'twitter-bot': {
+        featureName: 'Twitter Automation Bot',
+        description: 'Linking OAuth session, scheduling queue, and AI agent policies.',
+        directions: [
+          'Authenticate with Twitter and scope permissions',
+          'Draft content or configure autonomous agent cadence',
+        ],
+        cost: twitterCost,
+        disclaimer: 'Respect platform policies and local communications law; logs are locally stored.',
+      },
+      'telegram-bot': {
+        featureName: 'Telegram Command Center',
+        description: 'Bootstrapping bot token storage and responder flows.',
+        directions: [
+          'Provide BotFather token securely',
+          'Map commands to playbooks before activating',
+        ],
+        cost: telegramCost,
+        disclaimer: 'Never spam or violate telecom regulations. You are responsible for distribution.',
+      },
+      'service-bot': {
+        featureName: 'AI Service Desk',
+        description: 'Preparing customer support macros and compliance guardrails.',
+        directions: [
+          'Select tone + escalation rules',
+          'Feed FAQs or knowledge base links',
+        ],
+        cost: 'Usage billed per resolved session (quote on request)',
+        disclaimer: 'Ensure responses respect privacy laws (GDPR/CCPA etc.).',
+      },
+      'substack-bot': {
+        featureName: 'Substack Growth Bot',
+        description: 'Linking newsletter API tokens and drafting drip sequences.',
+        directions: [
+          'Connect Substack API key',
+          'Review queue before enabling auto-post',
+        ],
+        cost: 'Included in bot beta; SEAL usage billed later',
+        disclaimer: 'Content must obey jurisdictional advertising law.',
+      },
+      presale: {
+        featureName: 'Presale Portal',
+        description: 'Validating wallet allowlist and vesting schedule preview.',
+        directions: [
+          'Connect wallet and pass KYC/region gates',
+          'Select tranche and confirm token lockups',
+        ],
+        cost: 'Presale allocations vary per tranche',
+        disclaimer: 'Not an offer to sell securities. Always comply with your local regulations.',
+        extraNote: 'Countdown widget stays visible globally so you never miss go-live.',
+      },
+      docs: {
+        featureName: 'Docs & Change Logs',
+        description: 'Fetching latest on-chain references and integration guides.',
+        directions: [
+          'Use search to filter by stack',
+          'Bookmark frequently used runbooks',
+        ],
+        cost: 'Free access',
+        disclaimer: 'Documentation may describe beta features subject to change.',
+      },
+      web2: {
+        featureName: 'Web2 Integrations',
+        description: 'Loading CRM, analytics, and webhook blueprints.',
+        directions: [
+          'Store secrets in your self-hosted vault',
+          'Review rate limits before syncing',
+        ],
+        cost: 'Usage billed per connector (coming soon)',
+        disclaimer: 'Never paste production API keys into shared demos.',
+      },
+      launchpad: {
+        featureName: 'Rugless Launchpad',
+        description: 'Initializing token launch platform with fair launch mechanics and liquidity matching.',
+        directions: [
+          'Enter token details and supply',
+          'Configure liquidity pool and launch parameters',
+          'Review and execute launch transaction',
+        ],
+        cost: 'Platform fee + network transaction costs',
+        disclaimer: 'Ensure you have proper authority and comply with local regulations.',
+      },
+      'pumpfun-sniper': {
+        featureName: 'Pump.fun AI Sniper',
+        description: 'Real-time token launch detection with AI-powered analysis and automated sniping.',
+        directions: [
+          'Start the stream to detect new token launches',
+          'AI analyzes each token for sniping opportunities',
+          'Configure auto-snipe settings or manually snipe tokens',
+          'Monitor sniped tokens and track performance',
+        ],
+        cost: 'Transaction fees only (gas costs for snipes)',
+        disclaimer: 'Sniping involves risk. Only invest what you can afford to lose. AI analysis is not financial advice.',
+      },
+      tools: {
+        featureName: 'Developer Dashboard',
+        description: 'Loading developer tools, token management, and automation features.',
+        directions: [
+          'Navigate between launch, management, and analytics tabs',
+          'Use token manager for freeze/thaw/burn operations',
+          'Configure automation bots for marketing',
+        ],
+        cost: 'Free tier available; premium features require SEAL tokens',
+        disclaimer: 'Developer tools require appropriate token authority.',
+      },
+      premium: {
+        featureName: 'Premium Services',
+        description: 'Accessing premium features including wallet management, bundler, and advertising tools.',
+        directions: [
+          'Browse available premium services',
+          'Connect wallet for SEAL token payments',
+          'Activate services as needed',
+        ],
+        cost: 'Varies by service; see pricing page',
+        disclaimer: 'Premium services require SEAL token balance.',
+      },
+      wallets: {
+        featureName: 'Wallet Manager',
+        description: 'Loading wallet management interface for multi-wallet operations.',
+        directions: [
+          'Import or create new wallets',
+          'Manage wallet permissions and access',
+          'Export wallet information securely',
+        ],
+        cost: 'Free for basic wallet management',
+        disclaimer: 'Never share private keys. Store securely offline.',
+      },
+      advertising: {
+        featureName: 'Advertising Bots',
+        description: 'Initializing automated advertising and marketing campaign tools.',
+        directions: [
+          'Configure campaign parameters',
+          'Set budget and targeting options',
+          'Monitor campaign performance',
+        ],
+        cost: 'Campaign-based pricing; see premium services',
+        disclaimer: 'Ensure compliance with advertising regulations.',
+      },
+      social: {
+        featureName: 'Social Features',
+        description: 'Loading social media integration and community management tools.',
+        directions: [
+          'Connect social media accounts',
+          'Configure posting schedules',
+          'Monitor engagement metrics',
+        ],
+        cost: 'Included in premium subscription',
+        disclaimer: 'Respect platform terms of service.',
+      },
+      cybersecurity: {
+        featureName: 'Cybersecurity Dashboard',
+        description: 'Initializing security tools, audit scanners, and vulnerability detection.',
+        directions: [
+          'Run security scans on smart contracts',
+          'Review audit reports and recommendations',
+          'Configure security alerts',
+        ],
+        cost: 'Free for basic scans; advanced audits require payment',
+        disclaimer: 'Security tools are informational; conduct professional audits for production.',
+      },
+      'cyber-playground': {
+        featureName: 'AI Cyber Playground',
+        description: 'Booting AI agents, autonomous trading systems, and intelligent automation.',
+        directions: [
+          'Configure AI agent strategies',
+          'Set risk parameters and limits',
+          'Monitor agent performance in real-time',
+        ],
+        cost: 'Usage-based pricing; see AI services section',
+        disclaimer: 'AI agents execute real transactions. Set appropriate limits.',
+      },
+      admin: {
+        featureName: 'Admin Analytics',
+        description: 'Loading administrative dashboard with platform metrics and user analytics.',
+        directions: [
+          'View platform usage statistics',
+          'Monitor system health and performance',
+          'Access administrative controls',
+        ],
+        cost: 'Admin access only',
+        disclaimer: 'Administrative access requires proper authorization.',
+      },
+      'rent-reclaimer': {
+        featureName: 'Rent Reclaimer',
+        description: 'Initializing tool to reclaim rent from closed accounts and optimize SOL usage.',
+        directions: [
+          'Scan for accounts eligible for rent reclamation',
+          'Review potential SOL recovery',
+          'Execute batch reclamation transactions',
+        ],
+        cost: 'Transaction fees only',
+        disclaimer: 'Reclaiming rent closes accounts permanently. Verify before executing.',
+      },
+      faucet: {
+        featureName: 'Devnet Faucet',
+        description: 'Connecting to Solana devnet faucet for test SOL distribution.',
+        directions: [
+          'Enter your devnet wallet address',
+          'Request test SOL for development',
+          'Wait for confirmation and check balance',
+        ],
+        cost: 'Free (devnet only)',
+        disclaimer: 'Devnet SOL has no real value. Use only for testing.',
+      },
+      'tools-hub': {
+        featureName: 'Tools Hub',
+        description: 'Loading centralized hub for all developer tools and utilities.',
+        directions: [
+          'Browse available tools and services',
+          'Navigate to specific tools from the hub',
+          'Access quick actions and shortcuts',
+        ],
+        cost: 'Free access',
+        disclaimer: 'Tools may have individual usage costs.',
+      },
+      charts: {
+        featureName: 'Charts & Visualizations',
+        description: 'Loading market analytics, price charts, and on-chain data visualizations.',
+        directions: [
+          'Select tokens or pools to analyze',
+          'Customize chart timeframes and metrics',
+          'Export data for further analysis',
+        ],
+        cost: 'Free for basic charts; premium data requires subscription',
+        disclaimer: 'Charts are for informational purposes only.',
+      },
+      revenue: {
+        featureName: 'Pricing & Revenue',
+        description: 'Loading pricing information, revenue dashboard, and subscription management.',
+        directions: [
+          'View service pricing and tiers',
+          'Check subscription status and usage',
+          'Manage payment methods and billing',
+        ],
+        cost: 'Varies by service tier',
+        disclaimer: 'Pricing subject to change. Check current rates.',
+      },
+      'quick-launch': {
+        featureName: 'Quick Launch',
+        description: 'Initializing simplified token launch interface for rapid deployment.',
+        directions: [
+          'Enter token name and symbol',
+          'Configure basic launch parameters',
+          'Execute launch with one click',
+        ],
+        cost: 'Platform fee + network costs',
+        disclaimer: 'Quick launch uses default settings. Review before executing.',
+      },
+      'marketing-bot': {
+        featureName: 'Marketing Bot',
+        description: 'Loading AI-powered marketing automation with multi-platform posting.',
+        directions: [
+          'Select campaign mood and frequency',
+          'Connect social media accounts',
+          'Start automated posting campaign',
+        ],
+        cost: 'Credits per post; see pricing',
+        disclaimer: 'Ensure social accounts are properly configured before starting.',
+      },
+      simulation: {
+        featureName: 'Transaction Simulator',
+        description: 'Preparing state-diff simulator for transaction testing and validation.',
+        directions: [
+          'Load transaction draft',
+          'Run simulation and review state changes',
+          'Export simulation results',
+        ],
+        cost: 'Free for basic simulations',
+        disclaimer: 'Simulations are estimates; actual execution may vary.',
+      },
+      exporter: {
+        featureName: 'Code Exporter',
+        description: 'Loading code generation tools for exporting transactions to various formats.',
+        directions: [
+          'Select export format (JS, Rust, Python, etc.)',
+          'Configure code generation options',
+          'Copy or download generated code',
+        ],
+        cost: 'Free for basic exports',
+        disclaimer: 'Generated code should be reviewed before use in production.',
+      },
+      attestation: {
+        featureName: 'VeriSol Attestation',
+        description: 'Initializing smart contract verification and attestation tools.',
+        directions: [
+          'Upload contract source code',
+          'Run verification checks',
+          'Generate attestation certificates',
+        ],
+        cost: 'Free for basic verification',
+        disclaimer: 'Attestations are not a substitute for professional audits.',
+      },
+      'rd-console': {
+        featureName: 'R&D Console',
+        description: 'Opening research and development console for advanced experimentation.',
+        directions: [
+          'Access experimental features',
+          'Run custom scripts and commands',
+          'Monitor system logs and diagnostics',
+        ],
+        cost: 'Free access',
+        disclaimer: 'R&D features may be unstable. Use with caution.',
+      },
+      'freelance-devs': {
+        featureName: 'Developer Community',
+        description: 'Loading developer marketplace and freelance developer directory.',
+        directions: [
+          'Browse available developers',
+          'Post project requirements',
+          'Connect with developers',
+        ],
+        cost: 'Platform fees apply',
+        disclaimer: 'Verify developer credentials before engaging.',
+      },
+    };
+
+    return contextMap[activeView] ?? baseContext;
+  }, [activeView]);
+
   let content: React.ReactNode;
 
   if (currentScreen === 'landing') {
@@ -1491,415 +1949,7 @@ function AppContent() {
       }
     };
 
-    const getLoadingContext = (): LoaderContextInfo => {
-      const bundlerCost = `${SEAL_TOKEN_ECONOMICS.pricing.bundler_multi_send.toLocaleString()} SEAL per bundle + ${SEAL_TOKEN_ECONOMICS.pricing.bundler_recipient} SEAL per recipient`;
-      const twitterCost = `${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.twitter_bot_monthly.toLocaleString()} SEAL monthly`;
-      const telegramCost = `${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_setup.toLocaleString()} SEAL setup / ${SEAL_TOKEN_ECONOMICS.pricing.telegram_bot_monthly.toLocaleString()} SEAL monthly`;
-      const builderCost = `${SEAL_TOKEN_ECONOMICS.pricing.advanced_transaction.toLocaleString()} SEAL per advanced build`;
-      const scannerCost = `${SEAL_TOKEN_ECONOMICS.pricing.scanner_scan.toLocaleString()} SEAL per scan`;
-
-      const baseContext: LoaderContextInfo = {
-        featureName: 'Sealevel Studio',
-        description: 'Spinning up your workspace with wallet, network, and AI assistants.',
-        directions: [
-          'Connect a wallet or stay in read-only mode',
-          'Select Devnet or Mainnet RPC access',
-        ],
-        cost: 'Free tier usage (limits apply)',
-        disclaimer: 'Experimental tooling. Verify all addresses before signing.',
-      };
-
-      const contextMap: Record<string, LoaderContextInfo> = {
-        inspector: {
-          featureName: 'Account Inspector',
-          description: 'Fetching account data, lamport balances, and token state.',
-          directions: [
-            'Paste or select an address',
-            'Use history panel to compare snapshots',
-          ],
-          disclaimer: 'Data is fetched directly from Solana RPC endpoints.',
-        },
-        builder: {
-          featureName: 'Instruction Builder',
-          description: 'Preparing programmable transaction templates with guardrails.',
-          directions: [
-            'Select a program + instruction',
-            'Fill required accounts & args, then export or simulate',
-          ],
-          cost: builderCost,
-          disclaimer: 'Transactions execute on-chain; double check keys before sending.',
-        },
-        scanner: {
-          featureName: 'Arbitrage Scanner',
-          description: 'Booting price oracles, MEV defenses, and liquidity watchers.',
-          directions: [
-            'Select pools or let AI suggest routes',
-            'Configure alert thresholds & auto-trading rules',
-          ],
-          cost: scannerCost,
-          disclaimer: 'Signals are informational, not trading advice.',
-        },
-        bundler: {
-          featureName: 'Transaction Bundler',
-          description: 'Loading multi-send builder with size estimator and wallet registry.',
-          directions: [
-            'Connect wallet & paste recipient list',
-            'Estimate size before broadcast',
-          ],
-          cost: bundlerCost,
-          disclaimer: 'Multi-sends are irreversible. Ensure you comply with sanctions & AML laws.',
-        },
-        'twitter-bot': {
-          featureName: 'Twitter Automation Bot',
-          description: 'Linking OAuth session, scheduling queue, and AI agent policies.',
-          directions: [
-            'Authenticate with Twitter and scope permissions',
-            'Draft content or configure autonomous agent cadence',
-          ],
-          cost: twitterCost,
-          disclaimer: 'Respect platform policies and local communications law; logs are locally stored.',
-        },
-        'telegram-bot': {
-          featureName: 'Telegram Command Center',
-          description: 'Bootstrapping bot token storage and responder flows.',
-          directions: [
-            'Provide BotFather token securely',
-            'Map commands to playbooks before activating',
-          ],
-          cost: telegramCost,
-          disclaimer: 'Never spam or violate telecom regulations. You are responsible for distribution.',
-        },
-        'service-bot': {
-          featureName: 'AI Service Desk',
-          description: 'Preparing customer support macros and compliance guardrails.',
-          directions: [
-            'Select tone + escalation rules',
-            'Feed FAQs or knowledge base links',
-          ],
-          cost: 'Usage billed per resolved session (quote on request)',
-          disclaimer: 'Ensure responses respect privacy laws (GDPR/CCPA etc.).',
-        },
-        'substack-bot': {
-          featureName: 'Substack Growth Bot',
-          description: 'Linking newsletter API tokens and drafting drip sequences.',
-          directions: [
-            'Connect Substack API key',
-            'Review queue before enabling auto-post',
-          ],
-          cost: 'Included in bot beta; SEAL usage billed later',
-          disclaimer: 'Content must obey jurisdictional advertising law.',
-        },
-        presale: {
-          featureName: 'Presale Portal',
-          description: 'Validating wallet allowlist and vesting schedule preview.',
-          directions: [
-            'Connect wallet and pass KYC/region gates',
-            'Select tranche and confirm token lockups',
-          ],
-          cost: 'Presale allocations vary per tranche',
-          disclaimer: 'Not an offer to sell securities. Always comply with your local regulations.',
-          extraNote: 'Countdown widget stays visible globally so you never miss go-live.',
-        },
-        docs: {
-          featureName: 'Docs & Change Logs',
-          description: 'Fetching latest on-chain references and integration guides.',
-          directions: [
-            'Use search to filter by stack',
-            'Bookmark frequently used runbooks',
-          ],
-          cost: 'Free access',
-          disclaimer: 'Documentation may describe beta features subject to change.',
-        },
-        web2: {
-          featureName: 'Web2 Integrations',
-          description: 'Loading CRM, analytics, and webhook blueprints.',
-          directions: [
-            'Store secrets in your self-hosted vault',
-            'Review rate limits before syncing',
-          ],
-          cost: 'Usage billed per connector (coming soon)',
-          disclaimer: 'Never paste production API keys into shared demos.',
-        },
-        launchpad: {
-          featureName: 'Rugless Launchpad',
-          description: 'Initializing token launch platform with fair launch mechanics and liquidity matching.',
-          directions: [
-            'Enter token details and supply',
-            'Configure liquidity pool and launch parameters',
-            'Review and execute launch transaction',
-          ],
-          cost: 'Platform fee + network transaction costs',
-          disclaimer: 'Ensure you have proper authority and comply with local regulations.',
-        },
-        'pumpfun-sniper': {
-          featureName: 'Pump.fun AI Sniper',
-          description: 'Real-time token launch detection with AI-powered analysis and automated sniping.',
-          directions: [
-            'Start the stream to detect new token launches',
-            'AI analyzes each token for sniping opportunities',
-            'Configure auto-snipe settings or manually snipe tokens',
-            'Monitor sniped tokens and track performance',
-          ],
-          cost: 'Transaction fees only (gas costs for snipes)',
-          disclaimer: 'Sniping involves risk. Only invest what you can afford to lose. AI analysis is not financial advice.',
-        },
-        tools: {
-          featureName: 'Developer Dashboard',
-          description: 'Loading developer tools, token management, and automation features.',
-          directions: [
-            'Navigate between launch, management, and analytics tabs',
-            'Use token manager for freeze/thaw/burn operations',
-            'Configure automation bots for marketing',
-          ],
-          cost: 'Free tier available; premium features require SEAL tokens',
-          disclaimer: 'Developer tools require appropriate token authority.',
-        },
-        premium: {
-          featureName: 'Premium Services',
-          description: 'Accessing premium features including wallet management, bundler, and advertising tools.',
-          directions: [
-            'Browse available premium services',
-            'Connect wallet for SEAL token payments',
-            'Activate services as needed',
-          ],
-          cost: 'Varies by service; see pricing page',
-          disclaimer: 'Premium services require SEAL token balance.',
-        },
-        wallets: {
-          featureName: 'Wallet Manager',
-          description: 'Loading wallet management interface for multi-wallet operations.',
-          directions: [
-            'Import or create new wallets',
-            'Manage wallet permissions and access',
-            'Export wallet information securely',
-          ],
-          cost: 'Free for basic wallet management',
-          disclaimer: 'Never share private keys. Store securely offline.',
-        },
-        advertising: {
-          featureName: 'Advertising Bots',
-          description: 'Initializing automated advertising and marketing campaign tools.',
-          directions: [
-            'Configure campaign parameters',
-            'Set budget and targeting options',
-            'Monitor campaign performance',
-          ],
-          cost: 'Campaign-based pricing; see premium services',
-          disclaimer: 'Ensure compliance with advertising regulations.',
-        },
-        social: {
-          featureName: 'Social Features',
-          description: 'Loading social media integration and community management tools.',
-          directions: [
-            'Connect social media accounts',
-            'Configure posting schedules',
-            'Monitor engagement metrics',
-          ],
-          cost: 'Included in premium subscription',
-          disclaimer: 'Respect platform terms of service.',
-        },
-        cybersecurity: {
-          featureName: 'Cybersecurity Dashboard',
-          description: 'Initializing security tools, audit scanners, and vulnerability detection.',
-          directions: [
-            'Run security scans on smart contracts',
-            'Review audit reports and recommendations',
-            'Configure security alerts',
-          ],
-          cost: 'Free for basic scans; advanced audits require payment',
-          disclaimer: 'Security tools are informational; conduct professional audits for production.',
-        },
-        'cyber-playground': {
-          featureName: 'AI Cyber Playground',
-          description: 'Booting AI agents, autonomous trading systems, and intelligent automation.',
-          directions: [
-            'Configure AI agent strategies',
-            'Set risk parameters and limits',
-            'Monitor agent performance in real-time',
-          ],
-          cost: 'Usage-based pricing; see AI services section',
-          disclaimer: 'AI agents execute real transactions. Set appropriate limits.',
-        },
-        admin: {
-          featureName: 'Admin Analytics',
-          description: 'Loading administrative dashboard with platform metrics and user analytics.',
-          directions: [
-            'View platform usage statistics',
-            'Monitor system health and performance',
-            'Access administrative controls',
-          ],
-          cost: 'Admin access only',
-          disclaimer: 'Administrative access requires proper authorization.',
-        },
-        'rent-reclaimer': {
-          featureName: 'Rent Reclaimer',
-          description: 'Initializing tool to reclaim rent from closed accounts and optimize SOL usage.',
-          directions: [
-            'Scan for accounts eligible for rent reclamation',
-            'Review potential SOL recovery',
-            'Execute batch reclamation transactions',
-          ],
-          cost: 'Transaction fees only',
-          disclaimer: 'Reclaiming rent closes accounts permanently. Verify before executing.',
-        },
-        faucet: {
-          featureName: 'Devnet Faucet',
-          description: 'Connecting to Solana devnet faucet for test SOL distribution.',
-          directions: [
-            'Enter your devnet wallet address',
-            'Request test SOL for development',
-            'Wait for confirmation and check balance',
-          ],
-          cost: 'Free (devnet only)',
-          disclaimer: 'Devnet SOL has no real value. Use only for testing.',
-        },
-        'tools-hub': {
-          featureName: 'Tools Hub',
-          description: 'Loading centralized hub for all developer tools and utilities.',
-          directions: [
-            'Browse available tools and services',
-            'Navigate to specific tools from the hub',
-            'Access quick actions and shortcuts',
-          ],
-          cost: 'Free access',
-          disclaimer: 'Tools may have individual usage costs.',
-        },
-        charts: {
-          featureName: 'Charts & Visualizations',
-          description: 'Loading market analytics, price charts, and on-chain data visualizations.',
-          directions: [
-            'Select tokens or pools to analyze',
-            'Customize chart timeframes and metrics',
-            'Export data for further analysis',
-          ],
-          cost: 'Free for basic charts; premium data requires subscription',
-          disclaimer: 'Charts are for informational purposes only.',
-        },
-        revenue: {
-          featureName: 'Pricing & Revenue',
-          description: 'Loading pricing information, revenue dashboard, and subscription management.',
-          directions: [
-            'View service pricing and tiers',
-            'Check subscription status and usage',
-            'Manage payment methods and billing',
-          ],
-          cost: 'Varies by service tier',
-          disclaimer: 'Pricing subject to change. Check current rates.',
-        },
-        'quick-launch': {
-          featureName: 'Quick Launch',
-          description: 'Initializing simplified token launch interface for rapid deployment.',
-          directions: [
-            'Enter token name and symbol',
-            'Configure basic launch parameters',
-            'Execute launch with one click',
-          ],
-          cost: 'Platform fee + network costs',
-          disclaimer: 'Quick launch uses default settings. Review before executing.',
-        },
-        'marketing-bot': {
-          featureName: 'Marketing Bot',
-          description: 'Loading AI-powered marketing automation with multi-platform posting.',
-          directions: [
-            'Select campaign mood and frequency',
-            'Connect social media accounts',
-            'Start automated posting campaign',
-          ],
-          cost: 'Credits per post; see pricing',
-          disclaimer: 'Ensure social accounts are properly configured before starting.',
-        },
-        simulation: {
-          featureName: 'Transaction Simulator',
-          description: 'Preparing state-diff simulator for transaction testing and validation.',
-          directions: [
-            'Load transaction draft',
-            'Run simulation and review state changes',
-            'Export simulation results',
-          ],
-          cost: 'Free for basic simulations',
-          disclaimer: 'Simulations are estimates; actual execution may vary.',
-        },
-        exporter: {
-          featureName: 'Code Exporter',
-          description: 'Loading code generation tools for exporting transactions to various formats.',
-          directions: [
-            'Select export format (JS, Rust, Python, etc.)',
-            'Configure code generation options',
-            'Copy or download generated code',
-          ],
-          cost: 'Free for basic exports',
-          disclaimer: 'Generated code should be reviewed before use in production.',
-        },
-        attestation: {
-          featureName: 'VeriSol Attestation',
-          description: 'Initializing smart contract verification and attestation tools.',
-          directions: [
-            'Upload contract source code',
-            'Run verification checks',
-            'Generate attestation certificates',
-          ],
-          cost: 'Free for basic verification',
-          disclaimer: 'Attestations are not a substitute for professional audits.',
-        },
-        'rd-console': {
-          featureName: 'R&D Console',
-          description: 'Opening research and development console for advanced experimentation.',
-          directions: [
-            'Access experimental features',
-            'Run custom scripts and commands',
-            'Monitor system logs and diagnostics',
-          ],
-          cost: 'Free access',
-          disclaimer: 'R&D features may be unstable. Use with caution.',
-        },
-        'freelance-devs': {
-          featureName: 'Developer Community',
-          description: 'Loading developer marketplace and freelance developer directory.',
-          directions: [
-            'Browse available developers',
-            'Post project requirements',
-            'Connect with developers',
-          ],
-          cost: 'Platform fees apply',
-          disclaimer: 'Verify developer credentials before engaging.',
-        },
-      };
-
-      return contextMap[activeView] ?? baseContext;
-    };
-
-  // Stable callbacks for loader to prevent re-renders
-  const handleLoaderComplete = useCallback(() => {
-    setIsPageLoading(false);
-  }, []);
-
-  const handleLoaderEnter = useCallback(() => {
-    // Stay on current view when entering
-    setIsPageLoading(false);
-  }, []);
-
-  // Map activeView to feature ID for loading screen
-  const getCurrentFeatureId = (view: string): string => {
-      switch (view) {
-        case 'builder':
-          return 'transaction-builder';
-        case 'ai-agents':
-          return 'ai-agents';
-        case 'charts':
-          return 'market-analytics';
-        case 'cybersecurity':
-        case 'cyber-playground':
-          return 'security-tools';
-        case 'twitter-bot':
-        case 'telegram-bot':
-        case 'substack-bot':
-        case 'social':
-          return 'social-features';
-        case 'inspector':
-        default:
-          return 'transaction-builder'; // Default to transaction builder
-      }
-    };
+    // Use the getLoadingContext callback defined at the top of the component
 
     content = (
       <ClientOnly>

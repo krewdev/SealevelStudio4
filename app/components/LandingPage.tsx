@@ -573,16 +573,31 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
               muted
               playsInline
               preload="auto"
-              className="h-32 md:h-40 lg:h-48 w-auto opacity-80"
-              style={{ maxHeight: '192px' }}
+              className="h-32 md:h-40 lg:h-48 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              style={{ maxHeight: '192px', display: 'block' }}
               onError={(e) => {
-                console.error('Video failed to load:', e);
-                e.currentTarget.style.display = 'none';
+                console.error('Logo video failed to load:', e);
+                const videoElement = e.currentTarget as HTMLVideoElement;
+                videoElement.style.display = 'none';
+                // Try to show logo image as fallback
+                const fallbackImg = videoElement.nextElementSibling as HTMLImageElement;
+                if (fallbackImg && fallbackImg.tagName === 'IMG') {
+                  fallbackImg.style.display = 'block';
+                }
+              }}
+              onLoadedData={() => {
+                console.log('Logo video loaded successfully');
               }}
             >
               <source src="/logo-video.mp4" type="video/mp4" />
-              <source src="/logo-video.webm" type="video/webm" />
             </video>
+            {/* Fallback image if video fails */}
+            <img
+              src="/sea-level-logo.png"
+              alt="Sealevel Studio Logo"
+              className="h-32 md:h-40 lg:h-48 w-auto opacity-80 hidden"
+              style={{ maxHeight: '192px', display: 'none' }}
+            />
           </div>
           
           <div className="text-center text-gray-500 mb-4">

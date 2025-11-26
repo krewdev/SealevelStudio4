@@ -90,6 +90,15 @@ export function ToolsHub({ onBack, onNavigateToTool }: ToolsHubProps) {
       badge: 'New',
     },
     {
+      id: 'tools',
+      name: 'Developer Dashboard',
+      description: 'Token launchpad, management, bots, analytics, and DeFi tools',
+      icon: <Code className="w-6 h-6" />,
+      category: 'development',
+      onNavigate: () => onNavigateToTool?.('tools'),
+      badge: 'Pro',
+    },
+    {
       id: 'web2',
       name: 'Web2 Tools',
       description: 'Social media and web2 integration tools',

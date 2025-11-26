@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SealAnimation } from './SealAnimation';
 import {
   Wrench,
@@ -148,19 +148,39 @@ export function FeatureHighlightLoader({
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userReady, setUserReady] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+  const onEnterAppRef = useRef(onEnterApp);
+
+  // Keep refs updated
+  useEffect(() => {
+    onAnimationCompleteRef.current = onAnimationComplete;
+    onEnterAppRef.current = onEnterApp;
+  }, [onAnimationComplete, onEnterApp]);
 
   const handleEnterApp = useCallback(() => {
+    // Clear any pending timers
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     setUserReady(true);
-    setTimeout(() => {
-      setShowLoader(false);
-      if (onAnimationComplete) {
-        onAnimationComplete();
-      }
-      if (onEnterApp) {
-        onEnterApp();
-      }
-    }, 500);
-  }, [onAnimationComplete, onEnterApp]);
+    setShowLoader(false);
+    
+    // Call callbacks immediately
+    if (onAnimationCompleteRef.current) {
+      onAnimationCompleteRef.current();
+    }
+    if (onEnterAppRef.current) {
+      onEnterAppRef.current();
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading) {
@@ -168,32 +188,55 @@ export function FeatureHighlightLoader({
       setProgress(0);
       setUserReady(false);
 
-      // Prevent body scroll when loader is active
-      document.body.style.overflow = 'hidden';
+      // Allow scrolling on loader - don't lock body scroll
 
       // Animate progress bar
       const startTime = Date.now();
-      const interval = setInterval(() => {
+      intervalRef.current = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const newProgress = Math.min((elapsed / duration) * 100, 100);
         setProgress(newProgress);
 
         if (elapsed >= duration) {
-          clearInterval(interval);
-          // Auto-advance after a short delay
-          setTimeout(() => {
-            handleEnterApp();
-          }, 500);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          // Auto-advance immediately
+          handleEnterApp();
         }
       }, 16);
 
+      // Failsafe: Force completion after duration + buffer
+      timeoutRef.current = setTimeout(() => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        handleEnterApp();
+      }, duration + 1000);
+
       return () => {
-        clearInterval(interval);
-        document.body.style.overflow = '';
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
       };
     } else {
+      // Clean up when isLoading becomes false
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       setShowLoader(false);
-      document.body.style.overflow = '';
     }
   }, [isLoading, duration, handleEnterApp]);
 

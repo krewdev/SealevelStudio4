@@ -12,6 +12,7 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
   const videoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>();
   const [useVideo, setUseVideo] = useState(false);
+  const [videoChecked, setVideoChecked] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -158,74 +159,87 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
 
   // Prioritize video over canvas animation
   useEffect(() => {
+    // Always start with canvas, then check for video in the background
+    setUseVideo(false);
+    setVideoChecked(false);
+    
     const checkVideo = async () => {
       try {
-        // Check for MP4 video file
+        // Simple check - try to fetch the video file
         const response = await fetch('/sea-lion-animation.mp4', { method: 'HEAD' });
         if (response.ok) {
           setUseVideo(true);
-          console.log('Using sea lion MP4 animation');
+          setVideoChecked(true);
           return;
         }
 
-        // Fallback to alternate MP4
+        // Try alternate video
         const altResponse = await fetch('/sea-lion-animation.1mp4', { method: 'HEAD' });
         if (altResponse.ok) {
           setUseVideo(true);
-          console.log('Using alternate sea lion MP4 animation');
+          setVideoChecked(true);
           return;
         }
 
-        console.log('MP4 video not found, canvas animation disabled');
+        setVideoChecked(true);
         setUseVideo(false);
       } catch (error) {
-        console.log('Video check failed, canvas animation disabled:', error);
+        setVideoChecked(true);
         setUseVideo(false);
       }
     };
-    checkVideo();
+
+    // Check after a short delay - don't block rendering
+    const timeoutId = setTimeout(checkVideo, 200);
+    return () => clearTimeout(timeoutId);
   }, []);
 
-  // If video is available, use it
-  if (useVideo) {
-    return (
-      <video
-        ref={videoRef}
-        autoPlay
-        loop
-        muted
-        playsInline
-        className={`seal-animation ${className}`}
-        style={{
-          width: size,
-          height: size,
-          display: 'block',
-          filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))',
-          objectFit: 'contain',
-        }}
-        onError={() => {
-          // Fallback to canvas if video fails to load
-          setUseVideo(false);
-        }}
-      >
-        <source src="/sea-lion-animation.mp4" type="video/mp4" />
-        <source src="/sea-lion-animation.webm" type="video/webm" />
-      </video>
-    );
-  }
-
-  // No fallback - use canvas animation
+  // Always render canvas, but hide it when video is available
   return (
     <div className={`relative flex items-center justify-center ${className}`}
          style={{ width: size, height: size }}>
+      {/* Canvas animation - always rendered */}
       <canvas
         ref={canvasRef}
         style={{ 
           width: '100%', 
           height: '100%',
-          display: 'block'
+          display: useVideo && videoChecked ? 'none' : 'block'
         }}
       />
+      
+      {/* Video - shown only when available and checked */}
+      {useVideo && videoChecked && (
+        <video
+          ref={videoRef}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          className="seal-animation"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))',
+            objectFit: 'contain',
+          }}
+          onError={(e) => {
+            console.error('Video failed to load, using canvas animation');
+            setUseVideo(false);
+          }}
+          onLoadedData={() => {
+            console.log('Video loaded and ready to play');
+          }}
+        >
+          <source src="/sea-lion-animation.mp4" type="video/mp4" />
+          <source src="/sea-lion-animation.1mp4" type="video/mp4" />
+        </video>
+      )}
     </div>
   );
 }
