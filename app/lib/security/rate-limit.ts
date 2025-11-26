@@ -67,5 +67,3 @@ setInterval(() => {
   });
 }, 60000); // Run every minute
 
-
-
