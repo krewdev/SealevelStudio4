@@ -30,12 +30,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If no OpenAI key but local AI is available, suggest using local AI endpoint
+    // If no OpenAI key but local AI is available, allow request to proceed (client should handle)
+    // Or if the client specifically requested a model that implies local execution
+    
+    // Only block if NO key and NO local endpoint (handled above)
+    // If we have local endpoint but no key, we should let it through if the client is okay with it
+    // The client-side code should prefer local endpoint if available and no key is set.
+    
+    // If request comes here without apiKey but with localAiEndpoint, we should inform client 
+    // OR if this is a proxy to OpenAI, we can't proxy without a key.
+    // However, if the intention is to use local AI, the CLIENT should call the local endpoint directly, not this proxy.
+    // This route is specifically for OpenAI proxying.
+    
+    // Correction: The original logic was blocking requests even if local AI was available.
+    // If this route is ONLY for OpenAI, then blocking is correct.
+    // But the client might call this to check availability or fallback.
+    
     if (!apiKey && localAiEndpoint) {
       return NextResponse.json(
         { 
           error: 'OpenAI API key not configured',
-          suggestion: `Local AI is available at ${localAiEndpoint}. Consider using the local AI endpoint instead, or set OPENAI_API_KEY for OpenAI support.`,
+          suggestion: `Local AI is available at ${localAiEndpoint}. Please configure the client to use the local endpoint directly.`,
           localAiAvailable: true,
           localAiEndpoint,
           requiresConfiguration: true

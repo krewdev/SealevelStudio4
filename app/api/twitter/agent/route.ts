@@ -107,12 +107,12 @@ export async function POST(request: NextRequest) {
       // Start agent
       state.isRunning = true;
       
-      // Create Twitter client
       // Validate token before creating client
       if (!accessToken || accessToken.length < 10) {
         throw new Error('Invalid access token');
       }
       
+      // Create Twitter client
       const client = new TwitterApi(accessToken);
       
       // Start periodic posting
@@ -263,8 +263,7 @@ async function checkMentions(client: TwitterApi, userId: string, state: any) {
 
     // Get recent mentions using search API
     // Search for tweets mentioning the user
-    const mentions = await client.v2.search({
-      query: `@${username} -is:retweet`,
+    const mentions = await client.v2.search(`@${username} -is:retweet`, {
       max_results: 10,
       'tweet.fields': ['created_at', 'author_id', 'in_reply_to_user_id', 'text'],
     });

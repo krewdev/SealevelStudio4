@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
         post,
         message: 'Post published successfully',
         tweetId: tweet.data.id,
+        url: `https://twitter.com/i/status/${tweet.data.id}`,
       });
     } catch (error) {
       console.error('Twitter API error:', error);

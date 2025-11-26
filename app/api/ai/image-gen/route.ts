@@ -63,7 +63,7 @@ Design requirements:
 
     // Rate limiting check (basic)
     const requestCount = await checkRateLimit(request);
-    if (requestCount > 10) {
+    if (requestCount >= 10) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.' },
         { status: 429 }

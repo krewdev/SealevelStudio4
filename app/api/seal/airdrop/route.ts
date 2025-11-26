@@ -125,15 +125,55 @@ export async function POST(request: NextRequest) {
     seedBuffer = seedBuffer.slice(0, 32);
     const treasuryKeypair = Keypair.fromSeed(seedBuffer);
 
-    // Process airdrop
-    const signature = await airdropSealToBetaTester(
-      connection,
-      treasuryKeypair,
-      walletPubkey
-    );
+    // 5. Final Eligibility Check & Lock (Prevent Concurrency)
+    // Check again and lock immediately to prevent race conditions
+    if (airdropStore.isClaimed(walletAddress)) {
+      return NextResponse.json({ error: 'Airdrop already claimed' }, { status: 403 });
+    }
 
-    // Mark as claimed
-    airdropStore.updateStatus(walletAddress, 'claimed');
+    // Mark as claimed (optimistic lock)
+    // Create or update record to 'claimed' status
+    const existingRecord = airdropStore.get(walletAddress);
+    if (existingRecord) {
+      airdropStore.updateStatus(walletAddress, 'claimed');
+    } else {
+      airdropStore.save({
+        id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`,
+        wallet: walletAddress,
+        amount: 10000,
+        status: 'claimed',
+        requiresCNFT: true,
+        createdAt: new Date().toISOString(),
+        claimedAt: new Date().toISOString()
+      });
+    }
+
+    // Process airdrop
+    let signature;
+    try {
+      signature = await airdropSealToBetaTester(
+        connection,
+        treasuryKeypair,
+        walletPubkey
+      );
+    } catch (error) {
+      // Revert claim status on failure to allow retry
+      if (existingRecord) {
+        airdropStore.updateStatus(walletAddress, 'reserved');
+      } else {
+        // If we created it, set to reserved
+        airdropStore.save({
+          id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`, // ID changes but that's fine
+          wallet: walletAddress,
+          amount: 10000,
+          status: 'reserved',
+          requiresCNFT: true,
+          createdAt: new Date().toISOString(),
+          claimedAt: null
+        });
+      }
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
@@ -185,12 +225,21 @@ export async function GET(request: NextRequest) {
     const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
     checkUrl.searchParams.set('wallet', walletAddress);
     const checkResponse = await fetch(checkUrl.toString());
+    
+    if (!checkResponse.ok) {
+      return NextResponse.json(
+        { error: 'Failed to verify attestation status' },
+        { status: 500 }
+      );
+    }
+    
     const checkData = await checkResponse.json();
 
     const eligible = !isClaimed && checkData.hasAttestation;
     let reason;
     if (isClaimed) reason = 'Already claimed';
     else if (!checkData.hasAttestation) reason = 'Beta Tester Attestation required';
+    else reason = 'Eligible for airdrop';
 
     return NextResponse.json({
       eligible,

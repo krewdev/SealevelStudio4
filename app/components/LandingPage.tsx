@@ -344,11 +344,11 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                   console.error('onGetStarted handler is not defined');
                 }
               }}
-              className={`px-8 py-3 text-base font-medium rounded-lg text-white transition-all shadow-lg cursor-pointer ${
+              className={`px-8 py-3 text-base font-medium rounded-lg text-white transition-all shadow-lg ${
                 selectedChainData
                   ? `${selectedChainData.gradient} hover:opacity-90`
                   : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
-              } focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 hover:shadow-indigo-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+              } focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 hover:shadow-indigo-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer`}
               disabled={!onGetStarted}
             >
               {selectedChainData

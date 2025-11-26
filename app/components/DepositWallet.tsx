@@ -49,8 +49,8 @@ export function DepositWallet({ walletAddress, balance, onRefresh }: DepositWall
     }
     // SEAL token mint (replace with actual SEAL mint address)
     return network === 'mainnet'
-      ? 'SEAL_TOKEN_MAINNET_MINT' // Replace with actual
-      : 'SEAL_TOKEN_DEVNET_MINT'; // Replace with actual
+      ? 'So11111111111111111111111111111111111111112' // Placeholder: Wrapped SOL (Replace with actual SEAL mint)
+      : 'So11111111111111111111111111111111111111112'; // Placeholder: Wrapped SOL (Replace with actual SEAL mint)
   };
 
   return (

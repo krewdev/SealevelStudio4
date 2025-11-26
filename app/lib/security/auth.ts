@@ -52,3 +52,4 @@ export function verifyTimestampedSignature(
   return verifySignature(timestamp.toString(), signature, walletAddress);
 }
 
+
