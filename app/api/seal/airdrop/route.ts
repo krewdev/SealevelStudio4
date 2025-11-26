@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Apply lock
+    // Apply lock early to prevent race conditions
     const existingRecord = airdropStore.get(walletAddress);
     if (existingRecord) {
       airdropStore.updateStatus(walletAddress, 'claimed');

@@ -200,5 +200,3 @@ function generateRecommendations(features: FeatureStatus[]): string[] {
   return recommendations;
 }
 
-
-
