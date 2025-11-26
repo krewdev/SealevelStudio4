@@ -96,14 +96,14 @@ export async function POST(request: NextRequest) {
 
     // Post immediately to Twitter
     try {
-      // TwitterApi with OAuth 2.0 access token
-      // When using OAuth 2.0, pass the access token directly
-      const client = new TwitterApi(accessToken);
-      
       // Validate token format (basic check)
       if (!accessToken || accessToken.length < 10) {
         throw new Error('Invalid access token format');
       }
+
+      // TwitterApi with OAuth 2.0 access token
+      // When using OAuth 2.0, pass the access token directly
+      const client = new TwitterApi(accessToken);
       
       const tweet = await client.v2.tweet(content);
 

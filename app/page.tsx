@@ -1878,16 +1878,6 @@ function AppContent() {
     setIsPageLoading(false);
   }, []);
 
-  // Stable callbacks for loader to prevent re-renders
-  const handleLoaderComplete = useCallback(() => {
-    setIsPageLoading(false);
-  }, []);
-
-  const handleLoaderEnter = useCallback(() => {
-    // Stay on current view when entering
-    setIsPageLoading(false);
-  }, []);
-
   // Map activeView to feature ID for loading screen
   const getCurrentFeatureId = (view: string): string => {
       switch (view) {

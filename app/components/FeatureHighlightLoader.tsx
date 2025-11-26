@@ -149,6 +149,19 @@ export function FeatureHighlightLoader({
   const [progress, setProgress] = useState(0);
   const [userReady, setUserReady] = useState(false);
 
+  const handleEnterApp = useCallback(() => {
+    setUserReady(true);
+    setTimeout(() => {
+      setShowLoader(false);
+      if (onAnimationComplete) {
+        onAnimationComplete();
+      }
+      if (onEnterApp) {
+        onEnterApp();
+      }
+    }, 500);
+  }, [onAnimationComplete, onEnterApp]);
+
   useEffect(() => {
     if (isLoading) {
       setShowLoader(true);
@@ -183,19 +196,6 @@ export function FeatureHighlightLoader({
       document.body.style.overflow = '';
     }
   }, [isLoading, duration, handleEnterApp]);
-
-  const handleEnterApp = useCallback(() => {
-    setUserReady(true);
-    setTimeout(() => {
-      setShowLoader(false);
-      if (onAnimationComplete) {
-        onAnimationComplete();
-      }
-      if (onEnterApp) {
-        onEnterApp();
-      }
-    }, 500);
-  }, [onAnimationComplete, onEnterApp]);
 
   // Handle Enter key press
   useEffect(() => {
