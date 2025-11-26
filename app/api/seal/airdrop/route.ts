@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Check Server-Side Eligibility (Instead of client-side localStorage)
+    // Optimistic Lock: Mark as claimed immediately to prevent race conditions
+    // We will revert this if subsequent checks fail
     const isClaimed = airdropStore.isClaimed(walletAddress);
     if (isClaimed) {
        return NextResponse.json(
@@ -56,13 +58,22 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-
-    // Note: Ideally we check for reservation here too, but since reservation logic
-    // might currently happen client-side in this MVP, we might skip strict reservation check
-    // IF the user proves they have the Beta Tester cNFT (which acts as the "reservation").
-    // However, strictly following the "reservation" model:
-    // if (!airdropStore.hasReservation(walletAddress)) { ... }
-    // For now, let's assume owning the cNFT is sufficient proof of eligibility if not already claimed.
+    
+    // Apply lock
+    const existingRecord = airdropStore.get(walletAddress);
+    if (existingRecord) {
+      airdropStore.updateStatus(walletAddress, 'claimed');
+    } else {
+      airdropStore.save({
+        id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`,
+        wallet: walletAddress,
+        amount: 10000,
+        status: 'claimed',
+        requiresCNFT: true,
+        createdAt: new Date().toISOString(),
+        claimedAt: new Date().toISOString()
+      });
+    }
 
     const walletPubkey = new PublicKey(walletAddress);
 
@@ -75,34 +86,41 @@ export async function POST(request: NextRequest) {
     const connection = new Connection(rpcUrl, 'confirmed');
 
     // 4. Verify Beta Tester cNFT On-Chain (Critical Check)
-    // We reuse the logic or call the check endpoint internally if needed, 
-    // but ideally we verify directly here to avoid internal API call loops.
-    // Since checkAirdropEligibility was client-side, we need a server-side verification.
-    // For MVP, we will trust `airdropSealToBetaTester` to perform necessary checks OR
-    // we should implement `checkBetaTesterCNFT` logic here server-side.
-    // Given `airdropSealToBetaTester` just does the transfer, we MUST verify cNFT ownership here.
-    // Accessing `checkBetaTesterCNFT` logic which fetches from DAS API:
-    
-    // ... (We would call DAS API here to verify cNFT ownership) ...
-    // For safety, let's assume we call the check endpoint internally or import a helper.
-    // Since we can't easily import the client-side helper, let's mock the check 
-    // or rely on the previous design where the client proves it. 
-    // BUT trusting the client is bad.
-    // Let's verify via an internal fetch to our own API which handles the DAS lookup.
-    
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
-    checkUrl.searchParams.set('wallet', walletAddress);
-    const checkResponse = await fetch(checkUrl.toString());
-    
-    if (!checkResponse.ok) {
-        return NextResponse.json({ error: 'Failed to verify attestation' }, { status: 500 });
+    try {
+        // Construct absolute URL for internal fetch
+        const host = request.headers.get('host') || 'localhost:3000';
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+        const baseUrl = `${protocol}://${host}`;
+        
+        const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
+        checkUrl.searchParams.set('wallet', walletAddress);
+        const checkResponse = await fetch(checkUrl.toString());
+        
+        if (!checkResponse.ok) {
+            throw new Error('Failed to verify attestation');
+        }
+        const checkData = await checkResponse.json();
+        if (!checkData.hasAttestation) {
+            throw new Error('Beta Tester Attestation not found');
+        }
+    } catch (error) {
+        // Revert lock if verification fails
+        if (existingRecord) {
+            airdropStore.updateStatus(walletAddress, 'reserved');
+        } else {
+            // If we created it, set to reserved (or we could delete it, but reserved is safer for tracking)
+            airdropStore.save({
+                id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`,
+                wallet: walletAddress,
+                amount: 10000,
+                status: 'reserved',
+                requiresCNFT: true,
+                createdAt: new Date().toISOString(),
+                claimedAt: null
+            });
+        }
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Verification failed' }, { status: 403 });
     }
-    const checkData = await checkResponse.json();
-    if (!checkData.hasAttestation) {
-        return NextResponse.json({ error: 'Beta Tester Attestation not found' }, { status: 403 });
-    }
-
 
     // Get treasury wallet (from environment or secure storage)
     // WARNING: In production, treasury keypair should be stored securely (HSM, AWS KMS, etc.)
@@ -125,28 +143,8 @@ export async function POST(request: NextRequest) {
     seedBuffer = seedBuffer.slice(0, 32);
     const treasuryKeypair = Keypair.fromSeed(seedBuffer);
 
-    // 5. Final Eligibility Check & Lock (Prevent Concurrency)
-    // Check again and lock immediately to prevent race conditions
-    if (airdropStore.isClaimed(walletAddress)) {
-      return NextResponse.json({ error: 'Airdrop already claimed' }, { status: 403 });
-    }
-
-    // Mark as claimed (optimistic lock)
-    // Create or update record to 'claimed' status
-    const existingRecord = airdropStore.get(walletAddress);
-    if (existingRecord) {
-      airdropStore.updateStatus(walletAddress, 'claimed');
-    } else {
-      airdropStore.save({
-        id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`,
-        wallet: walletAddress,
-        amount: 10000,
-        status: 'claimed',
-        requiresCNFT: true,
-        createdAt: new Date().toISOString(),
-        claimedAt: new Date().toISOString()
-      });
-    }
+    // 5. Proceed with Transfer
+    // (Lock already applied in step 3)
 
     // Process airdrop
     let signature;
@@ -221,7 +219,10 @@ export async function GET(request: NextRequest) {
     const isClaimed = airdropStore.isClaimed(walletAddress);
     
     // Verify cNFT ownership
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const host = request.headers.get('host') || 'localhost:3000';
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${host}`;
+    
     const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
     checkUrl.searchParams.set('wallet', walletAddress);
     const checkResponse = await fetch(checkUrl.toString());

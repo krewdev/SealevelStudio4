@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
           <script>
             window.opener.postMessage({
               type: 'TWITTER_OAUTH_ERROR',
-              error: '${error}'
+              error: ${JSON.stringify(error)}
             }, '${baseUrl}');
             window.close();
           </script>
@@ -119,8 +119,8 @@ export async function GET(request: NextRequest) {
           <script>
             window.opener.postMessage({
               type: 'TWITTER_OAUTH_SUCCESS',
-              username: '${username || ''}',
-              walletAddress: '${walletAddress || ''}'
+              username: ${JSON.stringify(username || '')},
+              walletAddress: ${JSON.stringify(walletAddress || '')}
             }, '${baseUrl}');
             window.close();
           </script>
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
           <script>
             window.opener.postMessage({
               type: 'TWITTER_OAUTH_ERROR',
-              error: '${error instanceof Error ? error.message : 'auth_failed'}'
+              error: ${JSON.stringify(error instanceof Error ? error.message : 'auth_failed')}
             }, '${baseUrl}');
             window.close();
           </script>
