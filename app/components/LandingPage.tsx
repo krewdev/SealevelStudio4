@@ -378,12 +378,13 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
           <div className="container mx-auto max-w-5xl px-6">
             <div className="relative w-full rounded-xl overflow-hidden bg-gray-800/50 shadow-2xl" style={{ paddingBottom: '56.25%' }}> {/* 16:9 aspect ratio */}
               {videoError ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8 bg-gray-800/50 rounded-xl">
                   <svg className="w-16 h-16 mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                   <p className="text-lg font-medium mb-2">Video failed to load</p>
-                  <p className="text-sm text-gray-500">Please check that the video file exists in the public folder</p>
+                  <p className="text-sm text-gray-500 mb-4">The video file appears to be empty or corrupted (0 bytes)</p>
+                  <p className="text-xs text-gray-600">Please replace <code className="bg-gray-700 px-2 py-1 rounded">/public/grok-video-d0f651af-8841-4f46-a92b-698254578a6c.mp4</code> with a valid video file</p>
                 </div>
               ) : (
                 <>
@@ -406,6 +407,26 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
                       console.error('Video failed to load:', e);
+                      const video = e.currentTarget;
+                      const error = video.error;
+                      if (error) {
+                        let errorMessage = 'Unknown error';
+                        switch (error.code) {
+                          case error.MEDIA_ERR_ABORTED:
+                            errorMessage = 'Video loading was aborted';
+                            break;
+                          case error.MEDIA_ERR_NETWORK:
+                            errorMessage = 'Network error while loading video';
+                            break;
+                          case error.MEDIA_ERR_DECODE:
+                            errorMessage = 'Video decoding error (file may be corrupted)';
+                            break;
+                          case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            errorMessage = 'Video format not supported or file not found';
+                            break;
+                        }
+                        console.error('Video error details:', errorMessage, error);
+                      }
                       setVideoError(true);
                       setVideoLoading(false);
                     }}
@@ -426,7 +447,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                       setVideoLoading(false);
                     }}
                   >
-                    <source src="/grok-video-d0f651af-8841-4f46-a92b-698254578a6c.mp4" type="video/mp4" />
+                    <source src="/gemini_generated_video_EBF488F6.MP4" type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
                 </>

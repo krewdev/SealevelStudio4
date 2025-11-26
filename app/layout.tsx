@@ -51,7 +51,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
         {/* Preload landing page video for instant playback */}
-        <link rel="preload" href="/grok-video-d0f651af-8841-4f46-a92b-698254578a6c.mp4" as="video" type="video/mp4" />
+        <link rel="preload" href="/gemini_generated_video_EBF488F6.MP4" as="video" type="video/mp4" />
       </head>
       <body className={`${inter.className} bg-gray-900 text-gray-100 antialiased`} suppressHydrationWarning>
         <ChunkErrorHandler />
