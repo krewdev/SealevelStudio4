@@ -96,7 +96,15 @@ export async function POST(request: NextRequest) {
 
     // Post immediately to Twitter
     try {
+      // Validate token format (basic check)
+      if (!accessToken || accessToken.length < 10) {
+        throw new Error('Invalid access token format');
+      }
+
+      // TwitterApi with OAuth 2.0 access token
+      // When using OAuth 2.0, pass the access token directly
       const client = new TwitterApi(accessToken);
+      
       const tweet = await client.v2.tweet(content);
 
       const post: TwitterPost = {
@@ -111,13 +119,30 @@ export async function POST(request: NextRequest) {
         post,
         message: 'Post published successfully',
         tweetId: tweet.data.id,
+        url: `https://twitter.com/i/status/${tweet.data.id}`,
       });
     } catch (error) {
       console.error('Twitter API error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to post to Twitter';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // Check for common Twitter API errors
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          errorMessage = 'Twitter authentication expired. Please log in again.';
+        } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          errorMessage = 'Twitter API access denied. Check your app permissions.';
+        } else if (error.message.includes('429') || error.message.includes('rate limit')) {
+          errorMessage = 'Twitter rate limit exceeded. Please wait before posting again.';
+        }
+      }
+      
       return NextResponse.json(
         {
-          error: error instanceof Error ? error.message : 'Failed to post to Twitter',
+          error: errorMessage,
           success: false,
+          details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : String(error)) : undefined,
         },
         { status: 500 }
       );

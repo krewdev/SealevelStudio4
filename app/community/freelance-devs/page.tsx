@@ -21,6 +21,7 @@ import {
   Bookmark,
   Flag
 } from 'lucide-react';
+import { LogoWatermark } from '@/app/components/LogoWatermark';
 
 interface ForumPost {
   id: string;
@@ -153,9 +154,12 @@ export default function FreelanceDevsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gray-900 text-white relative">
+      {/* Logo Watermark */}
+      <LogoWatermark opacity={0.03} position="center right" scale={0.5} rotation={-5} />
+      
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700">
+      <div className="bg-gray-800 border-b border-gray-700 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -176,7 +180,7 @@ export default function FreelanceDevsPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-gray-800 border-b border-gray-700">
+      <div className="bg-gray-800 border-b border-gray-700 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
             {/* Search */}
@@ -211,7 +215,7 @@ export default function FreelanceDevsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-gray-800 border-b border-gray-700">
+      <div className="bg-gray-800 border-b border-gray-700 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
             {[
@@ -238,7 +242,7 @@ export default function FreelanceDevsPage() {
       </div>
 
       {/* Posts List */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         <div className="space-y-4">
           {filteredPosts.map((post) => {
             const config = POST_TYPE_CONFIG[post.type];
@@ -350,7 +354,7 @@ export default function FreelanceDevsPage() {
       </div>
 
       {/* Floating Action Button for Mobile */}
-      <div className="fixed bottom-6 right-6 md:hidden">
+      <div className="fixed bottom-6 right-6 md:hidden z-20">
         <button className="w-14 h-14 bg-purple-600 hover:bg-purple-700 rounded-full flex items-center justify-center shadow-lg transition-colors">
           <Plus className="w-6 h-6 text-white" />
         </button>

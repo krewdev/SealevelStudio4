@@ -47,6 +47,13 @@ export interface AttestationClient {
   getTierForUsage(usageCount: number): number; // Helper to get tier locally
   updateThresholds(tier1: number, tier2: number, tier3: number): Promise<string>;
   revokeAttestation(attestationId: number): Promise<string>;
+  // Presale attestation methods
+  initializePresaleRegistry(merkleTree: PublicKey): Promise<string>;
+  mintPresaleAttestation(
+    solContributed: number, // SOL amount in lamports
+    metadata: AttestationMetadata
+  ): Promise<string>;
+  verifyPresaleEligibility(solContributed: number): Promise<boolean>;
 }
 
 export interface TierInfo {
@@ -368,6 +375,113 @@ export function createAttestationClient(
       //   .rpc();
 
       throw new Error('Program not yet deployed. Please build and deploy the Anchor program first.');
+    },
+
+    async initializePresaleRegistry(merkleTree: PublicKey) {
+      const [presaleRegistry] = PublicKey.findProgramAddressSync(
+        [Buffer.from('presale_registry')],
+        ATTESTATION_PROGRAM_ID
+      );
+
+      const loadedProgram = await loadProgram();
+
+      if (loadedProgram) {
+        try {
+          const tx = await loadedProgram.methods
+            .initializePresaleRegistry(merkleTree)
+            .accounts({
+              presaleRegistry,
+              authority: wallet.publicKey!,
+              systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
+          return tx;
+        } catch (error) {
+          console.error('Error initializing presale registry:', error);
+          throw error;
+        }
+      }
+
+      const deployed = await isProgramDeployed();
+      if (deployed) {
+        throw new Error('Program is deployed but IDL could not be loaded. Please ensure the IDL file exists.');
+      }
+
+      throw new Error('Attestation program not deployed. Please deploy the program first.');
+    },
+
+    async mintPresaleAttestation(solContributed: number, metadata: AttestationMetadata) {
+      const [presaleRegistry] = PublicKey.findProgramAddressSync(
+        [Buffer.from('presale_registry')],
+        ATTESTATION_PROGRAM_ID
+      );
+
+      const loadedProgram = await loadProgram();
+
+      if (loadedProgram) {
+        try {
+          const tx = await loadedProgram.methods
+            .mintPresaleAttestation(
+              new BN(solContributed),
+              {
+                name: metadata.name,
+                symbol: metadata.symbol,
+                uri: metadata.uri,
+                attributes: metadata.attributes.map(attr => ({
+                  traitType: attr.trait_type,
+                  value: attr.value,
+                })),
+              }
+            )
+            .accounts({
+              presaleRegistry,
+              payer: wallet.publicKey!,
+              wallet: wallet.publicKey!,
+              systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
+
+          return tx;
+        } catch (error) {
+          console.error('Error minting presale attestation:', error);
+          throw error;
+        }
+      }
+
+      const deployed = await isProgramDeployed();
+      if (deployed) {
+        throw new Error('Program is deployed but IDL could not be loaded. Please ensure the IDL file exists.');
+      }
+
+      throw new Error('Attestation program not available. Please ensure the program is deployed and IDL is accessible.');
+    },
+
+    async verifyPresaleEligibility(solContributed: number): Promise<boolean> {
+      const [presaleRegistry] = PublicKey.findProgramAddressSync(
+        [Buffer.from('presale_registry')],
+        ATTESTATION_PROGRAM_ID
+      );
+
+      const loadedProgram = await loadProgram();
+
+      if (loadedProgram) {
+        try {
+          const eligible = await loadedProgram.methods
+            .verifyPresaleEligibility(new BN(solContributed))
+            .accounts({
+              presaleRegistry,
+              wallet: wallet.publicKey!,
+            })
+            .view();
+          return eligible as boolean;
+        } catch (error) {
+          console.error('Error verifying presale eligibility:', error);
+          // Fallback to client-side check
+        }
+      }
+
+      // Fallback: check client-side (minimum 0.1 SOL = 100_000_000 lamports)
+      return solContributed >= 100_000_000;
     },
   };
 }

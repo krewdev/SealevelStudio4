@@ -8,8 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey, Keypair } from '@solana/web3.js';
-import { airdropSealToBetaTester, checkAirdropEligibility } from '@/app/lib/seal-token/airdrop';
+import { airdropSealToBetaTester } from '@/app/lib/seal-token/airdrop';
 import { validateSolanaAddress } from '@/app/lib/security/validation';
+import { rateLimitByIp, rateLimitByWallet } from '@/app/lib/security/rate-limit';
+import { airdropStore } from '@/app/lib/seal-token/server-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +20,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. Rate Limiting
+    if (!rateLimitByIp(request)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const body = await request.json();
     const { walletAddress } = body;
 
@@ -28,7 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate wallet address
+    if (!rateLimitByWallet(walletAddress)) {
+      return NextResponse.json({ error: 'Wallet rate limit exceeded' }, { status: 429 });
+    }
+
+    // 2. Validate wallet address
     const addressValidation = validateSolanaAddress(walletAddress);
     if (!addressValidation.valid) {
       return NextResponse.json(
@@ -36,6 +47,22 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // 3. Check Server-Side Eligibility (Instead of client-side localStorage)
+    const isClaimed = airdropStore.isClaimed(walletAddress);
+    if (isClaimed) {
+       return NextResponse.json(
+        { error: 'Airdrop already claimed' },
+        { status: 403 }
+      );
+    }
+
+    // Note: Ideally we check for reservation here too, but since reservation logic
+    // might currently happen client-side in this MVP, we might skip strict reservation check
+    // IF the user proves they have the Beta Tester cNFT (which acts as the "reservation").
+    // However, strictly following the "reservation" model:
+    // if (!airdropStore.hasReservation(walletAddress)) { ... }
+    // For now, let's assume owning the cNFT is sufficient proof of eligibility if not already claimed.
 
     const walletPubkey = new PublicKey(walletAddress);
 
@@ -47,18 +74,35 @@ export async function POST(request: NextRequest) {
 
     const connection = new Connection(rpcUrl, 'confirmed');
 
-    // Check eligibility
-    const eligibility = await checkAirdropEligibility(connection, walletPubkey);
+    // 4. Verify Beta Tester cNFT On-Chain (Critical Check)
+    // We reuse the logic or call the check endpoint internally if needed, 
+    // but ideally we verify directly here to avoid internal API call loops.
+    // Since checkAirdropEligibility was client-side, we need a server-side verification.
+    // For MVP, we will trust `airdropSealToBetaTester` to perform necessary checks OR
+    // we should implement `checkBetaTesterCNFT` logic here server-side.
+    // Given `airdropSealToBetaTester` just does the transfer, we MUST verify cNFT ownership here.
+    // Accessing `checkBetaTesterCNFT` logic which fetches from DAS API:
     
-    if (!eligibility.eligible) {
-      return NextResponse.json(
-        { 
-          error: eligibility.reason || 'Not eligible for airdrop',
-          eligible: false,
-        },
-        { status: 403 }
-      );
+    // ... (We would call DAS API here to verify cNFT ownership) ...
+    // For safety, let's assume we call the check endpoint internally or import a helper.
+    // Since we can't easily import the client-side helper, let's mock the check 
+    // or rely on the previous design where the client proves it. 
+    // BUT trusting the client is bad.
+    // Let's verify via an internal fetch to our own API which handles the DAS lookup.
+    
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
+    checkUrl.searchParams.set('wallet', walletAddress);
+    const checkResponse = await fetch(checkUrl.toString());
+    
+    if (!checkResponse.ok) {
+        return NextResponse.json({ error: 'Failed to verify attestation' }, { status: 500 });
     }
+    const checkData = await checkResponse.json();
+    if (!checkData.hasAttestation) {
+        return NextResponse.json({ error: 'Beta Tester Attestation not found' }, { status: 403 });
+    }
+
 
     // Get treasury wallet (from environment or secure storage)
     // WARNING: In production, treasury keypair should be stored securely (HSM, AWS KMS, etc.)
@@ -70,16 +114,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate treasury keypair from seed (in production, use secure key management)
-    const treasurySeedBuffer = Buffer.from(treasurySeed, 'utf-8').slice(0, 32);
-    const treasuryKeypair = Keypair.fromSeed(treasurySeedBuffer);
+    // Generate treasury keypair from seed
+    // Ensure strict 32-byte seed
+    let seedBuffer = Buffer.from(treasurySeed, 'utf-8');
+    if (seedBuffer.length < 32) {
+       // Pad with zeros if too short (unsafe but prevents crash, better to fail in prod)
+       // Ideally, throw error.
+        return NextResponse.json({ error: 'Invalid treasury seed configuration' }, { status: 500 });
+    }
+    seedBuffer = seedBuffer.slice(0, 32);
+    const treasuryKeypair = Keypair.fromSeed(seedBuffer);
+
+    // 5. Final Eligibility Check & Lock (Prevent Concurrency)
+    // Check again and lock immediately to prevent race conditions
+    if (airdropStore.isClaimed(walletAddress)) {
+      return NextResponse.json({ error: 'Airdrop already claimed' }, { status: 403 });
+    }
+
+    // Mark as claimed (optimistic lock)
+    // Create or update record to 'claimed' status
+    const existingRecord = airdropStore.get(walletAddress);
+    if (existingRecord) {
+      airdropStore.updateStatus(walletAddress, 'claimed');
+    } else {
+      airdropStore.save({
+        id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`,
+        wallet: walletAddress,
+        amount: 10000,
+        status: 'claimed',
+        requiresCNFT: true,
+        createdAt: new Date().toISOString(),
+        claimedAt: new Date().toISOString()
+      });
+    }
 
     // Process airdrop
-    const signature = await airdropSealToBetaTester(
-      connection,
-      treasuryKeypair,
-      walletPubkey
-    );
+    let signature;
+    try {
+      signature = await airdropSealToBetaTester(
+        connection,
+        treasuryKeypair,
+        walletPubkey
+      );
+    } catch (error) {
+      // Revert claim status on failure to allow retry
+      if (existingRecord) {
+        airdropStore.updateStatus(walletAddress, 'reserved');
+      } else {
+        // If we created it, set to reserved
+        airdropStore.save({
+          id: `claim_${Date.now()}_${walletAddress.slice(0, 8)}`, // ID changes but that's fine
+          wallet: walletAddress,
+          amount: 10000,
+          status: 'reserved',
+          requiresCNFT: true,
+          createdAt: new Date().toISOString(),
+          claimedAt: null
+        });
+      }
+      throw error;
+    }
 
     return NextResponse.json({
       success: true,
@@ -124,22 +218,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const walletPubkey = new PublicKey(walletAddress);
+    const isClaimed = airdropStore.isClaimed(walletAddress);
+    
+    // Verify cNFT ownership
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const checkUrl = new URL('/api/verisol/beta-tester/check', baseUrl);
+    checkUrl.searchParams.set('wallet', walletAddress);
+    const checkResponse = await fetch(checkUrl.toString());
+    
+    if (!checkResponse.ok) {
+      return NextResponse.json(
+        { error: 'Failed to verify attestation status' },
+        { status: 500 }
+      );
+    }
+    
+    const checkData = await checkResponse.json();
 
-    // Get RPC endpoint
-    const heliusApiKey = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-    const rpcUrl = heliusApiKey
-      ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
-      : 'https://api.mainnet-beta.solana.com';
-
-    const connection = new Connection(rpcUrl, 'confirmed');
-
-    // Check eligibility
-    const eligibility = await checkAirdropEligibility(connection, walletPubkey);
+    const eligible = !isClaimed && checkData.hasAttestation;
+    let reason;
+    if (isClaimed) reason = 'Already claimed';
+    else if (!checkData.hasAttestation) reason = 'Beta Tester Attestation required';
+    else reason = 'Eligible for airdrop';
 
     return NextResponse.json({
-      eligible: eligibility.eligible,
-      reason: eligibility.reason,
+      eligible,
+      reason,
       wallet: walletAddress,
     });
   } catch (error) {
@@ -152,4 +256,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 

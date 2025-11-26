@@ -99,9 +99,9 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
   ];
 
   return (
-    <div className="min-h-screen animated-bg text-white relative overflow-hidden">
+    <div className="min-h-screen animated-bg text-white relative overflow-y-auto">
       {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-slate-900/20" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -133,7 +133,7 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
         </div>
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 pb-24">
         {/* Hero Section */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full mb-6">

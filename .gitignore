@@ -197,6 +197,7 @@ keypair.json
 .env.production
 .env.staging
 .env.development
+.env.merkle-tree.*
 
 # Debug files #
 ###############
@@ -219,3 +220,13 @@ storybook-static/
 tmp/
 temp/
 .tmp/
+
+# Training data (generated files) #
+####################################
+training-data/*.json
+training-data/*.jsonl
+training-data/*.csv
+
+# Chrome binaries (testing/downloaded) #
+#########################################
+chrome/

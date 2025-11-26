@@ -67,14 +67,26 @@ export function SealPresale({ onBack }: SealPresaleProps) {
   const [stats, setStats] = useState(getPresaleStats(DEFAULT_PRESALE_CONFIG));
   const [buyNotifications, setBuyNotifications] = useState<BuyNotification[]>([]);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [isStarted, setIsStarted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   // Countdown timer
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date().getTime();
+      const startTime = config.startTime.getTime();
       const endTime = config.endTime.getTime();
-      const distance = endTime - now;
+      
+      let targetTime = endTime;
+      let hasStarted = true;
+
+      if (now < startTime) {
+        targetTime = startTime;
+        hasStarted = false;
+      }
+
+      const distance = targetTime - now;
+      setIsStarted(hasStarted);
 
       if (distance > 0) {
         const days = Math.floor(distance / (1000 * 60 * 60 * 24));
@@ -85,6 +97,10 @@ export function SealPresale({ onBack }: SealPresaleProps) {
         setTimeLeft({ days, hours, minutes, seconds });
       } else {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        // If we were waiting for start, switch to started
+        if (!hasStarted) {
+             setIsStarted(true);
+        }
       }
     };
 
@@ -96,7 +112,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [config.endTime]);
+  }, [config.startTime, config.endTime]);
 
   // Mock buy notifications
   useEffect(() => {
@@ -300,7 +316,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
           <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 max-w-md mx-auto mb-8">
             <h2 className="text-xl font-bold mb-4 flex items-center justify-center gap-2">
               <Clock className="text-yellow-400" size={24} />
-              Presale Ends In
+              {isStarted ? 'Presale Ends In' : 'Presale Starts In'}
             </h2>
             <div className="grid grid-cols-4 gap-4">
               <div className="text-center">
@@ -597,10 +613,15 @@ export function SealPresale({ onBack }: SealPresaleProps) {
 
                   <button
                     onClick={handleContribute}
-                    disabled={!connected || !config.isActive || isProcessing || !solAmount || parseFloat(solAmount) <= 0 || (!whitelisted && config.whitelistEnabled)}
+                    disabled={!connected || !config.isActive || isProcessing || !solAmount || parseFloat(solAmount) <= 0 || (!whitelisted && config.whitelistEnabled) || !isStarted}
                     className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-lg transition-all flex items-center justify-center gap-2"
                   >
-                    {isProcessing ? (
+                    {!isStarted ? (
+                      <>
+                        <Clock size={20} />
+                        Presale Not Started
+                      </>
+                    ) : isProcessing ? (
                       <>
                         <Loader2 size={20} className="animate-spin" />
                         Processing...

@@ -1,0 +1,82 @@
+# Railway Ignore File
+# Exclude large directories and files that Railway doesn't need
+
+# Dependencies (Railway installs these)
+node_modules/
+**/node_modules/
+
+# Build outputs (Railway builds these)
+.next/
+out/
+dist/
+build/
+.vercel/
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.merkle-tree.*
+
+# Large media files (if not needed for deployment)
+public/sea-lion-animation*.mp4
+public/sea-lion-animation*.1mp4
+
+# Training data (generated files)
+training-data/*.json
+training-data/*.jsonl
+training-data/*.csv
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Solana/Anchor build artifacts
+target/
+.anchor/
+test-ledger/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache
+.cache/
+.parcel-cache/
+.tmp/
+tmp/
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Documentation builds
+docs/build/
+docs/.vuepress/dist/
+
+# Chrome binaries
+chrome/
+
+# Wallet/keypair files (never upload!)
+*.key
+*.pem
+wallet.json
+keypair.json
+*keypair*.json
+
+

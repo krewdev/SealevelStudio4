@@ -318,13 +318,13 @@ export function CybersecurityDashboard({ onBack }: CybersecurityDashboardProps) 
         )}
 
         {activeTab === 'code-analyzer' && (
-          <div className="h-full">
+          <div className="h-full overflow-y-auto">
             <CybersecurityFinder onBack={() => setActiveTab('overview')} />
           </div>
         )}
 
         {activeTab === 'security-scanner' && (
-          <div className="h-full">
+          <div className="h-full overflow-y-auto">
             <SecurityAI onBack={() => setActiveTab('overview')} />
           </div>
         )}

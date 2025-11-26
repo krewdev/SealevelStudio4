@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search,
   RefreshCw,
@@ -21,6 +21,7 @@ import {
   DollarSign,
   Percent,
   ArrowLeft,
+  Brain,
 } from 'lucide-react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { PoolScanner } from '../lib/pools/scanner';
@@ -39,6 +40,8 @@ import { getUserMessage } from '../lib/error-handling';
 import { AnimatedInput } from './ui/AnimatedInput';
 import { AnimatedSelect } from './ui/AnimatedSelect';
 import { Arbitrage3DVisualization } from './charts/Arbitrage3DVisualization';
+import { useArbitrageAI } from '../hooks/useArbitrageAI';
+import { ArbitrageScanningResults } from '../lib/arbitrage/arbitrage-result-schema';
 
 interface ArbitrageScannerProps {
   onBuildTransaction?: (opportunity: ArbitrageOpportunity) => void;
@@ -63,6 +66,21 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
   const [filterDEX, setFilterDEX] = useState<DEXProtocol | 'all'>('all');
   const [sortBy, setSortBy] = useState<'profit' | 'profitPercent' | 'confidence'>('profit');
   const [selectedOpportunity, setSelectedOpportunity] = useState<ArbitrageOpportunity | null>(null);
+  const [showExecutionModal, setShowExecutionModal] = useState(false);
+  const [pendingOpportunity, setPendingOpportunity] = useState<ArbitrageOpportunity | null>(null);
+  const [aiResults, setAiResults] = useState<ArbitrageScanningResults | null>(null);
+  const [showAIResults, setShowAIResults] = useState(false);
+  const { analyzeScan, isLoading: isAIAnalyzing, error: aiError } = useArbitrageAI();
+  
+  // Capture the opportunity when modal opens to avoid stale closure issues
+  const modalOpportunityRef = useRef<ArbitrageOpportunity | null>(null);
+
+  const handleExecuteClick = (opportunity: ArbitrageOpportunity) => {
+    // Capture the opportunity in a ref when modal opens
+    modalOpportunityRef.current = opportunity;
+    setPendingOpportunity(opportunity);
+    setShowExecutionModal(true);
+  };
 
   // Auto-refresh effect
   useEffect(() => {
@@ -298,6 +316,21 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
     }
   }, []);
 
+  const handleAIAnalysis = useCallback(async () => {
+    if (opportunities.length === 0) {
+      alert('No opportunities to analyze. Please scan first.');
+      return;
+    }
+
+    const results = await analyzeScan(opportunities);
+    if (results) {
+      setAiResults(results);
+      setShowAIResults(true);
+    } else if (aiError) {
+      alert(`AI Analysis Error: ${aiError}`);
+    }
+  }, [opportunities, analyzeScan, aiError]);
+
   return (
     <>
       <UnifiedAIAgents
@@ -398,6 +431,24 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           >
             {config.autoRefresh ? <Pause size={16} /> : <Play size={16} />}
             {config.autoRefresh ? 'Auto' : 'Manual'}
+          </button>
+          <button
+            onClick={handleAIAnalysis}
+            disabled={isAIAnalyzing || opportunities.length === 0}
+            className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 rounded flex items-center gap-2"
+            title={opportunities.length === 0 ? "Scan first to analyze with AI (LM Studio)" : "Analyze results with AI (LM Studio)"}
+          >
+            {isAIAnalyzing ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Brain size={16} />
+                AI Analysis
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -641,7 +692,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleExecute(opp);
+                            handleExecuteClick(opp);
                           }}
                           disabled={executing === opp.id || !wallet.publicKey}
                           className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded text-sm flex items-center gap-1"
@@ -669,13 +720,200 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           opportunity={selectedOpportunity}
           onTrainAI={() => handleTrainAI(selectedOpportunity)}
           onExecute={() => {
-            handleExecute(selectedOpportunity);
+            handleExecuteClick(selectedOpportunity);
             // Don't close automatically, let user see result or close manually
           }}
           onClose={() => setSelectedOpportunity(null)}
         />
       )}
     </div>
+
+      {/* Execution Choice Modal */}
+      {showExecutionModal && pendingOpportunity && (() => {
+        // Capture the opportunity value when modal renders to avoid stale closure
+        const capturedOpportunity = modalOpportunityRef.current || pendingOpportunity;
+        
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 to-blue-500" />
+              
+              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <Zap className="text-yellow-400" />
+                Execute Strategy
+              </h3>
+
+              <div className="mb-6">
+                <div className="bg-slate-800/50 rounded p-3 border border-slate-800 mb-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-400">Profit:</span>
+                    <span className="text-green-400 font-mono">+{capturedOpportunity.profit.toFixed(5)} SOL</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Confidence:</span>
+                    <span className={(capturedOpportunity.confidence || 0) > 0.7 ? "text-green-400" : "text-yellow-400"}>
+                      {((capturedOpportunity.confidence || 0) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-slate-300 text-sm mb-4">
+                  How would you like to proceed with this opportunity?
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      // Use captured opportunity to avoid stale closure
+                      const opp = modalOpportunityRef.current || capturedOpportunity;
+                      if (opp) {
+                        handleExecute(opp);
+                        setShowExecutionModal(false);
+                        modalOpportunityRef.current = null;
+                      }
+                    }}
+                    className="w-full p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg flex items-center justify-between group transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-white/20 p-2 rounded-full">
+                        <Zap size={18} className="text-white" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-bold text-white">Auto-Mode (AI Execute)</div>
+                        <div className="text-[10px] text-white/70">Direct execution with AI monitoring</div>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className="text-white/50 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      // Use captured opportunity to avoid stale closure
+                      const opp = modalOpportunityRef.current || capturedOpportunity;
+                      if (opp) {
+                        handleBuildTransaction(opp);
+                        setShowExecutionModal(false);
+                        modalOpportunityRef.current = null;
+                      }
+                    }}
+                    className="w-full p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg flex items-center justify-between group transition-all"
+                  >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-slate-700 p-2 rounded-full text-teal-400">
+                      <Settings size={18} />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-bold text-slate-200">Send to Builder</div>
+                      <div className="text-[10px] text-slate-500">Customize parameters manually</div>
+                    </div>
+                  </div>
+                    <ArrowRight size={16} className="text-slate-600 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => {
+                      setShowExecutionModal(false);
+                      modalOpportunityRef.current = null;
+                    }}
+                    className="text-slate-500 hover:text-white text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                
+                <div className="mt-4 p-2 bg-yellow-900/20 border border-yellow-900/30 rounded text-[10px] text-yellow-500/70 text-center">
+                   ⚠️ Warning: Auto-Mode executes immediately. Ensure you understand the risks.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* AI Results Modal */}
+      {showAIResults && aiResults && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Brain className="text-purple-400" size={20} />
+                AI Analysis Results
+              </h2>
+              <button
+                onClick={() => setShowAIResults(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Financial Summary */}
+              <div className="bg-slate-800/50 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3">Financial Summary</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-slate-400">SOL Made:</span>
+                    <span className="ml-2 text-green-400 font-bold">{aiResults.financialSummary.solMade.toFixed(6)} SOL</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Net Profit:</span>
+                    <span className="ml-2 text-green-400 font-bold">{aiResults.financialSummary.netSolProfit.toFixed(6)} SOL</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Gas Fees Paid:</span>
+                    <span className="ml-2 text-red-400">{aiResults.financialSummary.gasFeesPaid.toFixed(6)} SOL</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">SOL Deposited:</span>
+                    <span className="ml-2">{aiResults.financialSummary.solDeposited.toFixed(6)} SOL</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Statistics */}
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-teal-400">{aiResults.probableTrades.length}</div>
+                  <div className="text-sm text-slate-400">Opportunities</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-green-400">{aiResults.tradesExecuted.length}</div>
+                  <div className="text-sm text-slate-400">Executed</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-red-400">{aiResults.tradesFailed.length}</div>
+                  <div className="text-sm text-slate-400">Failed</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{aiResults.tradesMissed.length}</div>
+                  <div className="text-sm text-slate-400">Missed</div>
+                </div>
+              </div>
+
+              {/* Should Repeat */}
+              {aiResults.shouldRepeat && (
+                <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="text-yellow-400" size={20} />
+                    <span className="font-semibold">Continue Scanning Recommended</span>
+                  </div>
+                  <p className="text-slate-300 text-sm">{aiResults.repeatReason || 'AI recommends continuing the scan.'}</p>
+                </div>
+              )}
+
+              {/* Raw JSON (collapsible) */}
+              <details className="bg-slate-800/30 rounded-lg">
+                <summary className="p-3 cursor-pointer text-slate-400 hover:text-white">View Full JSON</summary>
+                <pre className="p-4 text-xs overflow-x-auto text-slate-300">
+                  {JSON.stringify(aiResults, null, 2)}
+                </pre>
+              </details>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

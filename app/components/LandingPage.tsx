@@ -198,8 +198,8 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
 
       {/* Hero Section */}
       <main className="pt-24">
-        <section className="relative container mx-auto max-w-7xl px-6 py-20 md:py-32 text-center">
-          <div className="absolute inset-0 max-w-4xl mx-auto h-3/4 -translate-y-1/4 bg-purple-900/40 blur-3xl rounded-full -z-10"></div>
+        <section className="relative container mx-auto max-w-7xl px-6 py-20 md:py-32 text-center" style={{ zIndex: 1 }}>
+          <div className="absolute inset-0 max-w-4xl mx-auto h-3/4 -translate-y-1/4 bg-purple-900/40 blur-3xl rounded-full -z-10 pointer-events-none"></div>
           
           {/* Logo - Centered in Hero */}
           <div className="mb-12 flex justify-center">
@@ -333,28 +333,29 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
             )}
           </div>
 
-          <button 
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Get Started button clicked', { selectedBlockchain, onGetStarted: !!onGetStarted });
-              if (onGetStarted) {
-                onGetStarted(selectedBlockchain || undefined);
-              } else {
-                console.error('onGetStarted handler is not defined');
-              }
-            }}
-            className={`px-8 py-3 text-base font-medium rounded-lg text-white transition-all shadow-lg cursor-pointer ${
-              selectedChainData
-                ? `${selectedChainData.gradient} hover:opacity-90`
-                : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
-            } focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 hover:shadow-indigo-500/30`}
-          >
-            {selectedChainData
-              ? `Get Started on ${selectedChainData.name}`
-              : 'Get Started'}
-          </button>
+          <div className="relative z-10 mt-8">
+            <button 
+              type="button"
+              onClick={() => {
+                console.log('Get Started button clicked', { selectedBlockchain, onGetStarted: !!onGetStarted });
+                if (onGetStarted) {
+                  onGetStarted(selectedBlockchain || undefined);
+                } else {
+                  console.error('onGetStarted handler is not defined');
+                }
+              }}
+              className={`px-8 py-3 text-base font-medium rounded-lg text-white transition-all shadow-lg ${
+                selectedChainData
+                  ? `${selectedChainData.gradient} hover:opacity-90`
+                  : 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700'
+              } focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 hover:shadow-indigo-500/30 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed enabled:cursor-pointer`}
+              disabled={!onGetStarted}
+            >
+              {selectedChainData
+                ? `Get Started on ${selectedChainData.name}`
+                : 'Get Started'}
+            </button>
+          </div>
         </section>
 
         {/* Problem Section */}

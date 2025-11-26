@@ -10,7 +10,7 @@ interface PriceHistory {
   liquidity: number;
 }
 
-interface Prediction {
+export interface Prediction {
   poolId: string;
   tokenPair: string;
   currentPrice: number;

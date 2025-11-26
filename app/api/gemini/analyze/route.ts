@@ -14,8 +14,13 @@ export async function POST(request: NextRequest) {
     
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Gemini API key not configured' },
-        { status: 500 }
+        { 
+          error: 'Gemini API key not configured',
+          suggestion: 'Please set GEMINI_API_KEY in your environment variables, or use local AI for analysis',
+          requiresConfiguration: true,
+          alternative: 'Consider using LOCAL_AI_ENDPOINT for local AI analysis instead'
+        },
+        { status: 503 } // Service Unavailable
       );
     }
 

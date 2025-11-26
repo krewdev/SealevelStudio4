@@ -42,7 +42,7 @@ export interface DirectMessage {
 
 export interface AgentActivity {
   id: string;
-  type: 'post' | 'reply' | 'dm_reply' | 'mention_reply' | 'error';
+  type: 'post' | 'reply' | 'dm_reply' | 'mention_reply' | 'error' | 'agent_start' | 'agent_stop' | 'dm_check' | 'mention_check';
   message: string;
   timestamp: Date;
   success: boolean;

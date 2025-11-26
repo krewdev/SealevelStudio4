@@ -5,10 +5,12 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Wallet, LogOut } from 'lucide-react';
 import { useNetwork } from '../contexts/NetworkContext';
+import { useUser } from '../contexts/UserContext';
 
 export const WalletButton = () => {
   const { publicKey, disconnect, wallet } = useWallet();
   const { network } = useNetwork();
+  const { user, isLoading } = useUser();
 
   // Force wallet to reconnect when network changes
   const handleNetworkSwitch = async () => {
@@ -24,6 +26,13 @@ export const WalletButton = () => {
     }
   };
 
+  // If user has custodial wallet OR is being created, don't show external wallet button
+  // (UserProfileWidget in header handles custodial wallet display)
+  if (user?.walletAddress || isLoading) {
+    return null;
+  }
+
+  // Show external wallet connection options
   if (publicKey) {
     return (
       <div className="flex items-center space-x-2">

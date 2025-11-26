@@ -128,7 +128,7 @@ Want me to help you find specific opportunities?`;
 
     // DeFi Concepts
     if (message.includes('flash loan') || message.includes('flash')) {
-      return `⚡ **Flash Loans Explained**
+      const flashLoanResponse = `⚡ **Flash Loans Explained**
 
 **What are Flash Loans?**
 Unsecured loans that must be borrowed and repaid in the same transaction. Perfect for arbitrage because you only pay if profitable.
@@ -145,12 +145,12 @@ Unsecured loans that must be borrowed and repaid in the same transaction. Perfec
 4. Keep the difference
 
 **Example Arbitrage:**
-```
+\`\`\`
 Borrow 1000 USDC from Kamino
 Swap USDC → SOL on Raydium ($X)
 Swap SOL → USDC on Orca ($Y)
 If Y > X + fees → Profit!
-```
+\`\`\`
 
 **Risks:**
 • Must repay in same block
@@ -158,6 +158,7 @@ If Y > X + fees → Profit!
 • Smart contract exploits
 
 Need help setting up a flash loan strategy?`;
+      return flashLoanResponse;
     }
 
     // Presale/Token Help

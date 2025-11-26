@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { SealAnimation } from './SealAnimation';
 import {
   Wrench,
@@ -14,7 +14,10 @@ import {
   Layers,
   Play,
   ArrowRight,
-  CheckCircle
+  CheckCircle,
+  X,
+  DollarSign,
+  Info
 } from 'lucide-react';
 
 interface Feature {
@@ -27,6 +30,15 @@ interface Feature {
   features: string[];
 }
 
+interface LoaderContext {
+  featureName?: string;
+  description?: string;
+  directions?: string[];
+  cost?: string;
+  disclaimer?: string;
+  extraNote?: string;
+}
+
 interface FeatureHighlightLoaderProps {
   isLoading: boolean;
   duration?: number;
@@ -34,6 +46,7 @@ interface FeatureHighlightLoaderProps {
   onFeatureClick?: (featureId: string) => void;
   onEnterApp?: () => void;
   currentFeature?: string; // The specific feature/page being loaded
+  context?: LoaderContext; // Context info about the page being loaded
 }
 
 const FEATURES: Feature[] = [
@@ -129,40 +142,14 @@ export function FeatureHighlightLoader({
   onAnimationComplete,
   onFeatureClick,
   onEnterApp,
-  currentFeature: currentFeatureId = 'transaction-builder'
+  currentFeature: currentFeatureId = 'transaction-builder',
+  context
 }: FeatureHighlightLoaderProps) {
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userReady, setUserReady] = useState(false);
 
-  useEffect(() => {
-    if (isLoading) {
-      setShowLoader(true);
-      setProgress(0);
-      setUserReady(false);
-
-      // Animate progress bar
-      const startTime = Date.now();
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const newProgress = Math.min((elapsed / duration) * 100, 100);
-        setProgress(newProgress);
-
-        if (elapsed >= duration) {
-          clearInterval(interval);
-          // Don't auto-complete, wait for user interaction
-        }
-      }, 16);
-
-      return () => {
-        clearInterval(interval);
-      };
-    } else {
-      setShowLoader(false);
-    }
-  }, [isLoading, duration]);
-
-  const handleEnterApp = () => {
+  const handleEnterApp = useCallback(() => {
     setUserReady(true);
     setTimeout(() => {
       setShowLoader(false);
@@ -173,7 +160,56 @@ export function FeatureHighlightLoader({
         onEnterApp();
       }
     }, 500);
-  };
+  }, [onAnimationComplete, onEnterApp]);
+
+  useEffect(() => {
+    if (isLoading) {
+      setShowLoader(true);
+      setProgress(0);
+      setUserReady(false);
+
+      // Prevent body scroll when loader is active
+      document.body.style.overflow = 'hidden';
+
+      // Animate progress bar
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const newProgress = Math.min((elapsed / duration) * 100, 100);
+        setProgress(newProgress);
+
+        if (elapsed >= duration) {
+          clearInterval(interval);
+          // Auto-advance after a short delay
+          setTimeout(() => {
+            handleEnterApp();
+          }, 500);
+        }
+      }, 16);
+
+      return () => {
+        clearInterval(interval);
+        document.body.style.overflow = '';
+      };
+    } else {
+      setShowLoader(false);
+      document.body.style.overflow = '';
+    }
+  }, [isLoading, duration, handleEnterApp]);
+
+  // Handle Enter key press
+  useEffect(() => {
+    if (!showLoader) return;
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (progress >= 100 || userReady)) {
+        handleEnterApp();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showLoader, progress, userReady, handleEnterApp]);
 
   const handleFeatureClick = (featureId: string) => {
     if (onFeatureClick) {
@@ -192,13 +228,30 @@ export function FeatureHighlightLoader({
 
   return (
     <div
-      className="fixed inset-0 bg-gray-900/95 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center transition-opacity duration-300"
+      className="fixed inset-0 bg-gray-900/95 backdrop-blur-sm z-[9999] transition-opacity duration-300 overflow-y-auto"
       style={{
         opacity: showLoader ? 1 : 0,
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (progress >= 100 || userReady)) {
+          handleEnterApp();
+        }
+      }}
+      tabIndex={-1}
     >
+      <div className="min-h-screen flex flex-col items-center justify-start md:justify-center py-8 px-4 pb-32">
+      {/* Skip Button - Subtle */}
+      <button
+        onClick={handleEnterApp}
+        className="absolute top-6 right-6 z-20 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800/50 border border-gray-700/50 hover:border-gray-600/50 flex items-center gap-2"
+        title="Skip loading (Enter)"
+      >
+        <X className="h-4 w-4" />
+        <span>Skip</span>
+      </button>
+
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-10">
+      <div className="absolute inset-0 opacity-10 overflow-hidden">
         <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute top-40 right-32 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{animationDelay: '2s'}}></div>
         <div className="absolute bottom-32 left-40 w-72 h-72 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse" style={{animationDelay: '4s'}}></div>
@@ -212,10 +265,10 @@ export function FeatureHighlightLoader({
       {/* Main Title */}
       <div className="text-center mb-8 relative z-10">
         <h1 className="text-4xl font-bold text-white mb-4">
-          Loading {currentFeature.title}
+          Loading {context?.featureName || currentFeature.title}
         </h1>
         <p className="text-xl text-gray-300 mb-2">
-          {currentFeature.description}
+          {context?.description || currentFeature.description}
         </p>
         <p className="text-gray-400">
           Preparing your Solana development environment...
@@ -232,10 +285,10 @@ export function FeatureHighlightLoader({
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white mb-1">
-                {currentFeature.title}
+                {context?.featureName || currentFeature.title}
               </h2>
               <p className="text-gray-300">
-                {currentFeature.description}
+                {context?.description || currentFeature.description}
               </p>
             </div>
           </div>
@@ -277,6 +330,45 @@ export function FeatureHighlightLoader({
             </div>
           </div>
 
+          {/* How to Use & Cost Information */}
+          {(context?.directions || context?.cost) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {context.directions && context.directions.length > 0 && (
+                <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/30">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-white font-medium mb-2">How to Use</h4>
+                      <ul className="space-y-2">
+                        {context.directions.map((direction, idx) => (
+                          <li key={idx} className="text-gray-300 text-sm flex items-start gap-2">
+                            <span className="text-blue-400 mt-1">•</span>
+                            <span>{direction}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {context.cost && (
+                <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/30">
+                  <div className="flex items-start gap-3">
+                    <DollarSign className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-white font-medium mb-2">Cost</h4>
+                      <p className="text-gray-300 text-sm">{context.cost}</p>
+                      {context.disclaimer && (
+                        <p className="text-gray-500 text-xs mt-2 italic">{context.disclaimer}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Fun Fact or Tip */}
           <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/30">
             <div className="flex items-start gap-3">
@@ -286,15 +378,22 @@ export function FeatureHighlightLoader({
                 </svg>
               </div>
               <div>
-                <h4 className="text-white font-medium mb-1">Did you know?</h4>
+                <h4 className="text-white font-medium mb-1">About {context?.featureName || currentFeature.title}</h4>
                 <p className="text-gray-300 text-sm">
-                  {currentFeature.id === 'transaction-builder' && "Sealevel Studio can handle complex multi-instruction transactions that would normally require custom scripts!"}
-                  {currentFeature.id === 'ai-agents' && "Our AI agents can autonomously trade, analyze markets, and manage risk 24/7 without human intervention!"}
-                  {currentFeature.id === 'decentralized-exchange' && "The platform integrates with Jupiter for optimal swap routing across multiple DEXs simultaneously!"}
-                  {currentFeature.id === 'security-tools' && "Advanced smart contract verification can detect vulnerabilities before they cost you money!"}
-                  {currentFeature.id === 'market-analytics' && "Real-time on-chain metrics provide insights that traditional exchanges can't offer!"}
-                  {currentFeature.id === 'social-features' && "Automated social posting helps maintain consistent community engagement across platforms!"}
+                  {context?.description || (
+                    <>
+                      {currentFeature.id === 'transaction-builder' && "Sealevel Studio can handle complex multi-instruction transactions that would normally require custom scripts!"}
+                      {currentFeature.id === 'ai-agents' && "Our AI agents can autonomously trade, analyze markets, and manage risk 24/7 without human intervention!"}
+                      {currentFeature.id === 'decentralized-exchange' && "The platform integrates with Jupiter for optimal swap routing across multiple DEXs simultaneously!"}
+                      {currentFeature.id === 'security-tools' && "Advanced smart contract verification can detect vulnerabilities before they cost you money!"}
+                      {currentFeature.id === 'market-analytics' && "Real-time on-chain metrics provide insights that traditional exchanges can't offer!"}
+                      {currentFeature.id === 'social-features' && "Automated social posting helps maintain consistent community engagement across platforms!"}
+                    </>
+                  )}
                 </p>
+                {context?.extraNote && (
+                  <p className="text-gray-400 text-xs mt-2 italic">{context.extraNote}</p>
+                )}
               </div>
             </div>
           </div>
@@ -322,7 +421,7 @@ export function FeatureHighlightLoader({
       {/* Progress Info */}
       <div className="text-center mb-6 relative z-10">
         <p className="text-gray-400 text-sm">
-          Initializing {currentFeature.title}... {Math.round(progress)}%
+          Initializing {context?.featureName || currentFeature.title}... {Math.round(progress)}%
         </p>
       </div>
 
@@ -340,30 +439,31 @@ export function FeatureHighlightLoader({
           {progress >= 100 || userReady ? (
             <span className="flex items-center gap-3">
               {currentFeature.icon}
-              Launch {currentFeature.title}
+              Launch {context?.featureName || currentFeature.title}
               <ArrowRight className="h-5 w-5" />
             </span>
           ) : (
             <span className="flex items-center gap-3">
               <div className="w-5 h-5 border-2 border-gray-500 border-t-current rounded-full animate-spin"></div>
-              Loading {currentFeature.title}...
+              Loading {context?.featureName || currentFeature.title}...
             </span>
           )}
         </button>
 
         <p className="text-gray-500 text-xs text-center mt-3 max-w-md">
           {progress >= 100 || userReady
-            ? `Ready to explore ${currentFeature.title}!`
+            ? `Ready to explore ${context?.featureName || currentFeature.title}! Press Enter to continue`
             : "Setting up your personalized Solana development environment..."
           }
         </p>
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-center relative z-10">
+      <div className="mt-8 text-center relative z-10">
         <p className="text-gray-600 text-xs">
           Built for the Solana ecosystem • Open source • Community driven
         </p>
+      </div>
       </div>
     </div>
   );

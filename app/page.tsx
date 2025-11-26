@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
 import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket } from 'lucide-react';
@@ -46,6 +46,15 @@ import { DeveloperCommunity } from './components/DeveloperCommunity';
 import { DeveloperDashboard } from './components/DeveloperDashboard';
 import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
 import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
+import { UserProvider } from './contexts/UserContext';
+import { UserProfileWidget } from './components/UserProfileWidget';
+import { SocialConnectButton } from './components/SocialConnectButton';
+import { QuickLaunch } from './components/QuickLaunch';
+import { MarketingBot } from './components/MarketingBot';
+import { RuglessLaunchpad } from './components/RuglessLaunchpad';
+import { PumpFunSniper } from './components/PumpFunSniper';
+import { BleedingEdgeWrapper } from './components/BleedingEdgeWrapper';
+import { PricingBanner } from './components/PricingBanner';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -672,7 +681,7 @@ function Header({
   onBackToLanding?: () => void;
 }) {
   return (
-    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700 px-6 shrink-0">
+    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-xl px-6 shrink-0 shadow-lg shadow-purple-500/5">
       <div className="flex items-center space-x-4">
         {onBackToLanding && (
           <button
@@ -683,25 +692,35 @@ function Header({
           </button>
         )}
         {/* Logo */}
-        <img
-          src="/sea-level-logo.png"
-          alt="Sealevel Studio"
-          className="h-10 w-auto"
-          style={{ maxHeight: '40px' }}
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-        <div className="text-xl font-bold tracking-tighter">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
-            Sealevel Studio
-          </span>
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <img
+              src="/sea-level-logo.png"
+              alt="Sealevel Studio"
+              className="h-10 w-auto"
+              style={{ maxHeight: '40px' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900 animate-pulse"></div>
+          </div>
+          <div className="text-xl font-bold tracking-tighter">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 animate-gradient">
+              Sealevel Studio
+            </span>
+          </div>
         </div>
       </div>
-      <div className="flex items-center space-x-4">
-        <button className="flex items-center space-x-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 transition-colors relative">
+      <div className="flex items-center space-x-3">
+        {/* Social Connect - Compact */}
+        <SocialConnectButton />
+        
+        {/* Network Selector - Enhanced */}
+        <button className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-700/50 px-4 py-2 text-sm font-medium text-gray-200 hover:from-gray-700 hover:to-gray-600/50 transition-all border border-gray-600/50 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/20 relative group">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
           <span>{networks[network].name}</span>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4 group-hover:text-purple-400 transition-colors" />
           <select
             value={network}
             onChange={(e) => setNetwork(e.target.value as keyof typeof NETWORKS)}
@@ -714,7 +733,14 @@ function Header({
             ))}
           </select>
         </button>
-        {wallet}
+        
+        {/* Wallet Button */}
+        <div className="flex items-center">
+          {wallet}
+        </div>
+        
+        {/* User Profile - Compact Dropdown */}
+        <UserProfileWidget />
       </div>
     </header>
   );
@@ -736,6 +762,9 @@ function Sidebar({
     { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
     { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
+    { id: 'quick-launch', label: 'Quick Launch', icon: <Rocket className="h-4 w-4" />, section: 'core', badge: 'New' },
+    { id: 'pumpfun-sniper', label: 'Pump.fun Sniper', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
+    { id: 'marketing-bot', label: 'Marketing Bot', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
     
     // Revenue
     { id: 'presale', label: 'SEAL Presale', icon: <TrendingUp className="h-4 w-4" />, section: 'revenue', badge: 'Hot' },
@@ -1041,6 +1070,17 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   if (activeView === 'tools') {
     return <DeveloperDashboard onBack={() => setActiveView('inspector')} />;
   }
+
+  // Rugless Launchpad has its own full-screen layout
+  if (activeView === 'launchpad') {
+    return <RuglessLaunchpad onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Pump.fun AI Sniper has its own full-screen layout
+  if (activeView === 'pumpfun-sniper') {
+    return <PumpFunSniper onBack={() => setActiveView('inspector')} />;
+  }
+
   if (activeView === 'premium') {
     return <PremiumServices 
       onBack={() => setActiveView('inspector')} 
@@ -1054,6 +1094,26 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Transaction Bundler has its own full-screen layout
   if (activeView === 'bundler') {
     return <TransactionBundler onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Quick Launch has its own layout
+  if (activeView === 'quick-launch') {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <button onClick={() => setActiveView('inspector')} className="mb-4 text-gray-400 hover:text-white">← Back</button>
+        <QuickLaunch onSuccess={(mint) => console.log('Launched:', mint)} />
+      </div>
+    );
+  }
+
+  // Marketing Bot has its own layout
+  if (activeView === 'marketing-bot') {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <button onClick={() => setActiveView('inspector')} className="mb-4 text-gray-400 hover:text-white">← Back</button>
+        <MarketingBot />
+      </div>
+    );
   }
 
   // Advertising Bots has its own full-screen layout
@@ -1166,6 +1226,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Default single-column layout for other views
   return (
     <>
+      <PricingBanner onNavigateToPricing={() => setActiveView('revenue')} />
       <FreeTrialBanner />
       <main className="flex-1 overflow-y-auto p-6 md:p-8">
         {activeView === 'inspector' && <AccountInspectorView connection={connection} network={network} publicKey={publicKey} />}
@@ -1285,6 +1346,14 @@ interface LoaderContextInfo {
 
 // Main App Component
 export default function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
+  );
+}
+
+function AppContent() {
   // ALL HOOKS MUST BE CALLED AT THE TOP - BEFORE ANY CONDITIONAL RETURNS
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'disclaimer' | 'tutorial' | 'app'>('landing');
   const [isPageLoading, setIsPageLoading] = useState(false);
@@ -1402,7 +1471,7 @@ export default function App() {
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'pumpfun-sniper' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {
@@ -1551,13 +1620,266 @@ export default function App() {
           cost: 'Usage billed per connector (coming soon)',
           disclaimer: 'Never paste production API keys into shared demos.',
         },
+        launchpad: {
+          featureName: 'Rugless Launchpad',
+          description: 'Initializing token launch platform with fair launch mechanics and liquidity matching.',
+          directions: [
+            'Enter token details and supply',
+            'Configure liquidity pool and launch parameters',
+            'Review and execute launch transaction',
+          ],
+          cost: 'Platform fee + network transaction costs',
+          disclaimer: 'Ensure you have proper authority and comply with local regulations.',
+        },
+        'pumpfun-sniper': {
+          featureName: 'Pump.fun AI Sniper',
+          description: 'Real-time token launch detection with AI-powered analysis and automated sniping.',
+          directions: [
+            'Start the stream to detect new token launches',
+            'AI analyzes each token for sniping opportunities',
+            'Configure auto-snipe settings or manually snipe tokens',
+            'Monitor sniped tokens and track performance',
+          ],
+          cost: 'Transaction fees only (gas costs for snipes)',
+          disclaimer: 'Sniping involves risk. Only invest what you can afford to lose. AI analysis is not financial advice.',
+        },
+        tools: {
+          featureName: 'Developer Dashboard',
+          description: 'Loading developer tools, token management, and automation features.',
+          directions: [
+            'Navigate between launch, management, and analytics tabs',
+            'Use token manager for freeze/thaw/burn operations',
+            'Configure automation bots for marketing',
+          ],
+          cost: 'Free tier available; premium features require SEAL tokens',
+          disclaimer: 'Developer tools require appropriate token authority.',
+        },
+        premium: {
+          featureName: 'Premium Services',
+          description: 'Accessing premium features including wallet management, bundler, and advertising tools.',
+          directions: [
+            'Browse available premium services',
+            'Connect wallet for SEAL token payments',
+            'Activate services as needed',
+          ],
+          cost: 'Varies by service; see pricing page',
+          disclaimer: 'Premium services require SEAL token balance.',
+        },
+        wallets: {
+          featureName: 'Wallet Manager',
+          description: 'Loading wallet management interface for multi-wallet operations.',
+          directions: [
+            'Import or create new wallets',
+            'Manage wallet permissions and access',
+            'Export wallet information securely',
+          ],
+          cost: 'Free for basic wallet management',
+          disclaimer: 'Never share private keys. Store securely offline.',
+        },
+        advertising: {
+          featureName: 'Advertising Bots',
+          description: 'Initializing automated advertising and marketing campaign tools.',
+          directions: [
+            'Configure campaign parameters',
+            'Set budget and targeting options',
+            'Monitor campaign performance',
+          ],
+          cost: 'Campaign-based pricing; see premium services',
+          disclaimer: 'Ensure compliance with advertising regulations.',
+        },
+        social: {
+          featureName: 'Social Features',
+          description: 'Loading social media integration and community management tools.',
+          directions: [
+            'Connect social media accounts',
+            'Configure posting schedules',
+            'Monitor engagement metrics',
+          ],
+          cost: 'Included in premium subscription',
+          disclaimer: 'Respect platform terms of service.',
+        },
+        cybersecurity: {
+          featureName: 'Cybersecurity Dashboard',
+          description: 'Initializing security tools, audit scanners, and vulnerability detection.',
+          directions: [
+            'Run security scans on smart contracts',
+            'Review audit reports and recommendations',
+            'Configure security alerts',
+          ],
+          cost: 'Free for basic scans; advanced audits require payment',
+          disclaimer: 'Security tools are informational; conduct professional audits for production.',
+        },
+        'cyber-playground': {
+          featureName: 'AI Cyber Playground',
+          description: 'Booting AI agents, autonomous trading systems, and intelligent automation.',
+          directions: [
+            'Configure AI agent strategies',
+            'Set risk parameters and limits',
+            'Monitor agent performance in real-time',
+          ],
+          cost: 'Usage-based pricing; see AI services section',
+          disclaimer: 'AI agents execute real transactions. Set appropriate limits.',
+        },
+        admin: {
+          featureName: 'Admin Analytics',
+          description: 'Loading administrative dashboard with platform metrics and user analytics.',
+          directions: [
+            'View platform usage statistics',
+            'Monitor system health and performance',
+            'Access administrative controls',
+          ],
+          cost: 'Admin access only',
+          disclaimer: 'Administrative access requires proper authorization.',
+        },
+        'rent-reclaimer': {
+          featureName: 'Rent Reclaimer',
+          description: 'Initializing tool to reclaim rent from closed accounts and optimize SOL usage.',
+          directions: [
+            'Scan for accounts eligible for rent reclamation',
+            'Review potential SOL recovery',
+            'Execute batch reclamation transactions',
+          ],
+          cost: 'Transaction fees only',
+          disclaimer: 'Reclaiming rent closes accounts permanently. Verify before executing.',
+        },
+        faucet: {
+          featureName: 'Devnet Faucet',
+          description: 'Connecting to Solana devnet faucet for test SOL distribution.',
+          directions: [
+            'Enter your devnet wallet address',
+            'Request test SOL for development',
+            'Wait for confirmation and check balance',
+          ],
+          cost: 'Free (devnet only)',
+          disclaimer: 'Devnet SOL has no real value. Use only for testing.',
+        },
+        'tools-hub': {
+          featureName: 'Tools Hub',
+          description: 'Loading centralized hub for all developer tools and utilities.',
+          directions: [
+            'Browse available tools and services',
+            'Navigate to specific tools from the hub',
+            'Access quick actions and shortcuts',
+          ],
+          cost: 'Free access',
+          disclaimer: 'Tools may have individual usage costs.',
+        },
+        charts: {
+          featureName: 'Charts & Visualizations',
+          description: 'Loading market analytics, price charts, and on-chain data visualizations.',
+          directions: [
+            'Select tokens or pools to analyze',
+            'Customize chart timeframes and metrics',
+            'Export data for further analysis',
+          ],
+          cost: 'Free for basic charts; premium data requires subscription',
+          disclaimer: 'Charts are for informational purposes only.',
+        },
+        revenue: {
+          featureName: 'Pricing & Revenue',
+          description: 'Loading pricing information, revenue dashboard, and subscription management.',
+          directions: [
+            'View service pricing and tiers',
+            'Check subscription status and usage',
+            'Manage payment methods and billing',
+          ],
+          cost: 'Varies by service tier',
+          disclaimer: 'Pricing subject to change. Check current rates.',
+        },
+        'quick-launch': {
+          featureName: 'Quick Launch',
+          description: 'Initializing simplified token launch interface for rapid deployment.',
+          directions: [
+            'Enter token name and symbol',
+            'Configure basic launch parameters',
+            'Execute launch with one click',
+          ],
+          cost: 'Platform fee + network costs',
+          disclaimer: 'Quick launch uses default settings. Review before executing.',
+        },
+        'marketing-bot': {
+          featureName: 'Marketing Bot',
+          description: 'Loading AI-powered marketing automation with multi-platform posting.',
+          directions: [
+            'Select campaign mood and frequency',
+            'Connect social media accounts',
+            'Start automated posting campaign',
+          ],
+          cost: 'Credits per post; see pricing',
+          disclaimer: 'Ensure social accounts are properly configured before starting.',
+        },
+        simulation: {
+          featureName: 'Transaction Simulator',
+          description: 'Preparing state-diff simulator for transaction testing and validation.',
+          directions: [
+            'Load transaction draft',
+            'Run simulation and review state changes',
+            'Export simulation results',
+          ],
+          cost: 'Free for basic simulations',
+          disclaimer: 'Simulations are estimates; actual execution may vary.',
+        },
+        exporter: {
+          featureName: 'Code Exporter',
+          description: 'Loading code generation tools for exporting transactions to various formats.',
+          directions: [
+            'Select export format (JS, Rust, Python, etc.)',
+            'Configure code generation options',
+            'Copy or download generated code',
+          ],
+          cost: 'Free for basic exports',
+          disclaimer: 'Generated code should be reviewed before use in production.',
+        },
+        attestation: {
+          featureName: 'VeriSol Attestation',
+          description: 'Initializing smart contract verification and attestation tools.',
+          directions: [
+            'Upload contract source code',
+            'Run verification checks',
+            'Generate attestation certificates',
+          ],
+          cost: 'Free for basic verification',
+          disclaimer: 'Attestations are not a substitute for professional audits.',
+        },
+        'rd-console': {
+          featureName: 'R&D Console',
+          description: 'Opening research and development console for advanced experimentation.',
+          directions: [
+            'Access experimental features',
+            'Run custom scripts and commands',
+            'Monitor system logs and diagnostics',
+          ],
+          cost: 'Free access',
+          disclaimer: 'R&D features may be unstable. Use with caution.',
+        },
+        'freelance-devs': {
+          featureName: 'Developer Community',
+          description: 'Loading developer marketplace and freelance developer directory.',
+          directions: [
+            'Browse available developers',
+            'Post project requirements',
+            'Connect with developers',
+          ],
+          cost: 'Platform fees apply',
+          disclaimer: 'Verify developer credentials before engaging.',
+        },
       };
 
       return contextMap[activeView] ?? baseContext;
     };
 
-    // Map activeView to feature ID for loading screen
-    const getCurrentFeatureId = (view: string): string => {
+  // Stable callbacks for loader to prevent re-renders
+  const handleLoaderComplete = useCallback(() => {
+    setIsPageLoading(false);
+  }, []);
+
+  const handleLoaderEnter = useCallback(() => {
+    // Stay on current view when entering
+    setIsPageLoading(false);
+  }, []);
+
+  // Map activeView to feature ID for loading screen
+  const getCurrentFeatureId = (view: string): string => {
       switch (view) {
         case 'builder':
           return 'transaction-builder';
@@ -1585,8 +1907,9 @@ export default function App() {
         <FeatureHighlightLoader
           isLoading={isPageLoading}
           duration={4000}
-          onAnimationComplete={() => setIsPageLoading(false)}
+          onAnimationComplete={handleLoaderComplete}
           currentFeature={getCurrentFeatureId(activeView)}
+          context={getLoadingContext()}
           onFeatureClick={(featureId) => {
             if (featureId === 'transaction-builder') {
               setActiveView('builder');
@@ -1602,40 +1925,39 @@ export default function App() {
               setActiveView('twitter-bot'); // Start with Twitter bot
             }
           }}
-          onEnterApp={() => {
-            // Stay on current view when entering
-            setIsPageLoading(false);
-          }}
+          onEnterApp={handleLoaderEnter}
         />
         
-        <div className="h-screen flex flex-col bg-gray-900">
-          {!isFullScreenView && (
-            <Header 
-              network={network} 
-              setNetwork={setNetwork} 
-              networks={NETWORKS} 
-              wallet={<WalletButton />}
-              onBackToLanding={handleBackToLanding}
-            />
-          )}
-          
-          <div className="flex-1 flex overflow-hidden">
+        <BleedingEdgeWrapper enabled={true}>
+          <div className="h-screen flex flex-col bg-gray-900">
             {!isFullScreenView && (
-              <Sidebar 
-                activeView={activeView} 
-                setActiveView={setActiveView}
-                onViewChange={() => setIsPageLoading(true)}
+              <Header 
+                network={network} 
+                setNetwork={setNetwork} 
+                networks={NETWORKS} 
+                wallet={<WalletButton />}
+                onBackToLanding={handleBackToLanding}
               />
             )}
-            <MainContent 
-              activeView={activeView}
-              setActiveView={setActiveView}
-              connection={connection} 
-              network={network} 
-              publicKey={publicKey} 
-            />
+            
+            <div className="flex-1 flex overflow-hidden">
+              {!isFullScreenView && (
+                <Sidebar 
+                  activeView={activeView} 
+                  setActiveView={setActiveView}
+                  onViewChange={() => setIsPageLoading(true)}
+                />
+              )}
+              <MainContent 
+                activeView={activeView}
+                setActiveView={setActiveView}
+                connection={connection} 
+                network={network} 
+                publicKey={publicKey} 
+              />
+            </div>
           </div>
-        </div>
+        </BleedingEdgeWrapper>
         
         {/* R&D Console - Floating (always available) */}
         <AdvancedRAndDConsole 

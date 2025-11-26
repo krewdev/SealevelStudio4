@@ -34,6 +34,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
+import { importTransaction } from '../lib/transaction-importer';
 import { PublicKey } from '@solana/web3.js';
 import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { ArbitragePanel } from './ArbitragePanel';
@@ -535,6 +536,40 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   // Arbitrage panel state
   const [showArbitragePanel, setShowArbitragePanel] = useState(false);
 
+  // Import state
+  const [importSignature, setImportSignature] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImport = async () => {
+    if (!importSignature || !connection) return;
+    setIsImporting(true);
+    try {
+      addLog(`Fetching transaction ${importSignature}...`, 'info');
+      const instructions = await importTransaction(connection, importSignature);
+      
+      // Merge with existing or replace? Let's replace for now as "Import" usually implies loading a specific tx.
+      // But to be safe/flexible, maybe append? No, users likely want to edit THAT tx.
+      // Let's append to avoid data loss, or offer choice. For now, append.
+      // Actually, user said "plugged into the builder", usually implies loading that tx state.
+      // Let's append to draft.
+      setTransactionDraft(prev => ({
+        ...prev,
+        instructions: [...prev.instructions, ...instructions]
+      }));
+      
+      setViewMode('advanced'); // Switch to advanced to see the instructions
+      setShowImportModal(false);
+      setImportSignature('');
+      addLog(`Successfully imported ${instructions.length} instructions`, 'success');
+    } catch (e: any) {
+      addLog(`Import failed: ${e.message}`, 'error');
+      console.error(e);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const categories = [
     { id: 'system', name: 'System', icon: '🏠' },
     { id: 'token', name: 'Token', icon: '🪙' },
@@ -904,7 +939,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       const draft: TransactionDraft = {
         instructions,
         priorityFee: 0,
-        memo: `Sealevel Studio - ${new Date().toISOString()}`
+        memo: `sealevelstudios.xyz 🤑`
       };
 
       const transaction = await builder.buildTransaction(draft);
@@ -1384,6 +1419,65 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                               placeholder="Or paste image URL or base64 data URI"
                             />
                           </div>
+                        ) : isAmountField ? (
+                          <div className="space-y-3 pt-2">
+                             <div className="relative group">
+                                <label className="absolute -top-3.5 left-0 text-[9px] text-slate-500 font-mono uppercase tracking-wider">Amount (SOL)</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="0.0"
+                                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-teal-500 focus:outline-none transition-colors"
+                                    value={
+                                      // Only apply lamports conversion for fields that are stored in lamports
+                                      // Fields like 'initialSupply' are stored in SOL, so don't divide
+                                      (value && !isNaN(Number(value)) && (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount'))
+                                        ? (Number(value) / 1000000000).toString()
+                                        : (value && !isNaN(Number(value)) ? value : '')
+                                    }
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === '') {
+                                            updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: '' });
+                                            return;
+                                        }
+                                        // Only convert to lamports for fields that should be stored in lamports
+                                        // Fields like 'initialSupply' and 'supplyCap' are stored in SOL
+                                        if (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount') {
+                                          const lamports = Math.floor(parseFloat(val) * 1000000000);
+                                          if (!isNaN(lamports)) {
+                                            updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: lamports.toString() });
+                                          }
+                                        } else {
+                                          // For fields like initialSupply, store as SOL (no conversion)
+                                          updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: val });
+                                        }
+                                    }}
+                                />
+                             </div>
+                             <div className="relative group">
+                                <label className="absolute -top-3.5 left-0 text-[9px] text-slate-500 font-mono uppercase tracking-wider">
+                                  {key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount' ? 'Amount (Lamports)' : 'Amount (Raw)'}
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:border-teal-500 focus:outline-none transition-colors font-mono text-xs"
+                                    value={value}
+                                    onChange={(e) => updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: e.target.value })}
+                                />
+                             </div>
+                             <div className="flex items-center gap-1.5 text-[10px] text-teal-400/80 bg-teal-900/20 p-1.5 rounded border border-teal-900/30">
+                                <Zap size={10} />
+                                <span>
+                                  {key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount'
+                                    ? 'AI Tip: 1 SOL = 10^9 Lamports. Use Lamports for exact precision.'
+                                    : key === 'initialSupply'
+                                    ? 'AI Tip: Enter supply in SOL units (e.g., 1.00 for 1 SOL worth of tokens).'
+                                    : 'AI Tip: Enter the amount in the appropriate unit.'}
+                                </span>
+                             </div>
+                          </div>
                         ) : (
                           <input 
                             type="text" 
@@ -1392,15 +1486,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                             onBlur={() => setTimeout(() => setFocusedInputField(null), 200)}
                             onChange={(e) => {
                               let newValue = e.target.value;
-                              // Auto-convert SOL to lamports for amount fields (hidden conversion)
-                              if (isAmountField && key === 'amount' && newValue.includes('.')) {
+                              // Auto-convert SOL to lamports only for fields that should be stored in lamports
+                              // Fields like 'initialSupply' and 'supplyCap' are stored in SOL units
+                              if (isAmountField && (key === 'amount' || key === 'delegatedAmount' || key === 'repayAmount') && newValue.includes('.')) {
                                 // User entered SOL, convert to lamports behind the scenes
                                 newValue = convertSolToLamports(newValue);
                               }
-                              if (isAmountField && key === 'initialSupply' && newValue.includes('.')) {
-                                // User entered SOL, convert to lamports behind the scenes
-                                newValue = convertSolToLamports(newValue);
-                              }
+                              // For initialSupply and supplyCap, keep as SOL (no conversion)
                               updateSimpleBlockParams(selectedBlock.instanceId!, { [key]: newValue });
                             }}
                             className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 pr-10 text-sm text-white focus:border-teal-500 focus:outline-none transition-colors"
@@ -1646,6 +1738,14 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+            title="Import Transaction from Signature"
+          >
+            <span className="text-lg">📥</span>
+            Import
+          </button>
+          <button
             onClick={() => setShowArbitragePanel(!showArbitragePanel)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
               showArbitragePanel
@@ -1827,6 +1927,77 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           addLog('Analyzing transaction for optimizations...', 'info');
         }}
       />
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-lg w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-teal-500" />
+            
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <span className="text-2xl">📥</span>
+                Import Transaction
+              </h3>
+              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  Transaction Signature
+                </label>
+                <input
+                  type="text"
+                  value={importSignature}
+                  onChange={(e) => setImportSignature(e.target.value)}
+                  placeholder="Enter transaction signature..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-teal-500 focus:outline-none transition-colors font-mono text-sm"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Enter the signature of any transaction to import its instructions into the builder.
+                </p>
+              </div>
+
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-800 flex gap-3">
+                <Zap className="text-yellow-400 shrink-0" size={20} />
+                <div className="text-xs text-slate-300 space-y-1">
+                  <p className="font-bold text-white">AI Auto-Parse</p>
+                  <p>Our AI will attempt to map instructions to known templates. Unrecognized instructions will be imported as custom blocks.</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={!importSignature || isImporting}
+                  className="px-6 py-2 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">⚡</span>
+                      Import & Build
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

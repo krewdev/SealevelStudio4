@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { agentRegistry, BaseSolanaAgent } from '@/app/lib/agents/solana-agent-kit';
 import { agentStorage } from '@/app/lib/agents/storage';
+import { verifyTimestampedSignature } from '@/app/lib/security/auth';
+import { rateLimitByIp } from '@/app/lib/security/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +16,37 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    if (!rateLimitByIp(request)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
-    const { action, wallet } = body;
+    const { action, wallet, signature, timestamp } = body;
 
     if (!action || !wallet) {
       return NextResponse.json(
         { error: 'Missing required fields: action, wallet' },
         { status: 400 }
+      );
+    }
+
+    // Authentication: Verify signature
+    if (!signature || !timestamp) {
+      return NextResponse.json(
+        { error: 'Authentication required: signature and timestamp missing' },
+        { status: 401 }
+      );
+    }
+
+    const isValid = verifyTimestampedSignature(Number(timestamp), signature, wallet);
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'Invalid signature or timestamp expired' },
+        { status: 401 }
       );
     }
 

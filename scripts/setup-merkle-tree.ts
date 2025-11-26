@@ -10,6 +10,10 @@
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { createSignerFromKeypair, signerIdentity, generateSigner } from '@metaplex-foundation/umi';
+import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters';
+import { createTree, mplBubblegum } from '@metaplex-foundation/mpl-bubblegum';
 
 // Bubblegum Program ID (Metaplex)
 const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCbk68f37Gc5o4tBzLb');
@@ -33,39 +37,57 @@ function deriveTreeAuthority(merkleTree: PublicKey): PublicKey {
 }
 
 /**
- * Create merkle tree using Metaplex Bubblegum
- * Note: This is a placeholder - actual implementation requires Metaplex SDK
+ * Create merkle tree using Metaplex Bubblegum SDK
  */
 async function createMerkleTree(
   connection: Connection,
+  keypair: Keypair,
   options: SetupOptions
 ): Promise<{
   merkleTree: PublicKey;
   treeAuthority: PublicKey;
   signature: string;
 }> {
-  // This is a placeholder implementation
-  // In production, use @metaplex-foundation/mpl-bubblegum SDK
+  console.log('Setting up Metaplex UMI...');
   
-  console.log('⚠️  This script requires Metaplex Bubblegum SDK');
-  console.log('Please use one of the following methods:');
-  console.log('');
-  console.log('1. Metaplex CLI:');
-  console.log('   metaplex create-tree --keypair <keypair> --rpc-url <rpc> --max-depth 14');
-  console.log('');
-  console.log('2. Programmatically using Metaplex SDK:');
-  console.log('   import { createTree } from "@metaplex-foundation/mpl-bubblegum";');
-  console.log('   await createTree(connection, { tree, treeAuthority, maxDepth: 14 });');
-  console.log('');
+  // Create UMI instance with Bubblegum plugin
+  const umi = createUmi(connection.rpcEndpoint).use(mplBubblegum());
   
-  // For now, generate a placeholder tree address
-  const merkleTree = Keypair.generate().publicKey;
-  const treeAuthority = deriveTreeAuthority(merkleTree);
+  // Convert keypair to UMI signer
+  const umiKeypair = fromWeb3JsKeypair(keypair);
+  const signer = createSignerFromKeypair(umi, umiKeypair);
+  umi.use(signerIdentity(signer));
+  
+  // Generate merkle tree signer (UMI will handle keypair generation)
+  console.log('Generating merkle tree keypair...');
+  const merkleTree = generateSigner(umi);
+  const merkleTreePublicKey = new PublicKey(merkleTree.publicKey);
+  const treeAuthority = deriveTreeAuthority(merkleTreePublicKey);
+  
+  console.log(`Merkle Tree Address: ${merkleTreePublicKey.toString()}`);
+  console.log(`Tree Authority: ${treeAuthority.toString()}`);
+  console.log(`Max Depth: ${options.maxDepth || 14}`);
+  console.log(`Max Buffer Size: ${options.maxBufferSize || 64}`);
+  console.log('');
+  console.log('Creating merkle tree on-chain (this may take a moment)...');
+  
+  // Create the tree
+  const builder = await createTree(umi, {
+    merkleTree,
+    maxDepth: options.maxDepth || 14,
+    maxBufferSize: options.maxBufferSize || 64,
+    public: false, // Tree is not public (only creator can mint)
+  });
+  
+  const result = await builder.sendAndConfirm(umi);
+  
+  const signature = result.signature.toString();
+  console.log(`Transaction confirmed: ${signature}`);
   
   return {
-    merkleTree,
+    merkleTree: merkleTreePublicKey,
     treeAuthority,
-    signature: 'placeholder-signature',
+    signature,
   };
 }
 
@@ -118,9 +140,25 @@ async function main() {
   }
 
   try {
+    // Check balance before creating tree
+    const balance = await connection.getBalance(keypair.publicKey);
+    const solBalance = balance / 1e9;
+    
+    console.log(`Payer: ${keypair.publicKey.toString()}`);
+    console.log(`Balance: ${solBalance} SOL`);
+    console.log('');
+    
+    if (solBalance < 0.1) {
+      console.log('⚠️  Warning: Low balance. Creating a merkle tree requires ~0.1 SOL for rent.');
+      if (network === 'devnet') {
+        console.log('   You can airdrop SOL on devnet:');
+        console.log(`   solana airdrop 2 ${keypair.publicKey.toString()} --url ${rpcUrl}`);
+      }
+      console.log('');
+    }
+    
     // Create merkle tree
-    console.log('Creating merkle tree...');
-    const { merkleTree, treeAuthority, signature } = await createMerkleTree(connection, {
+    const { merkleTree, treeAuthority, signature } = await createMerkleTree(connection, keypair, {
       network,
       maxDepth,
       maxBufferSize,
@@ -164,9 +202,7 @@ NEXT_PUBLIC_VERISOL_TREE_AUTHORITY=${treeAuthority.toString()}
 }
 
 // Run if executed directly
-if (require.main === module) {
-  main().catch(console.error);
-}
+main().catch(console.error);
 
 export { createMerkleTree, deriveTreeAuthority };
 
