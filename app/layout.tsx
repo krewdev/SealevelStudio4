@@ -50,6 +50,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Preload landing page video for instant playback */}
+        <link rel="preload" href="/grok-video-d0f651af-8841-4f46-a92b-698254578a6c.mp4" as="video" type="video/mp4" />
       </head>
       <body className={`${inter.className} bg-gray-900 text-gray-100 antialiased`} suppressHydrationWarning>
         <ChunkErrorHandler />

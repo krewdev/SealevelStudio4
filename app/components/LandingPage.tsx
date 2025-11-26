@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 export type BlockchainType = 'polkadot' | 'solana' | 'ethereum' | 'polygon' | 'avalanche' | 'base' | 'arbitrum' | 'optimism' | 'sui' | 'aptos';
 
@@ -122,7 +122,22 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
   // Default to Solana
   const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const [showBlockchainSelector, setShowBlockchainSelector] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const selectedChainData = selectedBlockchain ? BLOCKCHAINS.find(b => b.id === selectedBlockchain) : null;
+
+  // Preload video immediately when component mounts
+  useEffect(() => {
+    if (videoRef.current) {
+      // Force video to start loading
+      videoRef.current.load();
+      // Try to play (will be muted, so should work)
+      videoRef.current.play().catch((error) => {
+        console.log('Autoplay prevented, but video is preloading:', error);
+      });
+    }
+  }, []);
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 scroll-smooth">
       <style jsx>{`
@@ -355,6 +370,68 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                 ? `Get Started on ${selectedChainData.name}`
                 : 'Get Started'}
             </button>
+          </div>
+        </section>
+
+        {/* Video Embed Section */}
+        <section className="py-16 bg-gray-900/50">
+          <div className="container mx-auto max-w-5xl px-6">
+            <div className="relative w-full rounded-xl overflow-hidden bg-gray-800/50 shadow-2xl" style={{ paddingBottom: '56.25%' }}> {/* 16:9 aspect ratio */}
+              {videoError ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 p-8">
+                  <svg className="w-16 h-16 mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-lg font-medium mb-2">Video failed to load</p>
+                  <p className="text-sm text-gray-500">Please check that the video file exists in the public folder</p>
+                </div>
+              ) : (
+                <>
+                  {videoLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-800/50 z-10">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                        <p className="text-gray-400 text-sm">Loading video...</p>
+                      </div>
+                    </div>
+                  )}
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls
+                    preload="auto"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Video failed to load:', e);
+                      setVideoError(true);
+                      setVideoLoading(false);
+                    }}
+                    onLoadStart={() => {
+                      console.log('Video loading started');
+                      setVideoLoading(true);
+                    }}
+                    onLoadedData={() => {
+                      console.log('Video data loaded');
+                      setVideoLoading(false);
+                    }}
+                    onCanPlay={() => {
+                      console.log('Video can play');
+                      setVideoLoading(false);
+                    }}
+                    onCanPlayThrough={() => {
+                      console.log('Video can play through (fully loaded)');
+                      setVideoLoading(false);
+                    }}
+                  >
+                    <source src="/grok-video-d0f651af-8841-4f46-a92b-698254578a6c.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                </>
+              )}
+            </div>
           </div>
         </section>
 

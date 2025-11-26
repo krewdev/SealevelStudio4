@@ -691,18 +691,24 @@ function Header({
             ← Back to Home
           </button>
         )}
-        {/* Logo */}
+        {/* Logo Video */}
         <div className="flex items-center space-x-3">
           <div className="relative">
-            <img
-              src="/sea-level-logo.png"
-              alt="Sealevel Studio"
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
               className="h-10 w-auto"
               style={{ maxHeight: '40px' }}
               onError={(e) => {
+                console.error('Video failed to load:', e);
                 e.currentTarget.style.display = 'none';
               }}
-            />
+            >
+              <source src="/logo-video.mp4" type="video/mp4" />
+              <source src="/logo-video.webm" type="video/webm" />
+            </video>
             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900 animate-pulse"></div>
           </div>
           <div className="text-xl font-bold tracking-tighter">
