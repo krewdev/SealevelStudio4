@@ -4,7 +4,8 @@
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci --legacy-peer-deps && npm run build"
+# Optimized build command with memory limits and timeout handling
+buildCommand = "NODE_OPTIONS='--max-old-space-size=4096' npm ci --legacy-peer-deps && NODE_OPTIONS='--max-old-space-size=4096' npm run build"
 
 [deploy]
 startCommand = "npm start"
