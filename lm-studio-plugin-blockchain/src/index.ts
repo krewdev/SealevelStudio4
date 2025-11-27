@@ -157,7 +157,7 @@ export async function getTransaction(params: {
     return {
       signature,
       slot: tx.slot,
-      blockTime: tx.blockTime,
+      blockTime: tx.blockTime ?? null,
       success: tx.meta?.err === null,
       fee: tx.meta?.fee || 0,
       instructions: tx.transaction.message.instructions.length,

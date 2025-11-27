@@ -16,6 +16,7 @@ import {
   FileText,
   Droplet,
   Rocket,
+  Wallet,
 } from 'lucide-react';
 
 interface Tool {
