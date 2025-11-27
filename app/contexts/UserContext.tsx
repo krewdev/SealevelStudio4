@@ -30,7 +30,7 @@ interface UserContextType {
   linkTelegram: () => Promise<void>;
   updateCredits: (amount: number) => void;
   addCampaign: (campaign: Campaign) => void;
-  refreshBalance: () => Promise<void>;
+  refreshBalance: (walletAddress?: string) => Promise<void>;
   createWallet: (email?: string, vanityPrefix?: string) => Promise<void>;
 }
 
