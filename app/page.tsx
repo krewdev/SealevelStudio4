@@ -1416,8 +1416,16 @@ function AppContent() {
     }
   }, []);
 
-  const handleGetStarted = (blockchain?: BlockchainType) => {
+  const handleGetStarted = useCallback((blockchain?: BlockchainType) => {
     try {
+      // Ensure we're on the client side
+      if (typeof window === 'undefined') {
+        console.warn('handleGetStarted called on server side, skipping');
+        return;
+      }
+      
+      console.log('handleGetStarted called', { blockchain, shouldShowTutorial: !!shouldShowTutorial });
+      
       if (blockchain) {
         setSelectedBlockchain(blockchain);
         // Polkadot and Solana are fully supported
@@ -1437,6 +1445,7 @@ function AppContent() {
       if (typeof window !== 'undefined') {
         const disclaimerAgreed = localStorage.getItem('sealevel-disclaimer-agreed');
         if (!disclaimerAgreed) {
+          setIsPageLoading(false);
           setCurrentScreen('disclaimer');
           return;
         }
@@ -1444,38 +1453,89 @@ function AppContent() {
       
       // Proceed to tutorial or app
       setIsPageLoading(true);
+      
+      // Safely check tutorial status with fallback
+      let showAccountInspectorTutorial = false;
+      let showInstructionAssemblerTutorial = false;
+      
       try {
-        const showAccountInspectorTutorial = shouldShowTutorial('accountInspector');
-        const showInstructionAssemblerTutorial = shouldShowTutorial('instructionAssembler');
-        
-        if (showAccountInspectorTutorial || showInstructionAssemblerTutorial) {
-          setCurrentScreen('tutorial');
+        if (shouldShowTutorial && typeof shouldShowTutorial === 'function') {
+          showAccountInspectorTutorial = shouldShowTutorial('accountInspector');
+          showInstructionAssemblerTutorial = shouldShowTutorial('instructionAssembler');
         } else {
-          setCurrentScreen('app');
+          console.warn('shouldShowTutorial is not available, skipping tutorial check');
         }
       } catch (tutorialError) {
         console.error('Error checking tutorial:', tutorialError);
-        // Fallback to app if tutorial check fails
+        // Continue without tutorial if check fails
+      }
+      
+      // Navigate to appropriate screen
+      // Direct state update - React will batch these
+      if (showAccountInspectorTutorial || showInstructionAssemblerTutorial) {
+        setCurrentScreen('tutorial');
+      } else {
         setCurrentScreen('app');
       }
+      setIsPageLoading(false);
     } catch (error) {
       console.error('Error in handleGetStarted:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        blockchain,
+        shouldShowTutorial: typeof shouldShowTutorial,
+      });
+      
       // Show user-friendly error message
       alert('Something went wrong. Please try again or refresh the page.');
+      
       // Still try to proceed to app as fallback
       setIsPageLoading(true);
       setCurrentScreen('app');
+      setIsPageLoading(false);
     }
-  };
+  }, [shouldShowTutorial]);
 
-  const handleDisclaimerAgree = () => {
-    setIsPageLoading(true);
-    if (shouldShowTutorial('accountInspector') || shouldShowTutorial('instructionAssembler')) {
-      setCurrentScreen('tutorial');
-    } else {
+  const handleDisclaimerAgree = useCallback(() => {
+    try {
+      setIsPageLoading(true);
+      
+      // Save disclaimer agreement to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sealevel-disclaimer-agreed', 'true');
+      }
+      
+      // Safely check tutorial status with fallback
+      let showAccountInspectorTutorial = false;
+      let showInstructionAssemblerTutorial = false;
+      
+      try {
+        if (shouldShowTutorial && typeof shouldShowTutorial === 'function') {
+          showAccountInspectorTutorial = shouldShowTutorial('accountInspector');
+          showInstructionAssemblerTutorial = shouldShowTutorial('instructionAssembler');
+        } else {
+          console.warn('shouldShowTutorial is not available, skipping tutorial check');
+        }
+      } catch (tutorialError) {
+        console.error('Error checking tutorial:', tutorialError);
+        // Continue without tutorial if check fails
+      }
+      
+      // Navigate to appropriate screen
+      if (showAccountInspectorTutorial || showInstructionAssemblerTutorial) {
+        setCurrentScreen('tutorial');
+      } else {
+        setCurrentScreen('app');
+      }
+      setIsPageLoading(false);
+    } catch (error) {
+      console.error('Error in handleDisclaimerAgree:', error);
+      // Fallback to app screen
       setCurrentScreen('app');
+      setIsPageLoading(false);
     }
-  };
+  }, [shouldShowTutorial]);
 
   const handleBackToLanding = () => {
     setIsPageLoading(true); // Show loading animation when going back to landing
