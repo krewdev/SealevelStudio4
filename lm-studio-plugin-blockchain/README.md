@@ -52,6 +52,39 @@ A plugin for LM Studio that enables blockchain access to the Solana network. Thi
 
 ## Configuration
 
+### Encryption Key (Required for Production)
+
+LM Studio requires an encryption key for production use. This ensures secure handling of blockchain operations.
+
+**Generate an encryption key:**
+```bash
+npm run generate-key
+```
+
+Or manually:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**Set the encryption key:**
+
+1. **Create a `.env` file** in the plugin directory:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Add your encryption key:**
+   ```bash
+   LM_STUDIO_PLUGIN_ENCRYPTION_KEY=your_generated_key_here
+   ```
+
+3. **For production deployment**, set the environment variable:
+   - In LM Studio plugin settings, or
+   - As a system environment variable, or
+   - In your deployment platform's environment variables
+
+**Note:** The encryption key is optional for development but **required for production** to avoid security warnings.
+
 ### Environment Variables (Optional)
 
 You can configure custom RPC endpoints by setting environment variables:

@@ -7,6 +7,7 @@
 
 import { Connection, PublicKey, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getEncryptionKey } from './config.js';
 
 // Plugin configuration
 interface PluginConfig {
@@ -457,9 +458,20 @@ export const functionHandlers: Record<string, (params: any) => Promise<any>> = {
   validateAddress,
 };
 
+// Initialize plugin and check encryption key
+const encryptionKey = getEncryptionKey();
+if (process.env.NODE_ENV === 'production' && !encryptionKey) {
+  console.warn(
+    '⚠️  LM Studio Blockchain Plugin: Encryption key not set!\n' +
+    'For production use, set LM_STUDIO_PLUGIN_ENCRYPTION_KEY environment variable.\n' +
+    'Generate a key: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+  );
+}
+
 // Plugin entry point
 export default {
   tools,
   functionHandlers,
+  encryptionKey: encryptionKey || undefined, // Only expose if set
 };
 

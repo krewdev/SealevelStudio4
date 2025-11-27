@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "lms dev",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "generate-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
   },
   "keywords": [
     "lm-studio",
