@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-type NetworkType = 'mainnet' | 'devnet';
+type NetworkType = 'mainnet' | 'devnet' | 'testnet';
 
 interface NetworkContextType {
   network: NetworkType;
@@ -19,7 +19,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('sealevel-network');
-        if (saved === 'mainnet' || saved === 'devnet') {
+        if (saved === 'mainnet' || saved === 'devnet' || saved === 'testnet') {
           setNetwork(saved);
         }
       } catch (error) {

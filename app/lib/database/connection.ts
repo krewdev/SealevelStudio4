@@ -3,22 +3,26 @@
  * Handles PostgreSQL database connections with connection pooling
  */
 
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 let pool: Pool | null = null;
 
 /**
  * Get database connection pool
  * Creates a singleton pool instance
+ * Returns null if DATABASE_URL is not configured (for in-memory fallback)
  */
-export function getPool(): Pool {
+export function getPool(): Pool | null {
   if (!pool) {
     const databaseUrl = process.env.DATABASE_URL;
     
     if (!databaseUrl) {
       // Fallback to in-memory mode if no database configured
-      console.warn('⚠️  DATABASE_URL not configured. Wallet recovery will use in-memory storage.');
-      return null as any;
+      // Only warn in runtime, not during build
+      if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+        console.warn('⚠️  DATABASE_URL not configured. Wallet recovery will use in-memory storage.');
+      }
+      return null;
     }
 
     pool = new Pool({
@@ -40,7 +44,7 @@ export function getPool(): Pool {
 /**
  * Execute a database query
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> {

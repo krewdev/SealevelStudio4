@@ -59,7 +59,7 @@ export function rateLimitByWallet(wallet: string, config: RateLimitConfig = { li
 setInterval(() => {
   const now = Date.now();
   [ipRateLimit, walletRateLimit].forEach(store => {
-    for (const [key, record] of store.entries()) {
+    for (const [key, record] of Array.from(store.entries())) {
       if (now > record.resetTime) {
         store.delete(key);
       }
