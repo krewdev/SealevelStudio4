@@ -22,7 +22,9 @@
     "setup:presale-merkle-tree": "ts-node scripts/setup-presale-merkle-tree.ts",
     "verify:merkle-tree": "ts-node scripts/verify-merkle-tree.ts",
     "webhook:server": "node scripts/webhook-server.js",
-    "seed:transactions": "ts-node scripts/seed-transactions.ts"
+    "seed:transactions": "ts-node scripts/seed-transactions.ts",
+    "tunnel:start": "bash scripts/start-cloudflare-tunnel.sh",
+    "tunnel:quick": "cloudflared tunnel --url http://localhost:3000"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",

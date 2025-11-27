@@ -973,7 +973,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         'build',
         {
           instructions: instructions.map(inst => ({
-            programId: inst.programId,
+            programId: inst.template.programId,
             template: inst.template.name,
             accounts: inst.accounts,
           })),
@@ -1719,6 +1719,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           templates={filteredTemplates}
           onSelectTemplate={addAdvancedInstruction}
           onClose={() => setShowTemplateSelector(false)}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
       )}
       </div>
