@@ -42,10 +42,10 @@ interface RevenueLandingProps {
   onBack?: () => void;
   onNavigateToPresale?: () => void;
   onNavigateToPremium?: () => void;
+  onNavigateToVeriSol?: () => void;
 }
 
-export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremium }: RevenueLandingProps) {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremium, onNavigateToVeriSol }: RevenueLandingProps) {
   const [showPaymentMethods, setShowPaymentMethods] = useState<string | null>(null);
 
   const pricingTiers: PricingTier[] = [
@@ -57,61 +57,81 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
       description: 'Perfect for trying out Sea Level Studio',
       features: [
         'Account Inspector',
-        'Basic Transaction Builder',
-        'Limited Arbitrage Scanner (10 scans/day)',
+        '10 Transaction Builder Trials',
         'Community Support',
-        '5 free trial features',
         'Basic Analytics',
+        'Access to Free Tools',
+        'Limited Feature Access',
       ],
       cta: 'Get Started Free',
       paymentMethods: [],
     },
     {
-      id: 'pro',
-      name: 'Pro',
-      price: '$49',
+      id: 'chad',
+      name: 'Chad Tier',
+      price: '$20',
       period: 'month',
-      annualPrice: '$490',
-      annualSavings: 'Save $98/year',
-      description: 'For serious Solana developers',
+      description: 'For builders who want transaction tools',
       features: [
         'Everything in Free',
-        'Unlimited Arbitrage Scanner',
-        'Advanced Transaction Builder',
-        'AI Cyber Playground Access',
-        'Premium Support (24hr response)',
-        'Priority Feature Requests',
-        'Advanced Analytics Dashboard',
-        'API Access',
-        'Custom Webhooks',
+        'Unlimited Transaction Builder',
+        'Account Inspector',
+        'Basic Analytics Dashboard',
         'Transaction History Export',
+        'Community Support',
+        'Basic API Access',
+        'Transaction Templates',
       ],
-      cta: 'Upgrade to Pro',
+      cta: 'Subscribe to Chad Tier',
       popular: true,
       badge: 'Most Popular',
       paymentMethods: ['card', 'crypto', 'seal'],
       savings: 'Best Value',
     },
     {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: 'Custom',
-      period: '',
-      description: 'For teams and organizations',
+      id: 'dev',
+      name: 'Dev Tier',
+      price: '$75',
+      period: 'month',
+      description: 'For serious Solana developers building dApps',
       features: [
-        'Everything in Pro',
-        'Team Collaboration (up to 50 users)',
-        'Custom Integrations',
-        'Dedicated Support (4hr response SLA)',
-        'SLA Guarantees (99.9% uptime)',
-        'On-premise Deployment Option',
-        'Custom Training & Onboarding',
-        'Advanced Security Features',
-        'SSO & SAML Support',
-        'Custom Contract Terms',
+        'Everything in Chad Tier',
+        'AI Cyber Playground Access',
+        'Premium Support (24hr response)',
+        'Priority Feature Requests',
+        'Advanced Analytics Dashboard',
+        'Full API Access',
+        'Custom Webhooks',
+        'Advanced Security Scanner',
+        'Transaction Bundler',
+        'Multi-wallet Management',
       ],
-      cta: 'Contact Sales',
-      paymentMethods: ['card', 'crypto', 'seal', 'wire'],
+      cta: 'Subscribe to Dev Tier',
+      paymentMethods: ['card', 'crypto', 'seal'],
+    },
+    {
+      id: 'degen',
+      name: 'DEGEN Tier',
+      price: '$200',
+      period: 'month',
+      description: 'For power users, traders, and MEV searchers',
+      features: [
+        'Everything in Dev Tier',
+        'Market Maker Tools',
+        'MEV Tools & Jito Integration',
+        'Unlimited Arbitrage Scanner',
+        'Priority MEV Bundle Submission',
+        'Real-time Arbitrage Alerts',
+        'Advanced Trading Tools',
+        'Flash Loan Simulator',
+        'Custom Bot Integration',
+        'Dedicated Support (12hr response)',
+        'Early Access to New Features',
+        'Advanced Portfolio Analytics',
+        'Enterprise-grade Security',
+      ],
+      cta: 'Subscribe to DEGEN Tier',
+      paymentMethods: ['card', 'crypto', 'seal'],
     },
   ];
 
@@ -119,36 +139,37 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
     { label: 'Active Users', value: '10,000+', icon: <Users className="w-5 h-5" /> },
     { label: 'Transactions Built', value: '500K+', icon: <Code className="w-5 h-5" /> },
     { label: 'Arbitrage Opportunities', value: '1M+', icon: <TrendingUp className="w-5 h-5" /> },
-    { label: 'Revenue Generated', value: '$2.5M+', icon: <DollarSign className="w-5 h-5" /> },
+    { label: 'Features Available', value: '50+', icon: <Sparkles className="w-5 h-5" /> },
   ];
 
   return (
-    <div className="min-h-screen animated-bg text-white relative overflow-y-auto">
-      {/* Animated background particles */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-slate-900 text-white relative overflow-y-auto">
+      {/* Enhanced animated background particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-slate-900/20" />
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-purple-900/30 via-blue-900/20 to-indigo-900/30" />
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-purple-500/15 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-blue-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-indigo-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-3/4 left-1/3 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0.5s' }} />
       </div>
 
       {/* Header */}
-      <div className="relative z-10 border-b border-purple-800/50 glass-strong">
+      <div className="relative z-10 border-b border-purple-500/30 bg-gray-900/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800/50 transition-all duration-200 border border-gray-700/50 hover:border-purple-500/50"
               >
                 <ArrowLeft size={18} />
-                <span className="text-sm">Back</span>
+                <span className="text-sm font-medium">Back</span>
               </button>
             )}
             <div className="flex items-center gap-4 ml-auto">
               <button
                 onClick={onNavigateToPresale}
-                className="btn-modern px-6 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white"
+                className="px-6 py-2.5 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-orange-500/50"
               >
                 SEAL Presale
               </button>
@@ -159,27 +180,32 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 pb-24">
         {/* Hero Section */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full mb-6">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-purple-300">The Future of Solana Development</span>
+        <div className="text-center mb-20">
+          {/* Beta Trial Announcement */}
+          <div className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/50 rounded-full mb-6 backdrop-blur-sm animate-pulse">
+            <Sparkles className="w-5 h-5 text-green-400" />
+            <span className="text-base font-bold text-green-300">🚀 BETA TRIAL NOW LIVE - Get 10 Free Transactions!</span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-extrabold mb-6 text-gradient-primary">
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border border-purple-500/40 rounded-full mb-8 backdrop-blur-sm">
+            <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+            <span className="text-sm font-medium text-purple-300">The Future of Solana Development</span>
+          </div>
+          <h1 className="text-5xl md:text-7xl font-extrabold mb-6 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
             Build. Deploy. Profit.
           </h1>
-          <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
             The most powerful developer toolkit for Solana. Join thousands of developers building the future of DeFi.
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <button
               onClick={onNavigateToPremium}
-              className="btn-modern px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg font-semibold"
+              className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-lg font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-purple-500/50 transform hover:scale-105"
             >
               Start Free Trial
             </button>
             <button
               onClick={onNavigateToPresale}
-              className="btn-modern px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold"
+              className="px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-orange-500/50 transform hover:scale-105"
             >
               Join SEAL Presale
             </button>
@@ -187,74 +213,59 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-20">
           {stats.map((stat, index) => (
-            <div key={index} className="card-modern p-6 text-center">
-              <div className="flex justify-center mb-3 text-purple-400">
-                {stat.icon}
+            <div 
+              key={index} 
+              className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50 rounded-xl p-6 text-center hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 hover:scale-105"
+            >
+              <div className="flex justify-center mb-4 text-purple-400">
+                <div className="p-2 bg-purple-500/10 rounded-lg">
+                  {stat.icon}
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1 text-gradient-primary">{stat.value}</div>
-              <div className="text-sm text-gray-400">{stat.label}</div>
+              <div className="text-3xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">{stat.value}</div>
+              <div className="text-sm text-gray-400 font-medium">{stat.label}</div>
             </div>
           ))}
         </div>
 
         {/* Pricing Tiers */}
-        <div className="mb-16">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4 text-gradient-primary">Choose Your Plan</h2>
-            <p className="text-gray-400 text-lg mb-6">Start free, upgrade when you're ready</p>
+        <div className="mb-20">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              Choose Your Plan
+            </h2>
+            <p className="text-gray-300 text-lg mb-8">Start free, upgrade when you're ready</p>
             
-            {/* Billing Cycle Toggle (only for Pro tier) */}
-            <div className="inline-flex items-center gap-2 bg-slate-800/50 rounded-lg p-1 border border-slate-700">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingCycle('annual')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  billingCycle === 'annual'
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Annual
-                <span className="ml-2 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">
-                  Save 17%
+            {/* SEAL Staking Alternative */}
+            <div className="mt-6 mb-8">
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/40 rounded-full">
+                <Star className="w-4 h-4 text-orange-400" />
+                <span className="text-sm font-medium text-orange-300">
+                  Alternative: Stake SEAL tokens to unlock tier features
                 </span>
-              </button>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {pricingTiers.map((tier) => {
-              const displayPrice = tier.id === 'pro' && billingCycle === 'annual' 
-                ? tier.annualPrice 
-                : tier.price;
-              const displayPeriod = tier.id === 'pro' && billingCycle === 'annual'
-                ? 'year'
-                : tier.period;
-              const monthlyEquivalent = tier.id === 'pro' && billingCycle === 'annual'
-                ? '$41'
-                : tier.price;
+              const displayPrice = tier.price;
+              const displayPeriod = tier.period;
 
               return (
                 <div
                   key={tier.id}
-                  className={`card-modern card-glow p-8 relative transition-all ${
-                    tier.popular ? 'border-purple-500 glow-purple scale-105 shadow-2xl' : 'border-slate-700'
+                  className={`bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-md border-2 rounded-2xl p-8 relative transition-all duration-300 hover:shadow-2xl ${
+                    tier.popular 
+                      ? 'border-purple-500/60 shadow-2xl shadow-purple-500/20 scale-105' 
+                      : 'border-gray-700/50 hover:border-purple-500/40'
                   }`}
                 >
                   {tier.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                      <span className="badge-modern bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-1">
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-10">
+                      <span className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-1.5 rounded-full text-sm font-semibold shadow-lg">
                         {tier.badge}
                       </span>
                     </div>
@@ -262,73 +273,67 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
                   
                   {tier.savings && (
                     <div className="absolute top-4 right-4">
-                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
-                        <Gift className="w-3 h-3" />
+                      <span className="text-xs bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-400 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-green-500/30">
+                        <Gift className="w-3.5 h-3.5" />
                         {tier.savings}
                       </span>
                     </div>
                   )}
                   
                   <div className="mb-6">
-                    <h3 className="text-2xl font-bold mb-2">{tier.name}</h3>
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-4xl font-bold text-gradient-primary">{displayPrice}</span>
+                    <h3 className="text-2xl font-bold mb-3 text-white">{tier.name}</h3>
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-5xl font-extrabold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">{displayPrice}</span>
                       {displayPeriod && (
-                        <span className="text-gray-400">/{displayPeriod}</span>
+                        <span className="text-gray-400 text-lg">/{displayPeriod}</span>
                       )}
                     </div>
-                    {tier.id === 'pro' && billingCycle === 'annual' && (
-                      <div className="text-sm text-gray-400 mb-1">
-                        <span className="line-through text-gray-500">${parseInt(tier.price.replace('$', '')) * 12}/year</span>
-                        <span className="ml-2 text-green-400 font-semibold">{tier.annualSavings}</span>
+                    {(tier.id === 'chad' || tier.id === 'dev' || tier.id === 'degen') && (
+                      <div className="text-xs text-gray-400 mb-2">
+                        Or stake SEAL tokens for equivalent access
                       </div>
                     )}
-                    {tier.id === 'pro' && billingCycle === 'annual' && (
-                      <div className="text-xs text-gray-500">
-                        Just {monthlyEquivalent}/month billed annually
-                      </div>
-                    )}
-                    <p className="text-sm text-gray-400 mt-2">{tier.description}</p>
+                    <p className="text-sm text-gray-300 leading-relaxed">{tier.description}</p>
                   </div>
 
                   {/* Payment Methods */}
                   {tier.paymentMethods.length > 0 && (
-                    <div className="mb-4 pb-4 border-b border-slate-700">
+                    <div className="mb-6 pb-6 border-b border-gray-700/50">
                       <button
                         onClick={() => setShowPaymentMethods(showPaymentMethods === tier.id ? null : tier.id)}
-                        className="flex items-center justify-between w-full text-left text-sm text-gray-400 hover:text-white transition-colors"
+                        className="flex items-center justify-between w-full text-left text-sm text-gray-300 hover:text-white transition-colors group"
                       >
                         <span className="flex items-center gap-2">
-                          <Wallet className="w-4 h-4" />
-                          Payment Options
+                          <Wallet className="w-4 h-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
+                          <span className="font-medium">Payment Options</span>
                         </span>
-                        <span className="text-xs">
+                        <span className="text-xs bg-gray-700/50 px-2 py-1 rounded-full">
                           {tier.paymentMethods.length} method{tier.paymentMethods.length > 1 ? 's' : ''}
                         </span>
                       </button>
                       {showPaymentMethods === tier.id && (
-                        <div className="mt-3 space-y-2">
+                        <div className="mt-4 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
                           {tier.paymentMethods.includes('card') && (
-                            <div className="flex items-center gap-2 text-sm text-gray-300 bg-slate-800/50 p-2 rounded">
-                              <CreditCard className="w-4 h-4 text-blue-400" />
+                            <div className="flex items-center gap-3 text-sm text-gray-200 bg-gradient-to-r from-gray-800/50 to-gray-700/30 p-3 rounded-lg border border-gray-700/50">
+                              <CreditCard className="w-5 h-5 text-blue-400" />
                               <span>Credit/Debit Card</span>
                             </div>
                           )}
                           {tier.paymentMethods.includes('crypto') && (
-                            <div className="flex items-center gap-2 text-sm text-gray-300 bg-slate-800/50 p-2 rounded">
-                              <Coins className="w-4 h-4 text-yellow-400" />
+                            <div className="flex items-center gap-3 text-sm text-gray-200 bg-gradient-to-r from-gray-800/50 to-gray-700/30 p-3 rounded-lg border border-gray-700/50">
+                              <Coins className="w-5 h-5 text-yellow-400" />
                               <span>Cryptocurrency (SOL, USDC, USDT)</span>
                             </div>
                           )}
                           {tier.paymentMethods.includes('seal') && (
-                            <div className="flex items-center gap-2 text-sm text-gray-300 bg-slate-800/50 p-2 rounded">
-                              <Star className="w-4 h-4 text-orange-400" />
+                            <div className="flex items-center gap-3 text-sm text-gray-200 bg-gradient-to-r from-gray-800/50 to-gray-700/30 p-3 rounded-lg border border-gray-700/50">
+                              <Star className="w-5 h-5 text-orange-400" />
                               <span>SEAL Tokens (20% discount)</span>
                             </div>
                           )}
                           {tier.paymentMethods.includes('wire') && (
-                            <div className="flex items-center gap-2 text-sm text-gray-300 bg-slate-800/50 p-2 rounded">
-                              <DollarSign className="w-4 h-4 text-green-400" />
+                            <div className="flex items-center gap-3 text-sm text-gray-200 bg-gradient-to-r from-gray-800/50 to-gray-700/30 p-3 rounded-lg border border-gray-700/50">
+                              <DollarSign className="w-5 h-5 text-green-400" />
                               <span>Wire Transfer</span>
                             </div>
                           )}
@@ -337,33 +342,36 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
                     </div>
                   )}
 
-                  <ul className="space-y-3 mb-8 min-h-[300px]">
+                  <ul className="space-y-3.5 mb-8 min-h-[300px]">
                     {tier.features.map((feature, index) => (
                       <li key={index} className="flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-gray-300">{feature}</span>
+                        <span className="text-sm text-gray-200 leading-relaxed">{feature}</span>
                       </li>
                     ))}
                   </ul>
 
                   <button
                     onClick={() => {
-                      if (tier.id === 'pro') {
+                      if (tier.id === 'free') {
                         onNavigateToPremium?.();
-                      } else if (tier.id === 'enterprise') {
-                        window.location.href = 'mailto:sales@sealevel.studio?subject=Enterprise Plan Inquiry';
+                      } else if (tier.id === 'chad' || tier.id === 'dev' || tier.id === 'degen') {
+                        // Navigate to VeriSol attestation page to verify tier eligibility
+                        onNavigateToVeriSol?.();
                       } else {
                         onNavigateToPremium?.();
                       }
                     }}
-                    className={`btn-modern w-full py-3 font-semibold transition-all ${
+                    className={`w-full py-3.5 font-semibold rounded-lg transition-all duration-200 flex items-center justify-center gap-2 ${
                       tier.popular
-                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
-                        : 'bg-slate-800 hover:bg-slate-700 text-white'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105'
+                        : tier.id === 'degen'
+                        ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white shadow-lg hover:shadow-xl hover:shadow-orange-500/50 transform hover:scale-105'
+                        : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 hover:border-purple-500/50'
                     }`}
                   >
                     {tier.cta}
-                    {tier.id !== 'enterprise' && <ArrowRight className="w-4 h-4 ml-2 inline" />}
+                    {tier.id !== 'free' && <ArrowRight className="w-4 h-4" />}
                   </button>
 
                   {tier.id === 'free' && (
@@ -376,30 +384,67 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
             })}
           </div>
 
-          {/* Payment Methods Info */}
-          <div className="mt-12 card-modern p-6 bg-slate-900/50 border-slate-700">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Info className="w-6 h-6 text-blue-400" />
+          {/* VeriSol Attestation & SEAL Staking Info */}
+          <div className="mt-16 space-y-6">
+            <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="flex items-start gap-5">
+                <div className="p-3 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-xl border border-purple-500/30">
+                  <Shield className="w-6 h-6 text-purple-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold mb-4 text-white">VeriSol Attestation Required</h3>
+                  <div className="space-y-3 text-sm text-gray-200">
+                    <p>
+                      <strong className="text-white">Tier Verification:</strong> All paid tiers require a VeriSol attestation to verify your eligibility. Visit the VeriSol page to get your tier verified.
+                    </p>
+                    <p>
+                      <strong className="text-white">Two Ways to Access:</strong>
+                    </p>
+                    <ul className="list-disc list-inside space-y-2 ml-4 text-gray-300">
+                      <li><strong className="text-white">Subscription:</strong> Pay monthly with card, crypto, or SEAL tokens</li>
+                      <li><strong className="text-white">SEAL Staking:</strong> Stake SEAL tokens to unlock tier features without a subscription</li>
+                    </ul>
+                    <p className="mt-4">
+                      <strong className="text-white">How It Works:</strong> The VeriSol attestation system verifies your tier eligibility based on either your active subscription or your SEAL token stake amount. Once verified, you'll receive a compressed NFT (cNFT) attestation that grants you access to your tier's features.
+                    </p>
+                    <div className="mt-4 pt-4 border-t border-gray-700/50">
+                      <button
+                        onClick={() => onNavigateToVeriSol?.()}
+                        className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105 inline-flex items-center gap-2"
+                      >
+                        Get VeriSol Attestation
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold mb-2 text-white">Payment Information</h3>
-                <div className="space-y-2 text-sm text-gray-300">
-                  <p>
-                    <strong className="text-white">Credit/Debit Cards:</strong> Accepted via Stripe. Secure, instant activation.
-                  </p>
-                  <p>
-                    <strong className="text-white">Cryptocurrency:</strong> Pay with SOL, USDC, or USDT. Automatic conversion at checkout.
-                  </p>
-                  <p>
-                    <strong className="text-white">SEAL Tokens:</strong> Get 20% off when paying with SEAL tokens. Purchase SEAL tokens in our presale.
-                  </p>
-                  <p>
-                    <strong className="text-white">Enterprise:</strong> Wire transfers and custom payment terms available. Contact sales for details.
-                  </p>
-                  <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-slate-700">
-                    All subscriptions auto-renew. Cancel anytime. 30-day money-back guarantee on annual plans.
-                  </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="flex items-start gap-5">
+                <div className="p-3 bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-xl border border-orange-500/30">
+                  <Coins className="w-6 h-6 text-orange-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold mb-4 text-white">Payment & Staking Options</h3>
+                  <div className="space-y-3 text-sm text-gray-200">
+                    <p>
+                      <strong className="text-white">Credit/Debit Cards:</strong> Accepted via Stripe. Secure, instant activation.
+                    </p>
+                    <p>
+                      <strong className="text-white">Cryptocurrency:</strong> Pay with SOL, USDC, or USDT. Automatic conversion at checkout.
+                    </p>
+                    <p>
+                      <strong className="text-white">SEAL Tokens:</strong> Get 20% off when paying with SEAL tokens, or stake SEAL tokens to unlock tier features without a subscription.
+                    </p>
+                    <p className="mt-4">
+                      <strong className="text-white">SEAL Staking Benefits:</strong> Stake SEAL tokens instead of paying monthly. Your stake amount determines your tier access. Staked tokens remain yours and can be unstaked at any time (tier access will be revoked).
+                    </p>
+                    <p className="text-xs text-gray-400 mt-4 pt-4 border-t border-gray-700/50">
+                      All subscriptions auto-renew. Cancel anytime. 30-day money-back guarantee. SEAL staking is non-custodial - you maintain full control of your tokens.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -407,35 +452,35 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
         </div>
 
         {/* SEAL Presale Section */}
-        <div className="card-modern card-glow p-12 mb-16 bg-gradient-to-br from-orange-900/30 to-red-900/30 border-orange-500/30">
+        <div className="bg-gradient-to-br from-orange-900/40 via-red-900/30 to-orange-900/40 backdrop-blur-sm p-12 mb-20 rounded-2xl border-2 border-orange-500/40 shadow-2xl shadow-orange-500/20">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500/20 border border-orange-500/30 rounded-full mb-6">
-              <Star className="w-4 h-4 text-orange-400" />
-              <span className="text-sm text-orange-300">Limited Time Offer</span>
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-orange-500/30 to-red-500/30 border border-orange-500/50 rounded-full mb-8">
+              <Star className="w-4 h-4 text-orange-400 animate-pulse" />
+              <span className="text-sm font-semibold text-orange-300">Limited Time Offer</span>
             </div>
-            <h2 className="text-4xl font-bold mb-4 text-gradient-danger">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-orange-400 via-red-400 to-orange-400 bg-clip-text text-transparent">
               SEAL Token Presale
             </h2>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto leading-relaxed">
               Get in early on Sea Level Studio's native token. Early supporters get exclusive bonuses and lifetime benefits.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-slate-900/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-orange-400 mb-1">50% Bonus</div>
-                <div className="text-sm text-gray-400">First 24 hours</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+              <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-orange-500/50 transition-all duration-300 hover:scale-105">
+                <div className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent mb-2">50% Bonus</div>
+                <div className="text-sm text-gray-300 font-medium">First 24 hours</div>
               </div>
-              <div className="bg-slate-900/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-orange-400 mb-1">25% Bonus</div>
-                <div className="text-sm text-gray-400">First week</div>
+              <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-orange-500/50 transition-all duration-300 hover:scale-105">
+                <div className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent mb-2">25% Bonus</div>
+                <div className="text-sm text-gray-300 font-medium">First week</div>
               </div>
-              <div className="bg-slate-900/50 rounded-lg p-4">
-                <div className="text-2xl font-bold text-orange-400 mb-1">10% Bonus</div>
-                <div className="text-sm text-gray-400">First month</div>
+              <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 hover:border-orange-500/50 transition-all duration-300 hover:scale-105">
+                <div className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent mb-2">10% Bonus</div>
+                <div className="text-sm text-gray-300 font-medium">First month</div>
               </div>
             </div>
             <button
               onClick={onNavigateToPresale}
-              className="btn-modern px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold inline-flex items-center gap-2"
+              className="px-10 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-orange-500/50 transform hover:scale-105 inline-flex items-center gap-2"
             >
               Join Presale Now
               <ArrowRight className="w-5 h-5" />
@@ -444,51 +489,62 @@ export function RevenueLanding({ onBack, onNavigateToPresale, onNavigateToPremiu
         </div>
 
         {/* Feature Highlights */}
-        <div className="mb-16">
-          <h2 className="text-4xl font-bold mb-12 text-center text-gradient-primary">Why Choose Sea Level Studio?</h2>
+        <div className="mb-20">
+          <h2 className="text-4xl md:text-5xl font-bold mb-16 text-center bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            Why Choose Sea Level Studio?
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
-                icon: <Brain className="w-8 h-8" />,
+                icon: <Brain className="w-10 h-10" />,
                 title: 'AI-Powered',
                 description: 'Advanced AI agents help you build, optimize, and execute transactions with confidence.',
               },
               {
-                icon: <Shield className="w-8 h-8" />,
+                icon: <Shield className="w-10 h-10" />,
                 title: 'Secure by Default',
                 description: 'Built-in security scanning and vulnerability detection keep your transactions safe.',
               },
               {
-                icon: <TrendingUp className="w-8 h-8" />,
+                icon: <TrendingUp className="w-10 h-10" />,
                 title: 'Profit Opportunities',
                 description: 'Real-time arbitrage scanner finds profitable opportunities across all DEXs.',
               },
             ].map((feature, index) => (
-              <div key={index} className="card-modern p-6 text-center">
-                <div className="flex justify-center mb-4 text-purple-400">
-                  {feature.icon}
+              <div 
+                key={index} 
+                className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/50 text-center hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20 hover:scale-105"
+              >
+                <div className="flex justify-center mb-6">
+                  <div className="p-4 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 rounded-xl border border-purple-500/30">
+                    <div className="text-purple-400">
+                      {feature.icon}
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+                <h3 className="text-xl font-bold mb-3 text-white">{feature.title}</h3>
+                <p className="text-gray-300 leading-relaxed">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* CTA Section */}
-        <div className="text-center">
-          <h2 className="text-4xl font-bold mb-4 text-gradient-primary">Ready to Get Started?</h2>
-          <p className="text-xl text-gray-300 mb-8">Join thousands of developers building on Solana</p>
-          <div className="flex items-center justify-center gap-4">
+        <div className="text-center pb-12">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            Ready to Get Started?
+          </h2>
+          <p className="text-xl text-gray-300 mb-10">Join thousands of developers building on Solana</p>
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <button
               onClick={onNavigateToPremium}
-              className="btn-modern px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-lg font-semibold"
+              className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-lg font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105"
             >
               Start Free Trial
             </button>
             <button
               onClick={onNavigateToPresale}
-              className="btn-modern px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold"
+              className="px-10 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white text-lg font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-orange-500/50 transform hover:scale-105"
             >
               Join SEAL Presale
             </button>

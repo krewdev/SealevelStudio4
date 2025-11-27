@@ -1185,6 +1185,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
         onBack={() => setActiveView('inspector')}
         onNavigateToPresale={() => setActiveView('presale')}
         onNavigateToPremium={() => setActiveView('premium')}
+        onNavigateToVeriSol={() => setActiveView('attestation')}
       />
     );
   }
@@ -1396,7 +1397,6 @@ function AppContent() {
   }, [selectedBlockchain]);
 
   // Load selected blockchain from localStorage, default to Solana
-  // Also check for disclaimer agreement on initial load
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sealevel-blockchain');
@@ -1405,13 +1405,6 @@ function AppContent() {
       } else {
         // Default to Solana if nothing saved
         setSelectedBlockchain('solana');
-      }
-      
-      // Check if disclaimer needs to be shown on initial load
-      const disclaimerAgreed = localStorage.getItem('sealevel-disclaimer-agreed');
-      if (!disclaimerAgreed && currentScreen === 'landing') {
-        // Set disclaimer screen if user hasn't agreed yet
-        setCurrentScreen('disclaimer');
       }
     }
   }, []);
