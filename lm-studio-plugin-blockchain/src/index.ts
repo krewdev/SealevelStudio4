@@ -154,13 +154,35 @@ export async function getTransaction(params: {
       throw new Error('Transaction not found');
     }
     
+    // Handle both legacy and versioned transactions
+    let instructionCount = 0;
+    // Check if it's a legacy transaction by checking for 'instructions' property
+    if ('instructions' in tx.transaction.message) {
+      // Legacy transaction - instructions are directly accessible
+      instructionCount = (tx.transaction.message as any).instructions.length;
+    } else {
+      // Versioned transaction (v0) - use compiledInstructions
+      const compiledInstructions = (tx.transaction.message as any).compiledInstructions;
+      if (compiledInstructions && Array.isArray(compiledInstructions)) {
+        instructionCount = compiledInstructions.length;
+      } else {
+        // Fallback: count from inner instructions in meta if available
+        if (tx.meta?.innerInstructions && tx.meta.innerInstructions.length > 0) {
+          instructionCount = tx.meta.innerInstructions.reduce((sum, inner) => sum + inner.instructions.length, 0);
+        } else {
+          // Last resort: default to 1
+          instructionCount = 1;
+        }
+      }
+    }
+    
     return {
       signature,
       slot: tx.slot,
       blockTime: tx.blockTime ?? null,
       success: tx.meta?.err === null,
       fee: tx.meta?.fee || 0,
-      instructions: tx.transaction.message.instructions.length,
+      instructions: instructionCount,
     };
   } catch (error) {
     throw new Error(`Failed to get transaction: ${error instanceof Error ? error.message : String(error)}`);
@@ -269,16 +291,16 @@ export async function validateAddress(params: { address: string }): Promise<{
   valid: boolean;
   error?: string;
 }> {
+  const { address } = params;
   try {
-    const { address } = params;
     new PublicKey(address);
     return {
-      address,
+      address: address,
       valid: true,
     };
   } catch (error) {
     return {
-      address,
+      address: address,
       valid: false,
       error: error instanceof Error ? error.message : String(error),
     };
