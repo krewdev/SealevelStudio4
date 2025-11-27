@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
 import { ClientOnly } from './components/ClientOnly'
 import { WalletProvider } from './components/WalletProvider'
 import { PresaleCountdown } from './components/PresaleCountdown'
@@ -70,6 +71,7 @@ export default function RootLayout({
         <ClientOnly>
           <PresaleCountdown />
         </ClientOnly>
+        <Analytics />
       </body>
     </html>
   )
