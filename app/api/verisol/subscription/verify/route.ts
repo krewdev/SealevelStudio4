@@ -295,9 +295,10 @@ export async function GET(request: NextRequest) {
  * Body: { wallet: string }
  */
 export async function POST(request: NextRequest) {
+  let walletAddress: string | null = null;
+  
   try {
     let body;
-    let walletAddress: string | null = null;
     
     try {
       body = await request.json();
