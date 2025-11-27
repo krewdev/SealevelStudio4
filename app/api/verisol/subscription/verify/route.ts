@@ -297,6 +297,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     let body;
+    let walletAddress: string | null = null;
+    
     try {
       body = await request.json();
     } catch {
@@ -305,7 +307,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { wallet: walletAddress } = body;
+    const { wallet } = body;
+    walletAddress = wallet || null;
     
     if (!walletAddress) {
       return NextResponse.json(
