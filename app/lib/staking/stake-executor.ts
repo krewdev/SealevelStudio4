@@ -5,15 +5,9 @@
 
 import {
   Connection,
-  Transaction,
-  PublicKey,
-  SystemProgram,
-  LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
 import { WalletContextState } from '@solana/wallet-adapter-react';
 import { getAllStakingProviders, getStakingProvider, StakingProvider } from './staking-providers';
-import { getTemplateById } from '../instructions/templates';
-import { TransactionBuilder } from '../transaction-builder';
 
 export interface StakeExecutionResult {
   success: boolean;

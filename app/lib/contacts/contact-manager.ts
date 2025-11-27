@@ -155,7 +155,7 @@ export class ContactManager {
 
     const results: ContactSearchResult[] = [];
 
-    for (const contact of this.contacts.values()) {
+    for (const contact of Array.from(this.contacts.values())) {
       let matchScore = 0;
       let matchType: 'name' | 'email' | 'wallet' | null = null;
 
@@ -206,7 +206,7 @@ export class ContactManager {
    */
   findContactByName(name: string): Contact | null {
     const lowerName = name.toLowerCase().trim();
-    for (const contact of this.contacts.values()) {
+    for (const contact of Array.from(this.contacts.values())) {
       if (contact.name.toLowerCase() === lowerName) {
         return contact;
       }
@@ -219,7 +219,7 @@ export class ContactManager {
    */
   findContactByWallet(walletAddress: string): Contact | null {
     const lowerWallet = walletAddress.toLowerCase();
-    for (const contact of this.contacts.values()) {
+    for (const contact of Array.from(this.contacts.values())) {
       if (contact.walletAddress?.toLowerCase() === lowerWallet) {
         return contact;
       }
@@ -232,7 +232,7 @@ export class ContactManager {
    */
   findContactByEmail(email: string): Contact | null {
     const lowerEmail = email.toLowerCase();
-    for (const contact of this.contacts.values()) {
+    for (const contact of Array.from(this.contacts.values())) {
       if (contact.email?.toLowerCase() === lowerEmail) {
         return contact;
       }
