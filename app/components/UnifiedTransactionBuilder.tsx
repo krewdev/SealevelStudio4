@@ -43,6 +43,9 @@ import { AdvancedInstructionCard } from './AdvancedInstructionCard';
 import { TemplateSelectorModal } from './TemplateSelectorModal';
 import { useTransactionLogger } from '../hooks/useTransactionLogger';
 import { RecentTransactions } from './RecentTransactions';
+import { useUser } from '../contexts/UserContext';
+import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
+import { Connection } from '@solana/web3.js';
 
 // --- Block to Instruction Template Mapping ---
 const BLOCK_TO_TEMPLATE: Record<string, string> = {
@@ -501,6 +504,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   const { log, updateStatus } = useTransactionLogger();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const { user } = useUser();
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   
   // Shared transaction state
@@ -1003,7 +1007,15 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   };
 
   const executeTransaction = async () => {
-    if (!builtTransaction || !sendTransaction || !publicKey) {
+    if (!builtTransaction) {
+      addLog('Error: Transaction not built', 'error');
+      return;
+    }
+
+    // Check if we should use custodial wallet
+    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
+    
+    if (!useCustodial && (!sendTransaction || !publicKey)) {
       addLog('Error: Transaction not built or wallet not connected', 'error');
       return;
     }
@@ -1015,17 +1027,49 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       // Check for additional signers (like mint keypairs from create_token_and_mint)
       const additionalSigners = (builtTransaction as any)._additionalSigners || [];
       
-      // If there are additional signers, we need to sign with them
-      // For R&D: This allows executing transactions with program-derived keypairs
-      if (additionalSigners.length > 0) {
-        addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
-        // Sign transaction with additional signers
-        additionalSigners.forEach((signer: any) => {
-          builtTransaction.partialSign(signer);
-        });
+      let signedTransaction = builtTransaction;
+      
+      if (useCustodial && user?.walletAddress) {
+        // Sign with custodial wallet (and additional signers if any)
+        addLog('Signing with custodial wallet...', 'info');
+        signedTransaction = await signTransactionWithCustodialAndSigners(
+          builtTransaction,
+          additionalSigners,
+          {
+            userWalletAddress: user.walletAddress,
+            connection,
+          }
+        );
+        addLog('Transaction signed with custodial wallet', 'success');
+      } else {
+        // Use external wallet (Phantom, etc.)
+        if (additionalSigners.length > 0) {
+          addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
+          // Sign transaction with additional signers
+          additionalSigners.forEach((signer: any) => {
+            signedTransaction.partialSign(signer);
+          });
+        }
+        
+        // External wallet will sign when sendTransaction is called
+        if (!sendTransaction) {
+          throw new Error('No wallet available for signing');
+        }
       }
       
-      const signature = await sendTransaction(builtTransaction, connection);
+      // Send transaction
+      let signature: string;
+      if (useCustodial) {
+        // For custodial wallet, we need to send the already-signed transaction
+        const serialized = signedTransaction.serialize({ requireAllSignatures: false });
+        signature = await connection.sendRawTransaction(serialized, {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else {
+        // For external wallet, use sendTransaction which will prompt for signature
+        signature = await sendTransaction(signedTransaction, connection);
+      }
       addLog(`Transaction sent! Signature: ${signature}`, 'success');
       addLog(`View on Solscan: https://solscan.io/tx/${signature}`, 'info');
       
