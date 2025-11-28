@@ -689,42 +689,43 @@ function Header({
   onBackToLanding?: () => void;
 }) {
   return (
-    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-xl px-6 shrink-0 shadow-lg shadow-purple-500/5">
-      <div className="flex items-center space-x-4">
+    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-xl px-3 sm:px-6 shrink-0 shadow-lg shadow-purple-500/5">
+      <div className="flex items-center space-x-2 sm:space-x-4">
         {onBackToLanding && (
           <button
             onClick={onBackToLanding}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
           >
-            ← Back to Home
+            <span className="hidden sm:inline">← Back to Home</span>
+            <span className="sm:hidden">←</span>
           </button>
         )}
         {/* Logo */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <img
             src="/sea-level-logo.png"
             alt="Sealevel Studio"
-            className="h-10 w-auto"
+            className="h-8 sm:h-10 w-auto"
             style={{ maxHeight: '40px' }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          <div className="text-xl font-bold tracking-tighter">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 animate-gradient">
+          <div className="text-lg sm:text-xl font-bold tracking-tighter">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 animate-gradient hidden sm:inline">
               Sealevel Studio
             </span>
           </div>
         </div>
       </div>
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-1.5 sm:space-x-3">
         {/* Social Connect - Compact */}
         <SocialConnectButton />
         
-        {/* Network Selector - Enhanced */}
-        <button className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-700/50 px-4 py-2 text-sm font-medium text-gray-200 hover:from-gray-700 hover:to-gray-600/50 transition-all border border-gray-600/50 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/20 relative group">
+        {/* Network Selector - Enhanced - Icons only on mobile */}
+        <button className="flex items-center space-x-1 sm:space-x-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-700/50 px-2 sm:px-4 py-2 text-sm font-medium text-gray-200 hover:from-gray-700 hover:to-gray-600/50 transition-all border border-gray-600/50 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/20 relative group">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          <span>{networks[network].name}</span>
+          <span className="hidden sm:inline">{networks[network].name}</span>
           <ChevronDown className="h-4 w-4 group-hover:text-purple-400 transition-colors" />
           <select
             value={network}
