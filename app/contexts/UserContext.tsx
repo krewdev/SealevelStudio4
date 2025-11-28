@@ -68,6 +68,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Create a custodial wallet
+   * ⚠️ NOTE: This is a development/mock implementation.
+   * - Creates real Solana wallet addresses
+   * - Can receive funds and display balance
+   * - ✅ Can sign transactions via /api/wallet/sign endpoint
+   * - Note: For production, consider using a proper key management service
+   */
   const createWallet = async (email?: string, vanityPrefix?: string) => {
     try {
       // Generate a session ID for this user

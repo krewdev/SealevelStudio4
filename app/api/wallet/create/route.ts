@@ -15,9 +15,16 @@ export const dynamic = 'force-dynamic';
  * 
  * Returns: { wallet: { address, walletId, createdAt }, requiresEmailVerification?: boolean }
  * 
+ * ⚠️ DEVELOPMENT/MOCK IMPLEMENTATION:
+ * - Creates real Solana keypairs and wallet addresses
+ * - Stores encrypted keys in cookies (or database if DATABASE_URL is configured)
+ * - Wallet can receive funds and check balance
+ * - ✅ Supports transaction signing via /api/wallet/sign endpoint
+ * - Note: For production, consider using a proper key management service
+ * 
  * SECURITY: The secret key is NEVER returned to the client.
  * It is stored server-side only (in httpOnly cookies or database).
- * All signing operations must go through server-side API endpoints.
+ * All signing operations must go through server-side API endpoints (/api/wallet/sign).
  * 
  * If email is provided:
  * - Email verification token will be sent (unless email already verified)
