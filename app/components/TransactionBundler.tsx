@@ -70,8 +70,13 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   };
 
   const handleEstimate = useCallback(async () => {
-    if (!publicKey) {
-      setError('Please connect your wallet');
+    // Use custodial wallet if available, otherwise external wallet
+    const payerPublicKey = user?.walletAddress 
+      ? new PublicKey(user.walletAddress)
+      : publicKey;
+      
+    if (!payerPublicKey) {
+      setError('Please connect your wallet or create a custodial wallet');
       return;
     }
 
@@ -113,7 +118,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     } finally {
       setIsBuilding(false);
     }
-  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo]);
+  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo, user]);
 
   const handleSend = useCallback(async () => {
     // Check if we should use custodial wallet
