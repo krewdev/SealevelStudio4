@@ -820,6 +820,10 @@ ${instructions.map((ix, i) => `    // Instruction ${i + 1}: ${ix.template.name}
   };
 
   const generatePythonCode = (instructions: BuiltInstruction[]): string => {
+    const instructionComments = instructions.map((ix, i) => 
+      `    # Instruction ${i + 1}: ${ix.template.name}\n    # ${ix.template.description}\n    # TODO: Add instruction`
+    ).join('\n\n');
+    
     return `from solders.transaction import Transaction
 from solders.system_program import transfer, TransferParams
 from solders.pubkey import Pubkey
@@ -828,7 +832,7 @@ from solders.pubkey import Pubkey
 def build_transaction() -> Transaction:
     transaction = Transaction()
     
-${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n    # {ix.template.description}\n    # TODO: Add instruction').join('\n\n')}
+${instructionComments}
     
     return transaction
 `;
