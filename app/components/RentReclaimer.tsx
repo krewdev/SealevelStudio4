@@ -274,6 +274,145 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
     }
   };
 
+  // Scan all token accounts for the active wallet
+  const scanTokenAccounts = async () => {
+    if (!activeWallet) {
+      setError('Please connect a wallet or use your custodial wallet');
+      return;
+    }
+
+    setScanning(true);
+    setError(null);
+    setTokenAccounts([]);
+    setSelectedAccounts(new Set());
+
+    try {
+      // Get all token accounts owned by the wallet
+      const tokenAccountsData = await connection.getParsedTokenAccountsByOwner(
+        activeWallet,
+        {
+          programId: TOKEN_PROGRAM_ID,
+        }
+      );
+
+      const accounts: TokenAccount[] = [];
+      for (const accountInfo of tokenAccountsData.value) {
+        const parsedInfo = accountInfo.account.data.parsed?.info;
+        if (!parsedInfo) continue;
+
+        const amount = BigInt(parsedInfo.tokenAmount?.amount || '0');
+        const accountPubkey = accountInfo.pubkey;
+        const accountData = await connection.getAccountInfo(accountPubkey);
+
+        // Only include zero-balance token accounts that can be closed
+        if (amount === BigInt(0) && accountData) {
+          const owner = parsedInfo.owner || accountInfo.account.owner.toString();
+          const canClose = owner === activeWallet.toString() || 
+                          parsedInfo.closeAuthority === activeWallet.toString();
+
+          if (canClose) {
+            accounts.push({
+              address: accountPubkey.toString(),
+              mint: parsedInfo.mint,
+              amount,
+              lamports: accountData.lamports,
+              owner,
+              closeAuthority: parsedInfo.closeAuthority,
+            });
+          }
+        }
+      }
+
+      setTokenAccounts(accounts);
+      if (accounts.length === 0) {
+        setSuccess('No reclaimable token accounts found. All accounts either have balances or are not owned by this wallet.');
+      } else {
+        setSuccess(`Found ${accounts.length} reclaimable token account${accounts.length > 1 ? 's' : ''} with zero balance`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to scan token accounts');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Bulk close selected token accounts
+  const bulkCloseAccounts = async () => {
+    if (!activeWallet) {
+      setError('Wallet not available');
+      return;
+    }
+
+    if (selectedAccounts.size === 0) {
+      setError('Please select at least one account to close');
+      return;
+    }
+
+    setBulkClosing(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const accountsToClose = tokenAccounts.filter(acc => selectedAccounts.has(acc.address));
+      let totalReclaimed = 0;
+      let successCount = 0;
+      let failCount = 0;
+
+      // Process in batches to avoid transaction size limits
+      const batchSize = 10; // Close up to 10 accounts per transaction
+      for (let i = 0; i < accountsToClose.length; i += batchSize) {
+        const batch = accountsToClose.slice(i, i + batchSize);
+        const transaction = new Transaction();
+
+        for (const account of batch) {
+          try {
+            transaction.add(
+              createCloseAccountInstruction(
+                new PublicKey(account.address),
+                activeWallet,
+                activeWallet,
+                []
+              )
+            );
+            totalReclaimed += account.lamports;
+          } catch (err) {
+            console.error(`Failed to add close instruction for ${account.address}:`, err);
+            failCount++;
+          }
+        }
+
+        if (transaction.instructions.length > 0) {
+          try {
+            await signAndSendTransaction(transaction);
+            successCount += transaction.instructions.length;
+          } catch (err) {
+            console.error('Failed to send batch transaction:', err);
+            failCount += transaction.instructions.length;
+          }
+        }
+      }
+
+      const reclaimedSol = totalReclaimed / LAMPORTS_PER_SOL;
+      setReclaimedAmount(reclaimedSol);
+      setSuccess(
+        `Successfully closed ${successCount} account${successCount !== 1 ? 's' : ''} ` +
+        `and reclaimed ${reclaimedSol.toFixed(6)} SOL${failCount > 0 ? ` (${failCount} failed)` : ''}`
+      );
+
+      // Refresh token accounts list
+      await scanTokenAccounts();
+      
+      // Refresh balance if using custodial wallet
+      if (useCustodial && user?.walletAddress) {
+        await refreshBalance(user.walletAddress);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close accounts');
+    } finally {
+      setBulkClosing(false);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       checkAccount();
@@ -327,6 +466,197 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
             </div>
           </div>
         )}
+
+        {/* Wallet Selection */}
+        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-blue-400 font-medium">Select Wallet</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setUseCustodial(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  useCustodial
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <WalletIcon size={16} className="inline mr-2" />
+                Custodial Wallet
+              </button>
+              <button
+                onClick={() => setUseCustodial(false)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  !useCustodial
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <WalletIcon size={16} className="inline mr-2" />
+                External Wallet
+              </button>
+            </div>
+          </div>
+          {useCustodial ? (
+            <div>
+              {user?.walletAddress ? (
+                <p className="text-sm text-gray-300">
+                  Using custodial wallet: <span className="font-mono text-xs">{user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-8)}</span>
+                </p>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-yellow-400">
+                    No custodial wallet found.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await createWallet();
+                        setSuccess('Custodial wallet created!');
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Failed to create wallet');
+                      }
+                    }}
+                    className="btn-modern px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700"
+                  >
+                    Create Wallet
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              {externalWallet ? (
+                <p className="text-sm text-gray-300">
+                  Using external wallet: <span className="font-mono text-xs">{externalWallet.toString().slice(0, 8)}...{externalWallet.toString().slice(-8)}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-yellow-400">
+                  Please connect your external wallet to use this option.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Bulk Scanner */}
+        <div className="card-modern p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <List className="w-5 h-5 text-purple-400" />
+            <h2 className="text-xl font-semibold">Scan Token Accounts</h2>
+          </div>
+          <p className="text-sm text-gray-400 mb-4">
+            Scan your wallet for token accounts with zero balance (no liquidity tokens from other platforms) that can be closed to reclaim rent.
+          </p>
+          <button
+            onClick={scanTokenAccounts}
+            disabled={scanning || !activeWallet}
+            className="btn-modern px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {scanning ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4" />
+                Scan for Reclaimable Accounts
+              </>
+            )}
+          </button>
+
+          {/* Token Accounts List */}
+          {tokenAccounts.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">
+                  Found {tokenAccounts.length} Reclaimable Account{tokenAccounts.length > 1 ? 's' : ''}
+                </h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedAccounts(new Set(tokenAccounts.map(acc => acc.address)))}
+                    className="text-sm text-blue-400 hover:text-blue-300"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setSelectedAccounts(new Set())}
+                    className="text-sm text-gray-400 hover:text-gray-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {tokenAccounts.map((account) => {
+                  const isSelected = selectedAccounts.has(account.address);
+                  const rentSol = account.lamports / LAMPORTS_PER_SOL;
+                  return (
+                    <div
+                      key={account.address}
+                      className={`p-4 rounded-lg border ${
+                        isSelected
+                          ? 'bg-blue-500/10 border-blue-500/30'
+                          : 'bg-gray-800/50 border-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedAccounts);
+                            if (e.target.checked) {
+                              newSelected.add(account.address);
+                            } else {
+                              newSelected.delete(account.address);
+                            }
+                            setSelectedAccounts(newSelected);
+                          }}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-mono text-xs text-gray-300">
+                              {account.address.slice(0, 8)}...{account.address.slice(-8)}
+                            </span>
+                            <span className="text-yellow-400 font-semibold">
+                              {rentSol.toFixed(6)} SOL
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Mint: <span className="font-mono">{account.mint.slice(0, 8)}...{account.mint.slice(-8)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedAccounts.size > 0 && (
+                <div className="mt-4">
+                  <button
+                    onClick={bulkCloseAccounts}
+                    disabled={bulkClosing}
+                    className="btn-modern w-full px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {bulkClosing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Closing {selectedAccounts.size} Account{selectedAccounts.size > 1 ? 's' : ''}...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        Close {selectedAccounts.size} Selected Account{selectedAccounts.size > 1 ? 's' : ''}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Account Input */}
         <div className="card-modern p-6 mb-6">
@@ -507,6 +837,8 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
               <li>The rent-exempt SOL will be sent to your wallet</li>
               <li>Closing an account is permanent and cannot be undone</li>
               <li>Always verify the account details before closing</li>
+              <li>Use the bulk scanner to find and close multiple zero-balance token accounts at once</li>
+              <li>Works with both custodial and external wallets</li>
             </ul>
           </div>
         </div>
