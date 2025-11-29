@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useNetwork } from '../contexts/NetworkContext';
 import { useUser } from '../contexts/UserContext';
+import { CopyButton } from './CopyButton';
 
 interface DevnetFaucetProps {
   onBack?: () => void;
@@ -56,6 +57,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [useCustodial, setUseCustodial] = useState(true); // Default to custodial wallet
   const [currentFaucetAmount, setCurrentFaucetAmount] = useState<number | null>(null);
+  const [lastTransactionSignature, setLastTransactionSignature] = useState<string | null>(null);
   const [faucetStatus, setFaucetStatus] = useState<FaucetStatus>({
     lastRequest: null,
     requestsToday: 0,
@@ -196,6 +198,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
 
       // Wait for confirmation
       await connection.confirmTransaction(signature, 'confirmed');
+      setLastTransactionSignature(signature);
 
       // Update faucet status
       const now = Date.now();
@@ -324,9 +327,12 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           {useCustodial ? (
             <div>
               {user?.walletAddress ? (
-                <p className="text-sm text-gray-300">
-                  Using custodial wallet: <span className="font-mono text-xs">{user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-8)}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-white">
+                    Using custodial wallet: <span className="font-mono text-sm text-white font-semibold">{user.walletAddress}</span>
+                  </p>
+                  <CopyButton text={user.walletAddress} size={14} />
+                </div>
               ) : (
                 <p className="text-sm text-yellow-400">
                   No custodial wallet found. A wallet will be created automatically when you request SOL.
@@ -387,9 +393,16 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           {success && (
             <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="text-green-400 font-medium">Success</p>
                 <p className="text-sm text-gray-300 mt-1">{success}</p>
+                {lastTransactionSignature && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="text-xs text-gray-400">Transaction:</span>
+                    <span className="font-mono text-xs text-white">{lastTransactionSignature}</span>
+                    <CopyButton text={lastTransactionSignature} size={12} />
+                  </div>
+                )}
               </div>
             </div>
           )}
