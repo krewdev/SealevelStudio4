@@ -178,7 +178,7 @@ export function UserProfileWidget() {
             className="fixed inset-0 z-40" 
             onClick={() => setShowDropdown(false)}
           />
-          <div ref={dropdownRef} className="absolute right-0 mt-2 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div ref={dropdownRef} className="absolute right-0 mt-2 w-80 bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="p-4 border-b border-gray-700/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
