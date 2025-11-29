@@ -342,9 +342,12 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           ) : (
             <div>
               {externalWallet ? (
-                <p className="text-sm text-gray-300">
-                  Using external wallet: <span className="font-mono text-xs">{externalWallet.toString().slice(0, 8)}...{externalWallet.toString().slice(-8)}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-white">
+                    Using external wallet: <span className="font-mono text-sm text-white font-semibold">{externalWallet.toString()}</span>
+                  </p>
+                  <CopyButton text={externalWallet.toString()} size={14} />
+                </div>
               ) : (
                 <p className="text-sm text-yellow-400">
                   Please connect your external wallet to use this option.
