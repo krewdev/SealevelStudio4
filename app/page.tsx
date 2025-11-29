@@ -791,16 +791,22 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
         </div>
       )}
 
-      <div className="flex w-full max-w-2xl space-x-3 mb-6">
-        <input
-          type="text"
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder={`Enter ${network} account address...`}
-          className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          disabled={loading}
-        />
+      <div className="flex w-full max-w-2xl space-x-3 mb-6 relative">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            onKeyPress={handleKeyPress}
+            onFocus={() => {
+              // Could show search history dropdown here
+            }}
+            placeholder={`Enter ${network} account address...`}
+            className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            disabled={loading}
+          />
+          {/* Search history suggestions could go here */}
+        </div>
         <button
           onClick={handleSearch}
           disabled={loading || !accountId.trim()}
@@ -815,19 +821,44 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
         </button>
       </div>
 
-      {/* Example addresses */}
-      <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
-        <h3 className="text-sm font-medium text-gray-300 mb-2">Example {network} addresses to try:</h3>
-        <div className="flex flex-wrap gap-2">
-          {exampleAddresses[network].map((address, index) => (
-            <button
-              key={index}
-              onClick={() => setAccountId(address)}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-mono text-gray-200 hover:text-white transition-colors"
-            >
-              {address.slice(0, 8)}...{address.slice(-8)}
-            </button>
-          ))}
+      {/* Quick Access: Example addresses and Search History */}
+      <div className="mb-6 space-y-3">
+        {searchHistory.length > 0 && (
+          <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+            <h3 className="text-sm font-medium text-gray-300 mb-2 flex items-center">
+              <History className="h-4 w-4 mr-2" />
+              Recent Searches
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {searchHistory.slice(0, 5).map((address, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setAccountId(address);
+                    handleSearch();
+                  }}
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-mono text-gray-200 hover:text-white transition-colors flex items-center space-x-1"
+                >
+                  <span>{address.slice(0, 8)}...{address.slice(-8)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+          <h3 className="text-sm font-medium text-gray-300 mb-2">Example {network} addresses to try:</h3>
+          <div className="flex flex-wrap gap-2">
+            {exampleAddresses[network].map((address, index) => (
+              <button
+                key={index}
+                onClick={() => setAccountId(address)}
+                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-mono text-gray-200 hover:text-white transition-colors"
+              >
+                {address.slice(0, 8)}...{address.slice(-8)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
