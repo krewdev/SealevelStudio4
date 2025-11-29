@@ -176,7 +176,7 @@ export function UnifiedAIAgents(props: UnifiedAIAgentsProps) {
   return (
     <div
       ref={panelRef}
-      className={`fixed bottom-6 right-6 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl transition-all duration-300 ${
+      className={`fixed bottom-6 right-6 z-[60] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl transition-all duration-300 ${
         isMinimized ? 'w-80 h-16' : 'w-[500px] h-[600px]'
       } flex flex-col`}
     >
