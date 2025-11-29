@@ -1334,6 +1334,10 @@ ${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n 
       }
 
       onTransactionBuilt?.(transaction, cost);
+      
+      // Save to history
+      const historyName = `Transaction with ${instructions.length} instruction${instructions.length !== 1 ? 's' : ''}`;
+      saveToHistory(historyName, undefined, 'built');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to build transaction';
       setBuildError(errorMsg);
@@ -1426,6 +1430,10 @@ ${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n 
         await updateStatus(transactionLogId, 'success', signature);
       }
       
+      // Save to history with signature
+      const historyName = `Transaction executed - ${new Date().toLocaleTimeString()}`;
+      saveToHistory(historyName, signature, 'executed');
+      
       // Log mint address if created
       if (additionalSigners.length > 0) {
         const mintPubkey = additionalSigners[0].publicKey.toString();
@@ -1440,6 +1448,10 @@ ${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n 
       const errorMsg = error instanceof Error ? error.message : 'Transaction failed';
       addLog(`Error: ${errorMsg}`, 'error');
       console.error('Transaction execution error:', error);
+      
+      // Save failed transaction to history
+      const historyName = `Transaction failed - ${new Date().toLocaleTimeString()}`;
+      saveToHistory(historyName, undefined, 'failed');
       
       // Update transaction log to failed
       const transactionLogId = (builtTransaction as any)?._transactionLogId;
