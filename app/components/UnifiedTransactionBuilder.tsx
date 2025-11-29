@@ -2197,6 +2197,132 @@ ${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n 
             <TrendingUp size={16} />
             Arbitrage
           </button>
+          
+          {/* Enhanced Features Buttons */}
+          <div className="flex items-center gap-2 border-l border-gray-700 pl-3">
+            {/* Templates */}
+            <button
+              onClick={() => setShowTemplateModal(!showTemplateModal)}
+              className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+              title="Saved Templates"
+            >
+              <BookOpen size={16} />
+              {savedTemplates.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {savedTemplates.length}
+                </span>
+              )}
+            </button>
+            
+            {/* History */}
+            <button
+              onClick={() => setShowHistoryModal(!showHistoryModal)}
+              className="relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+              title="Transaction History"
+            >
+              <History size={16} />
+              {transactionHistory.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {transactionHistory.length}
+                </span>
+              )}
+            </button>
+            
+            {/* Simulate */}
+            {builtTransaction && (
+              <button
+                onClick={simulateTransaction}
+                disabled={isSimulating}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-indigo-700 text-indigo-200 hover:bg-indigo-600 transition-colors disabled:opacity-50"
+                title="Simulate Transaction"
+              >
+                {isSimulating ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Eye size={16} />
+                )}
+                Simulate
+              </button>
+            )}
+            
+            {/* Export */}
+            {(builtTransaction || transactionDraft.instructions.length > 0) && (
+              <div className="relative group">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                  title="Export Transaction"
+                >
+                  <Download size={16} />
+                  Export
+                </button>
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50">
+                    <button
+                      onClick={() => {
+                        exportTransaction('json');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-t-lg flex items-center gap-2"
+                    >
+                      <FileJson size={16} />
+                      JSON
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportTransaction('typescript');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <FileCode size={16} />
+                      TypeScript
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportTransaction('rust');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                    >
+                      <FileCode size={16} />
+                      Rust
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportTransaction('python');
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-b-lg flex items-center gap-2"
+                    >
+                      <FileCode size={16} />
+                      Python
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Save Template */}
+            {(transactionDraft.instructions.length > 0 || simpleWorkflow.length > 0) && (
+              <button
+                onClick={() => {
+                  const name = prompt('Template name:');
+                  if (name) {
+                    const description = prompt('Description (optional):') || '';
+                    const category = prompt('Category (optional):') || 'custom';
+                    saveAsTemplate(name, description, category);
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-purple-700 text-purple-200 hover:bg-purple-600 transition-colors"
+                title="Save as Template"
+              >
+                <Bookmark size={16} />
+                Save
+              </button>
+            )}
+          </div>
+          
           {publicKey ? (
             <button
               onClick={() => copyAddress(publicKey.toString())}
