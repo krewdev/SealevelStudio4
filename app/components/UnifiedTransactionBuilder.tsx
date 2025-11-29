@@ -28,7 +28,23 @@ import {
   Clipboard,
   ClipboardCheck,
   Info,
-  TrendingUp
+  TrendingUp,
+  Download,
+  Upload,
+  History,
+  FileJson,
+  FileText,
+  FileCode,
+  Bookmark,
+  BookOpen,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  GripVertical,
+  ExternalLink,
+  Copy,
+  Star,
+  Filter
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { TransactionBuilder } from '../lib/transaction-builder';
@@ -143,6 +159,30 @@ interface Log {
 }
 
 type ViewMode = 'simple' | 'advanced';
+
+// Enhanced Transaction Builder Types
+interface TransactionTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  instructions: BuiltInstruction[];
+  createdAt: number;
+  updatedAt: number;
+  tags: string[];
+  isFavorite?: boolean;
+}
+
+interface TransactionHistoryItem {
+  id: string;
+  name: string;
+  instructions: BuiltInstruction[];
+  builtTransaction?: any;
+  cost?: any;
+  signature?: string;
+  timestamp: number;
+  status: 'built' | 'executed' | 'failed';
+}
 
 // Template Tooltip Component (for advanced mode)
 function TemplateTooltip({ 
@@ -547,6 +587,299 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   const [importSignature, setImportSignature] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Enhanced features state
+  const [activeTab, setActiveTab] = useState<'build' | 'simulate' | 'templates' | 'history'>('build');
+  const [savedTemplates, setSavedTemplates] = useState<TransactionTemplate[]>([]);
+  const [transactionHistory, setTransactionHistory] = useState<TransactionHistoryItem[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // ===== ENHANCED UTILITY FUNCTIONS =====
+  
+  // Load templates from localStorage
+  useEffect(() => {
+    const loadTemplates = () => {
+      try {
+        const saved = localStorage.getItem('txBuilderTemplates');
+        if (saved) {
+          setSavedTemplates(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error('Failed to load templates:', e);
+      }
+    };
+    loadTemplates();
+  }, []);
+
+  // Save templates to localStorage
+  useEffect(() => {
+    if (savedTemplates.length > 0) {
+      localStorage.setItem('txBuilderTemplates', JSON.stringify(savedTemplates));
+    }
+  }, [savedTemplates]);
+
+  // Load transaction history from localStorage
+  useEffect(() => {
+    const loadHistory = () => {
+      try {
+        const saved = localStorage.getItem('txBuilderHistory');
+        if (saved) {
+          setTransactionHistory(JSON.parse(saved).slice(0, 50)); // Keep last 50
+        }
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  // Save transaction history to localStorage
+  useEffect(() => {
+    if (transactionHistory.length > 0) {
+      localStorage.setItem('txBuilderHistory', JSON.stringify(transactionHistory.slice(0, 50)));
+    }
+  }, [transactionHistory]);
+
+  // Save current transaction as template
+  const saveAsTemplate = (name: string, description: string = '', category: string = 'custom', tags: string[] = []) => {
+    const instructions = viewMode === 'simple' 
+      ? simpleWorkflow.map(b => ({ 
+          template: getTemplateById(BLOCK_TO_TEMPLATE[b.id] || b.id) || {} as InstructionTemplate,
+          accounts: b.params,
+          args: b.params
+        }))
+      : transactionDraft.instructions;
+
+    if (instructions.length === 0) {
+      addLog('Cannot save empty template', 'error');
+      return;
+    }
+
+    const template: TransactionTemplate = {
+      id: `template_${Date.now()}`,
+      name,
+      description,
+      category,
+      instructions,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      tags,
+      isFavorite: false,
+    };
+
+    setSavedTemplates(prev => [...prev, template]);
+    addLog(`Template "${name}" saved successfully!`, 'success');
+  };
+
+  // Load template into builder
+  const loadTemplate = (template: TransactionTemplate) => {
+    setTransactionDraft({ instructions: template.instructions });
+    setViewMode('advanced');
+    addLog(`Loaded template "${template.name}"`, 'success');
+  };
+
+  // Delete template
+  const deleteTemplate = (templateId: string) => {
+    setSavedTemplates(prev => prev.filter(t => t.id !== templateId));
+    addLog('Template deleted', 'info');
+  };
+
+  // Save to history
+  const saveToHistory = (name: string, signature?: string, status: 'built' | 'executed' | 'failed' = 'built') => {
+    const instructions = viewMode === 'simple'
+      ? simpleWorkflow.map(b => ({ 
+          template: getTemplateById(BLOCK_TO_TEMPLATE[b.id] || b.id) || {} as InstructionTemplate,
+          accounts: b.params,
+          args: b.params
+        }))
+      : transactionDraft.instructions;
+
+    const historyItem: TransactionHistoryItem = {
+      id: `history_${Date.now()}`,
+      name,
+      instructions,
+      builtTransaction: builtTransaction ? JSON.parse(JSON.stringify(builtTransaction)) : undefined,
+      cost: transactionCost,
+      signature,
+      timestamp: Date.now(),
+      status,
+    };
+
+    setTransactionHistory(prev => [historyItem, ...prev].slice(0, 50));
+  };
+
+  // Load from history
+  const loadFromHistory = (item: TransactionHistoryItem) => {
+    setTransactionDraft({ instructions: item.instructions });
+    if (item.builtTransaction) {
+      setBuiltTransaction(item.builtTransaction);
+    }
+    if (item.cost) {
+      setTransactionCost(item.cost);
+    }
+    setViewMode('advanced');
+    addLog(`Loaded transaction "${item.name}" from history`, 'success');
+  };
+
+  // Export transaction
+  const exportTransaction = async (format: 'json' | 'typescript' | 'rust' | 'python') => {
+    if (!builtTransaction && transactionDraft.instructions.length === 0) {
+      addLog('No transaction to export', 'error');
+      return;
+    }
+
+    const instructions = viewMode === 'simple'
+      ? simpleWorkflow.map(b => ({ 
+          template: getTemplateById(BLOCK_TO_TEMPLATE[b.id] || b.id) || {} as InstructionTemplate,
+          accounts: b.params,
+          args: b.params
+        }))
+      : transactionDraft.instructions;
+
+    const exportData = {
+      instructions,
+      cost: transactionCost,
+      timestamp: new Date().toISOString(),
+      network: 'solana',
+    };
+
+    let content = '';
+    let filename = '';
+    let mimeType = '';
+
+    if (format === 'json') {
+      content = JSON.stringify(exportData, null, 2);
+      filename = `transaction-${Date.now()}.json`;
+      mimeType = 'application/json';
+    } else if (format === 'typescript') {
+      content = generateTypeScriptCode(instructions);
+      filename = `transaction-${Date.now()}.ts`;
+      mimeType = 'text/typescript';
+    } else if (format === 'rust') {
+      content = generateRustCode(instructions);
+      filename = `transaction-${Date.now()}.rs`;
+      mimeType = 'text/rust';
+    } else if (format === 'python') {
+      content = generatePythonCode(instructions);
+      filename = `transaction-${Date.now()}.py`;
+      mimeType = 'text/python';
+    }
+
+    // Download file
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    addLog(`Exported transaction as ${format.toUpperCase()}`, 'success');
+  };
+
+  // Code generation helpers
+  const generateTypeScriptCode = (instructions: BuiltInstruction[]): string => {
+    return `import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
+
+// Generated Transaction - ${new Date().toISOString()}
+export async function buildTransaction(): Promise<Transaction> {
+  const transaction = new Transaction();
+  
+${instructions.map((ix, i) => `  // Instruction ${i + 1}: ${ix.template.name}
+  // ${ix.template.description}
+  transaction.add(/* TODO: Add instruction */);`).join('\n\n')}
+  
+  return transaction;
+}
+`;
+  };
+
+  const generateRustCode = (instructions: BuiltInstruction[]): string => {
+    return `use solana_program::{
+    pubkey::Pubkey,
+    instruction::{Instruction, AccountMeta},
+    transaction::Transaction,
+    system_program,
+};
+
+// Generated Transaction - ${new Date().toISOString()}
+pub fn build_transaction() -> Transaction {
+    let mut transaction = Transaction::new_with_payer(&[], None).unwrap();
+    
+${instructions.map((ix, i) => `    // Instruction ${i + 1}: ${ix.template.name}
+    // ${ix.template.description}
+    // TODO: Add instruction`).join('\n\n')}
+    
+    transaction
+}
+`;
+  };
+
+  const generatePythonCode = (instructions: BuiltInstruction[]): string => {
+    return `from solders.transaction import Transaction
+from solders.system_program import transfer, TransferParams
+from solders.pubkey import Pubkey
+
+# Generated Transaction - ${new Date().toISOString()}
+def build_transaction() -> Transaction:
+    transaction = Transaction()
+    
+${instructions.map((ix, i) => f'    # Instruction {i + 1}: {ix.template.name}\n    # {ix.template.description}\n    # TODO: Add instruction').join('\n\n')}
+    
+    return transaction
+`;
+  };
+
+  // Simulate transaction
+  const simulateTransaction = async () => {
+    if (!connection || !builtTransaction || !publicKey) {
+      addLog('Cannot simulate: connection, transaction, or wallet missing', 'error');
+      return;
+    }
+
+    setIsSimulating(true);
+    setSimulationResult(null);
+    
+    try {
+      addLog('Starting transaction simulation...', 'info');
+      
+      // Simulate the transaction
+      const simulation = await connection.simulateTransaction(builtTransaction);
+      
+      if (simulation.value.err) {
+        setSimulationResult({
+          success: false,
+          error: simulation.value.err,
+          logs: simulation.value.logs || [],
+          unitsConsumed: simulation.value.unitsConsumed || 0,
+        });
+        addLog(`Simulation failed: ${JSON.stringify(simulation.value.err)}`, 'error');
+      } else {
+        setSimulationResult({
+          success: true,
+          logs: simulation.value.logs || [],
+          unitsConsumed: simulation.value.unitsConsumed || 0,
+        });
+        addLog(`Simulation successful! Used ${simulation.value.unitsConsumed} compute units`, 'success');
+      }
+      
+      setActiveTab('simulate');
+    } catch (error: any) {
+      addLog(`Simulation error: ${error.message}`, 'error');
+      setSimulationResult({
+        success: false,
+        error: error.message,
+        logs: [],
+        unitsConsumed: 0,
+      });
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   const handleImport = async () => {
     if (!importSignature || !connection) return;
