@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
       }
 
       // If we didn't find a match, return error
-      if (!secretKey || !publicKey || attempts >= maxAttempts) {
+      if (!secretKey || !publicKey) {
         return NextResponse.json(
           { 
-            error: `Could not generate address starting with "${normalizedPrefix}" after ${maxAttempts} attempts. Try a shorter prefix.`, 
+            error: `Could not generate address starting with "${normalizedPrefix}" after ${attempts} attempts. Try a shorter prefix.`, 
             success: false 
           },
           { status: 400 }
@@ -94,10 +94,26 @@ export async function POST(request: NextRequest) {
       secretKey = keypair.secretKey;
     }
 
-    // Ensure both publicKey and secretKey are assigned (TypeScript guard)
-    if (!publicKey || !secretKey) {
+    // Ensure both publicKey and secretKey are assigned and valid (TypeScript guard)
+    if (!publicKey || !secretKey || !keypair) {
       return NextResponse.json(
         { error: 'Failed to generate wallet keypair', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Validate keypair integrity
+    if (secretKey.length !== 64) {
+      return NextResponse.json(
+        { error: 'Invalid keypair generated (invalid secret key length)', success: false },
+        { status: 500 }
+      );
+    }
+
+    // Verify the keypair is valid by checking public key matches
+    if (keypair.publicKey.toBase58() !== publicKey) {
+      return NextResponse.json(
+        { error: 'Keypair validation failed (public key mismatch)', success: false },
         { status: 500 }
       );
     }
