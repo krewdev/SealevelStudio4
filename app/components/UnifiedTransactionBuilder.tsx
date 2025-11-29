@@ -546,6 +546,16 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   const { connection } = useConnection();
   const { user } = useUser();
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
+
+  // Helper to get wallet address (custodial or external)
+  const getWalletAddress = () => {
+    return publicKey?.toString() || user?.walletAddress || null;
+  };
+
+  // Helper to check if wallet is available
+  const hasWallet = () => {
+    return !!(publicKey || user?.walletAddress);
+  };
   
   // Shared transaction state
   const [transactionDraft, setTransactionDraft] = useState<TransactionDraft>({
@@ -840,7 +850,7 @@ ${instructionComments}
 
   // Simulate transaction
   const simulateTransaction = async () => {
-    if (!connection || !builtTransaction || !publicKey) {
+    if (!connection || !builtTransaction || !hasWallet()) {
       addLog('Cannot simulate: connection, transaction, or wallet missing', 'error');
       return;
     }
@@ -1037,30 +1047,33 @@ ${instructionComments}
       };
 
       if (block.id === 'system_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['from'] = publicKey.toString();
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) throw new Error('Please generate a wallet first');
+        accounts['from'] = walletAddress;
         accounts['to'] = block.params.to || '';
         args['amount'] = convertSolToLamports(block.params.amount || '0');
       } else if (block.id === 'token_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['authority'] = publicKey.toString();
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) throw new Error('Please generate a wallet first');
+        accounts['authority'] = walletAddress;
         accounts['source'] = '';
         accounts['destination'] = block.params.destination || '';
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'create_token_and_mint') {
         // Combined operation: Create mint + Create token account + Mint tokens with ALL features
-        if (!publicKey) throw new Error('Wallet not connected');
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) throw new Error('Please generate a wallet first');
         
         // Core SPL Mint Attributes
         const decimals = parseInt(block.params.decimals || '9');
         const initialSupply = convertSolToLamports(block.params.initialSupply || '0');
-        const mintAuthority = block.params.mintAuthority || publicKey.toString();
-        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? publicKey.toString() : '');
+        const mintAuthority = block.params.mintAuthority || walletAddress;
+        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? walletAddress : '');
         const enableFreeze = block.params.enableFreeze === 'true';
         const revokeMintAuthority = block.params.revokeMintAuthority === 'true';
         
         // Token Account Attributes
-        const tokenAccountOwner = block.params.tokenAccountOwner || publicKey.toString();
+        const tokenAccountOwner = block.params.tokenAccountOwner || walletAddress;
         const delegate = block.params.delegate || '';
         const delegatedAmount = BigInt(block.params.delegatedAmount || '0');
         const freezeInitialAccount = block.params.freezeInitialAccount === 'true';
@@ -1128,7 +1141,7 @@ ${instructionComments}
         args['metadataPointer'] = metadataPointer;
         args['supplyCap'] = supplyCap;
         
-        accounts['payer'] = publicKey.toString();
+        accounts['payer'] = walletAddress;
         accounts['tokenAccountOwner'] = tokenAccountOwner;
         if (freezeAuthority) {
           accounts['freezeAuthority'] = freezeAuthority;
@@ -1145,14 +1158,16 @@ ${instructionComments}
         instructions.push({ template: placeholderTemplate, accounts, args });
         continue; // Skip normal processing
       } else if (block.id === 'token_mint') {
-        if (!publicKey) throw new Error('Wallet not connected');
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) throw new Error('Please generate a wallet first');
         accounts['mint'] = block.params.mint || '';
         accounts['destination'] = block.params.destination || '';
-        accounts['authority'] = publicKey.toString();
+        accounts['authority'] = walletAddress;
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'jup_swap') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['userTransferAuthority'] = publicKey.toString();
+        const walletAddress = getWalletAddress();
+        if (!walletAddress) throw new Error('Please generate a wallet first');
+        accounts['userTransferAuthority'] = walletAddress;
         args['amount'] = BigInt(block.params.amount || '0');
         args['minAmountOut'] = BigInt(block.params.minAmountOut || '0');
       } else {
@@ -1361,8 +1376,8 @@ ${instructionComments}
     // Check if we should use custodial wallet
     const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
     
-    if (!useCustodial && (!sendTransaction || !publicKey)) {
-      addLog('Error: Transaction not built or wallet not connected', 'error');
+    if (!useCustodial && (!sendTransaction || !hasWallet())) {
+      addLog('Error: Transaction not built or wallet not available', 'error');
       return;
     }
 
@@ -1593,9 +1608,9 @@ ${instructionComments}
               {builtTransaction && (
                 <button 
                   onClick={executeTransaction}
-                  disabled={isExecuting || !publicKey}
+                  disabled={isExecuting || !hasWallet()}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                    isExecuting || !publicKey
+                    isExecuting || !hasWallet()
                     ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
                     : 'bg-green-500 hover:bg-green-400 text-slate-900 hover:scale-105 active:scale-95'
                   }`}
@@ -2047,7 +2062,7 @@ ${instructionComments}
             {builtTransaction && (
               <button
                 onClick={executeTransaction}
-                disabled={isExecuting || !publicKey}
+                disabled={isExecuting || !hasWallet()}
                 className="flex items-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
               >
                 {isExecuting ? (
@@ -2327,13 +2342,13 @@ ${instructionComments}
             )}
           </div>
           
-          {publicKey ? (
+          {(publicKey || user?.walletAddress) && (
             <button
-              onClick={() => copyAddress(publicKey.toString())}
+              onClick={() => copyAddress((publicKey?.toString() || user?.walletAddress) || '')}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
               title="Click to copy wallet address"
             >
-              {justCopied === publicKey.toString() ? (
+              {justCopied === (publicKey?.toString() || user?.walletAddress) ? (
                 <>
                   <ClipboardCheck size={14} />
                   <span>Copied!</span>
@@ -2341,14 +2356,10 @@ ${instructionComments}
               ) : (
                 <>
                   <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span>{publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}</span>
+                  <span>{((publicKey?.toString() || user?.walletAddress) || '').slice(0, 4)}...{((publicKey?.toString() || user?.walletAddress) || '').slice(-4)}</span>
                 </>
               )}
             </button>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
-              Wallet Not Connected
-            </span>
           )}
           <button
             onClick={() => setShowClipboard(!showClipboard)}

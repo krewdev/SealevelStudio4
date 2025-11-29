@@ -370,6 +370,7 @@ function parseSystemAccount(data: Buffer) {
 // ### Account Inspector View ###
 // This is the core feature we're building now
 function AccountInspectorView({ connection, network, publicKey }: { connection: Connection; network: string; publicKey: PublicKey | null }) {
+  const { user } = useUser();
   const [accountId, setAccountId] = useState('');
   const [accountData, setAccountData] = useState<ParsedAccountData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -400,13 +401,14 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
 
   // Check if wallet network matches inspector network
   const getWalletNetwork = () => {
-    if (!publicKey) return 'Not Connected';
+    const walletAddress = publicKey?.toString() || user?.walletAddress;
+    if (!walletAddress) return null;
     // This is a simplified check - in reality you'd need to check the wallet's cluster
     // For now, we'll assume Phantom/Solflare auto-switch based on the connection
     return network; // The wallet should follow the connection network
   };
 
-  // Now walletNetwork will always be a string
+  // Now walletNetwork will be a string or null
   const walletNetwork = getWalletNetwork();
   const networkMismatch = walletNetwork && walletNetwork !== network;
 
@@ -424,11 +426,12 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
 
   // Auto-populate with connected wallet address
   const fillWalletAddress = () => {
-    if (publicKey) {
-      setAccountId(publicKey.toString());
-      console.log('Filled wallet address:', publicKey.toString());
+    const walletAddress = publicKey?.toString() || user?.walletAddress;
+    if (walletAddress) {
+      setAccountId(walletAddress);
+      console.log('Filled wallet address:', walletAddress);
     } else {
-      setError('Wallet not connected! Please connect your wallet first.');
+      setError('Please generate a wallet first using the Generate Wallet button in the header.');
     }
   };
 

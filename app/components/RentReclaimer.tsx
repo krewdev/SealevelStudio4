@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Connection,
   PublicKey,
@@ -25,8 +25,12 @@ import {
   Search,
   Trash2,
   DollarSign,
+  Wallet as WalletIcon,
+  List,
+  X,
 } from 'lucide-react';
 import { useNetwork } from '../contexts/NetworkContext';
+import { useUser } from '../contexts/UserContext';
 
 interface RentReclaimerProps {
   onBack?: () => void;
@@ -43,10 +47,21 @@ interface AccountInfo {
   amount?: string;
 }
 
+interface TokenAccount {
+  address: string;
+  mint: string;
+  amount: bigint;
+  lamports: number;
+  owner: string;
+  closeAuthority?: string;
+}
+
 export function RentReclaimer({ onBack }: RentReclaimerProps) {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey: externalWallet, signTransaction, sendTransaction } = useWallet();
   const { network } = useNetwork();
+  const { user, refreshBalance, createWallet } = useUser();
+  const [useCustodial, setUseCustodial] = useState(true); // Default to custodial wallet
   const [accountAddress, setAccountAddress] = useState('');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +69,17 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [reclaimedAmount, setReclaimedAmount] = useState<number | null>(null);
+  
+  // Bulk scanning state
+  const [scanning, setScanning] = useState(false);
+  const [tokenAccounts, setTokenAccounts] = useState<TokenAccount[]>([]);
+  const [bulkClosing, setBulkClosing] = useState(false);
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+
+  // Determine which wallet to use
+  const activeWallet = useCustodial && user?.walletAddress 
+    ? new PublicKey(user.walletAddress)
+    : externalWallet;
 
   const validateAddress = (address: string): boolean => {
     try {
@@ -108,9 +134,10 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
           amount = tokenAccount.amount.toString();
           
           // Token accounts can be closed if balance is 0
-          reclaimable = tokenAccount.amount === BigInt(0) && publicKey && 
-            (tokenAccount.owner.toString() === publicKey.toString() || 
-              tokenAccount.closeAuthority?.toString() === publicKey.toString()) || false;
+          const walletPubkey = activeWallet;
+          reclaimable = tokenAccount.amount === BigInt(0) && walletPubkey && 
+            (tokenAccount.owner.toString() === walletPubkey.toString() || 
+              tokenAccount.closeAuthority?.toString() === walletPubkey.toString()) || false;
         } catch (err) {
           accountType = 'unknown';
         }
@@ -141,14 +168,66 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
     }
   };
 
+  // Sign transaction with custodial or external wallet
+  const signAndSendTransaction = async (transaction: Transaction): Promise<string> => {
+    if (!activeWallet) {
+      throw new Error('No wallet available');
+    }
+
+    // Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = activeWallet;
+
+    if (useCustodial && user?.walletAddress) {
+      // Sign with custodial wallet via API
+      const serialized = transaction.serialize({ requireAllSignatures: false });
+      const base64 = Buffer.from(serialized).toString('base64');
+
+      const response = await fetch('/api/wallet/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction: base64 }),
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to sign transaction');
+      }
+
+      // Deserialize signed transaction
+      const signedBuffer = Buffer.from(data.signedTransaction, 'base64');
+      const signedTx = Transaction.from(signedBuffer);
+
+      // Send transaction
+      const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        maxRetries: 3,
+      });
+
+      await connection.confirmTransaction(signature, 'confirmed');
+      return signature;
+    } else {
+      // Sign with external wallet
+      if (!signTransaction || !sendTransaction) {
+        throw new Error('External wallet not connected');
+      }
+
+      const signed = await signTransaction(transaction);
+      const signature = await sendTransaction(signed, connection);
+      await connection.confirmTransaction(signature, 'confirmed');
+      return signature;
+    }
+  };
+
   const reclaimRent = async () => {
     if (!accountInfo || !accountInfo.reclaimable) {
       setError('Account cannot be reclaimed');
       return;
     }
 
-    if (!publicKey || !signTransaction || !sendTransaction) {
-      setError('Wallet not connected');
+    if (!activeWallet) {
+      setError('Wallet not available');
       return;
     }
 
@@ -165,9 +244,9 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
         transaction.add(
           createCloseAccountInstruction(
             accountPubkey, // account to close
-            publicKey,     // destination for rent (wallet owner)
-            publicKey,     // owner/authority
-            []             // multisig signers (empty for single signer)
+            activeWallet,  // destination for rent (wallet owner)
+            activeWallet, // owner/authority
+            []            // multisig signers (empty for single signer)
           )
         );
       } else {
@@ -176,23 +255,18 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
         return;
       }
 
-      // Get recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash('confirmed');
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-
-      // Sign and send
-      const signed = await signTransaction(transaction);
-      const signature = await sendTransaction(signed, connection);
-      
-      // Wait for confirmation
-      await connection.confirmTransaction(signature, 'confirmed');
+      await signAndSendTransaction(transaction);
 
       const reclaimed = accountInfo.lamports / LAMPORTS_PER_SOL;
       setReclaimedAmount(reclaimed);
       setSuccess(`Successfully reclaimed ${reclaimed.toFixed(6)} SOL`);
       setAccountInfo(null);
       setAccountAddress('');
+      
+      // Refresh balance if using custodial wallet
+      if (useCustodial && user?.walletAddress) {
+        await refreshBalance(user.walletAddress);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reclaim rent');
     } finally {
@@ -386,7 +460,7 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
                     </p>
                     <button
                       onClick={reclaimRent}
-                      disabled={reclaiming || !publicKey}
+                      disabled={reclaiming || !activeWallet}
                       className="mt-4 btn-modern px-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {reclaiming ? (
@@ -412,8 +486,8 @@ export function RentReclaimer({ onBack }: RentReclaimerProps) {
                   {accountInfo.type === 'system' && 'System accounts cannot be closed via rent reclamation.'}
                   {accountInfo.type === 'program' && 'Program accounts cannot be closed via rent reclamation.'}
                   {accountInfo.type === 'token' && accountInfo.amount !== '0' && 'Token accounts with non-zero balance cannot be closed.'}
-                  {accountInfo.type === 'token' && accountInfo.amount === '0' && publicKey && 
-                    accountInfo.owner !== publicKey.toString() && 'You must be the owner or close authority to close this account.'}
+                  {accountInfo.type === 'token' && accountInfo.amount === '0' && activeWallet && 
+                    accountInfo.owner !== activeWallet.toString() && 'You must be the owner or close authority to close this account.'}
                 </p>
               </div>
             )}
