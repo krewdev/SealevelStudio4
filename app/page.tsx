@@ -668,12 +668,22 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
   useEffect(() => {
     if (!autoRefresh || !accountId || !connection) return;
     
-    const interval = setInterval(() => {
-      if (accountId) {
-        handleSearch();
+    const refreshAccount = async () => {
+      if (!accountId || !connection) return;
+      try {
+        const pubkey = new PublicKey(accountId.trim());
+        const accountInfo = await connection.getAccountInfo(pubkey);
+        if (accountInfo) {
+          const parsedData = await parseAccountData(connection, pubkey, accountInfo);
+          setAccountData(parsedData);
+          fetchTransactionHistory(accountId);
+        }
+      } catch (err) {
+        console.error('Auto-refresh error:', err);
       }
-    }, 10000); // Refresh every 10 seconds
+    };
     
+    const interval = setInterval(refreshAccount, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
   }, [autoRefresh, accountId, connection]);
 
