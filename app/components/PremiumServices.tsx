@@ -108,7 +108,7 @@ export function PremiumServices({ onBack, onNavigateToWalletManager, onNavigateT
       icon: <Sparkles size={24} />,
       cost: 'Free',
       link: '/premium/service-bot',
-      available: true, // Available
+      available: false, // Coming soon
       features: [
         'Solana development questions',
         'Code explanations & debugging',
