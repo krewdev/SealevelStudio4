@@ -67,10 +67,11 @@ export function UserProfileWidget() {
       <>
         <button
           onClick={() => setShowEmailModal(true)}
-          className="flex items-center space-x-1 sm:space-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-2 sm:px-4 py-2 text-sm font-medium text-white transition-all shadow-lg hover:shadow-purple-500/20"
+          className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-all shadow-lg hover:shadow-purple-500/30"
         >
-          <Sparkles className="w-4 h-4" />
-          <span className="hidden sm:inline">Generate Wallet</span>
+          <Sparkles className="w-5 h-5" />
+          <span>Generate Wallet</span>
+          <span className="px-2 py-0.5 bg-white/20 text-xs rounded-full">Required</span>
         </button>
 
         {/* Email Collection Modal */}
@@ -176,7 +177,7 @@ export function UserProfileWidget() {
             className="fixed inset-0 z-40" 
             onClick={() => setShowDropdown(false)}
           />
-          <div ref={dropdownRef} className="absolute right-0 mt-2 w-80 bg-gray-800/95 backdrop-blur-xl border border-gray-700/50 rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div ref={dropdownRef} className="absolute right-0 mt-2 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="p-4 border-b border-gray-700/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
