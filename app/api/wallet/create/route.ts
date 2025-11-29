@@ -136,7 +136,12 @@ export async function POST(request: NextRequest) {
 
     // Handle email-based wallet recovery (if email provided)
     let emailHandled = false;
-    let emailResponseData = { ...walletData };
+    let emailResponseData: typeof walletData & {
+      requiresEmailVerification?: boolean;
+      emailLinked?: boolean;
+      message?: string;
+      devVerificationToken?: string;
+    } = { ...walletData };
 
     if (email) {
       // Validate email format

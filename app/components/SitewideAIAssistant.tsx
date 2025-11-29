@@ -17,6 +17,7 @@ import { executeIntent, ExecutionResult } from '../lib/ai/action-executor';
 import { getAllStakingProviders } from '../lib/staking/staking-providers';
 import { saveContact } from '../lib/send/send-executor';
 import { checkLMStudioAvailable, getAIResponseWithContext } from '../lib/ai/lm-studio-client';
+import { getAIResponseWithMCPContext } from '../lib/ai/mcp-enhanced-client';
 
 interface Message {
   id: string;
@@ -91,16 +92,37 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
     setIsTyping(true);
 
     try {
-      // Try to use LM Studio for better understanding if available
+      // Try to use LM Studio with MCP enhancement for better understanding if available
       let aiResponse: string | null = null;
+      let mcpResourcesUsed = false;
       if (lmStudioAvailable) {
         try {
-          aiResponse = await getAIResponseWithContext(textToSend, {
+          // Try MCP-enhanced first (enriched with dataset and transaction examples)
+          const mcpResult = await getAIResponseWithMCPContext(textToSend, {
             userWallet: publicKey?.toString(),
             network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
           });
+          aiResponse = mcpResult.content;
+          mcpResourcesUsed = mcpResult.mcpResourcesUsed;
+
+          // Fallback to regular if MCP fails
+          if (!aiResponse) {
+            aiResponse = await getAIResponseWithContext(textToSend, {
+              userWallet: publicKey?.toString(),
+              network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
+            });
+          }
         } catch (error) {
           console.warn('LM Studio query failed, falling back to rule-based:', error);
+          // Try regular client as fallback
+          try {
+            aiResponse = await getAIResponseWithContext(textToSend, {
+              userWallet: publicKey?.toString(),
+              network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
+            });
+          } catch (fallbackError) {
+            console.warn('Fallback LM Studio query also failed:', fallbackError);
+          }
         }
       }
 
@@ -145,7 +167,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
             data: result.actionData,
             originalIntent: intent,
           });
-          
+
           const providerMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
@@ -161,7 +183,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
             data: result.actionData,
             originalIntent: intent,
           });
-          
+
           const contactMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
@@ -218,7 +240,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
     setIsTyping(true);
     try {
       const result = await executeIntent(originalIntent, connection, { publicKey, connected, wallet } as any);
-      
+
       const message: Message = {
         id: Date.now().toString(),
         role: 'assistant',
@@ -244,7 +266,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
     if (!pendingAction || pendingAction.type !== 'provide_contact_info') return;
 
     const { data, originalIntent } = pendingAction;
-    
+
     // Determine if info is wallet address or email
     const isWallet = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(info);
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(info);
@@ -278,7 +300,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
       // Now execute the send
       originalIntent.parameters.recipient = data.contactName;
       const result = await executeIntent(originalIntent, connection, { publicKey, connected, wallet } as any);
-      
+
       const message: Message = {
         id: Date.now().toString(),
         role: 'assistant',
