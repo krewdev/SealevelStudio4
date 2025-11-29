@@ -23,6 +23,7 @@ import {
   Sun,
   Volume2,
   VolumeX,
+  Download,
 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useNetwork } from '../contexts/NetworkContext';
@@ -550,6 +551,21 @@ export function Settings({ onClose }: SettingsProps) {
                 
                 {!showRecoveryPhrase ? (
                   <div className="space-y-4">
+                    {/* Disclaimer */}
+                    <div className="p-4 bg-red-900/20 border-2 border-red-500/50 rounded-xl mb-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-left">
+                          <h4 className="text-red-400 font-semibold mb-2 text-sm">⚠️ Security Warning</h4>
+                          <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
+                            <li>Never share your recovery phrase with anyone</li>
+                            <li>Anyone with your recovery phrase can access your wallet</li>
+                            <li>Store it in a secure location offline</li>
+                            <li>If you lose it, you cannot recover your wallet</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm text-gray-400 mb-2">
                         Enter Password to Reveal Recovery Phrase
@@ -567,26 +583,68 @@ export function Settings({ onClose }: SettingsProps) {
                       disabled={loading || !password}
                       className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-medium"
                     >
-                      {loading ? 'Loading...' : 'Reveal Recovery Phrase'}
+                      {loading ? 'Loading...' : 'I Understand - Reveal Recovery Phrase'}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="bg-gray-800 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-400">Recovery Phrase (12 words)</span>
-                        <button
-                          onClick={() => copyToClipboard(recoveryPhrase, 'recoveryPhrase')}
-                          className="text-gray-400 hover:text-white"
-                        >
-                          {copied === 'recoveryPhrase' ? (
-                            <Check className="w-4 h-4 text-green-400" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
+                    {/* Warning */}
+                    <div className="p-4 bg-red-900/20 border-2 border-red-500/50 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="text-left">
+                          <h4 className="text-red-400 font-semibold mb-2 text-sm">⚠️ Keep This Secret</h4>
+                          <p className="text-xs text-gray-300">
+                            Write down these words in order and store them securely. Never share this phrase with anyone.
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-white">{recoveryPhrase}</p>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-gray-400">Recovery Phrase (12 words)</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => copyToClipboard(recoveryPhrase, 'recoveryPhrase')}
+                            className="text-gray-400 hover:text-white p-1"
+                            title="Copy"
+                          >
+                            {copied === 'recoveryPhrase' ? (
+                              <Check className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const blob = new Blob([recoveryPhrase], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `wallet-recovery-phrase-${Date.now()}.txt`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="text-gray-400 hover:text-white p-1"
+                            title="Download"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {recoveryPhrase.split(' ').map((word, index) => (
+                          <div
+                            key={index}
+                            className="bg-gray-900/50 border border-gray-700 rounded p-2 text-center"
+                          >
+                            <span className="text-xs text-gray-500 mr-1">{index + 1}.</span>
+                            <span className="text-sm text-white font-semibold">{word}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <button
                       onClick={() => setShowRecoveryPhrase(false)}
