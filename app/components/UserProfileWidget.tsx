@@ -3,6 +3,7 @@ import { useUser } from '../contexts/UserContext';
 import { Twitter, Send, LogOut, User as UserIcon, Wallet, Coins, Loader2, ChevronDown, Mail, Sparkles, Settings } from 'lucide-react';
 import { DepositWallet } from './DepositWallet';
 import { Settings as SettingsComponent } from './Settings';
+import { CopyButton } from './CopyButton';
 
 export function UserProfileWidget() {
   const { user, isLoading, linkTwitter, linkTelegram, logout, refreshBalance, createWallet } = useUser();
@@ -184,10 +185,13 @@ export function UserProfileWidget() {
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
                     <UserIcon className="w-6 h-6 text-white" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">
-                      {user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-8)}
-                    </h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-white font-mono">
+                        {user.walletAddress}
+                      </h3>
+                      <CopyButton text={user.walletAddress} size={12} />
+                    </div>
                     <p className="text-xs text-gray-400">
                       {user.balance !== undefined ? `${user.balance.toFixed(4)} SOL` : 'Loading balance...'}
                     </p>
