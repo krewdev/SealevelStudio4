@@ -34,7 +34,16 @@ interface FaucetStatus {
 
 const FAUCET_COOLDOWN = 60 * 1000; // 1 minute in milliseconds
 const MAX_REQUESTS_PER_DAY = 10;
-const FAUCET_AMOUNT = 1; // SOL
+const MIN_FAUCET_AMOUNT = 0.001; // Minimum 0.001 SOL
+const MAX_FAUCET_AMOUNT = 1; // Maximum 1 SOL (chain limit)
+
+/**
+ * Generate a random faucet amount between MIN_FAUCET_AMOUNT and MAX_FAUCET_AMOUNT
+ * @returns Random amount in SOL
+ */
+function getRandomFaucetAmount(): number {
+  return Math.random() * (MAX_FAUCET_AMOUNT - MIN_FAUCET_AMOUNT) + MIN_FAUCET_AMOUNT;
+}
 
 export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
   const { connection } = useConnection();
@@ -46,6 +55,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [useCustodial, setUseCustodial] = useState(true); // Default to custodial wallet
+  const [currentFaucetAmount, setCurrentFaucetAmount] = useState<number | null>(null);
   const [faucetStatus, setFaucetStatus] = useState<FaucetStatus>({
     lastRequest: null,
     requestsToday: 0,
@@ -174,10 +184,14 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
     setSuccess(null);
 
     try {
+      // Generate random faucet amount between 0.001 and 1 SOL
+      const faucetAmount = getRandomFaucetAmount();
+      setCurrentFaucetAmount(faucetAmount);
+      
       // Request airdrop from Solana devnet
       const signature = await connection.requestAirdrop(
         activeWallet,
-        FAUCET_AMOUNT * LAMPORTS_PER_SOL
+        faucetAmount * LAMPORTS_PER_SOL
       );
 
       // Wait for confirmation
@@ -202,7 +216,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
         cooldownSeconds: Math.floor(FAUCET_COOLDOWN / 1000),
       });
 
-      setSuccess(`Successfully received ${FAUCET_AMOUNT} SOL!`);
+      setSuccess(`Successfully received ${faucetAmount.toFixed(4)} SOL!`);
       
       // Refresh balance
       setTimeout(() => {
@@ -342,7 +356,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
             </div>
             <h2 className="text-2xl font-bold mb-2">Request Devnet SOL</h2>
             <p className="text-gray-400">
-              Get {FAUCET_AMOUNT} SOL for free to test your applications
+              Get {currentFaucetAmount ? `${currentFaucetAmount.toFixed(4)}` : '0.001-1.0'} SOL for free to test your applications
             </p>
           </div>
 
@@ -404,7 +418,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
             ) : (
               <>
                 <Droplet className="w-5 h-5" />
-                Request {FAUCET_AMOUNT} SOL
+                Request SOL (0.001-1.0)
               </>
             )}
           </button>
@@ -436,7 +450,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
               The devnet faucet provides free SOL for testing and development. This SOL has no real value and can only be used on the Solana devnet.
             </p>
             <ul className="list-disc list-inside space-y-2 ml-4">
-              <li>Each request gives you {FAUCET_AMOUNT} SOL</li>
+              <li>Each request gives you a random amount between {MIN_FAUCET_AMOUNT} and {MAX_FAUCET_AMOUNT} SOL</li>
               <li>Maximum {MAX_REQUESTS_PER_DAY} requests per day</li>
               <li>{Math.floor(FAUCET_COOLDOWN / 1000)} second cooldown between requests</li>
               <li>Only available on devnet network</li>
