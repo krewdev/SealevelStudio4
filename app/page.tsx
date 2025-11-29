@@ -882,113 +882,456 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
         </div>
       )}
 
-      {/* Account Data Display */}
+      {/* Account Data Display with Enhanced Tabs */}
       {accountData && (
         <div className="space-y-6">
-          {/* Account Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-300">Account Data</h2>
-            <div className="flex items-center space-x-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                accountData.type === 'token' ? 'bg-green-900 text-green-300' :
-                accountData.type === 'system' ? 'bg-blue-900 text-blue-300' :
-                accountData.type === 'program' ? 'bg-purple-900 text-purple-300' :
-                'bg-gray-900 text-gray-300'
-              }`}>
-                {accountData.type.toUpperCase()}
-              </span>
-              {accountData.executable && (
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-900 text-yellow-300">
-                  EXECUTABLE
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-              <h3 className="text-sm font-medium text-gray-400 mb-2">Address</h3>
+          {/* Account Header with Actions */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center space-x-3">
+              <h2 className="text-xl font-bold text-white">Account Details</h2>
               <div className="flex items-center space-x-2">
-                <code className="text-sm bg-gray-900 px-2 py-1 rounded text-gray-200 font-mono break-all">
-                  {accountId}
-                </code>
-                <button
-                  onClick={() => copyToClipboard(accountId)}
-                  className="p-1 hover:bg-gray-700 rounded"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
-                {isValidSolanaAddress(accountId) && (
-                  <a
-                    href={`https://solscan.io/account/${encodeURIComponent(accountId)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 hover:bg-gray-700 rounded"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  accountData.type === 'token' ? 'bg-green-900 text-green-300' :
+                  accountData.type === 'token-2022' ? 'bg-emerald-900 text-emerald-300' :
+                  accountData.type === 'mint' ? 'bg-cyan-900 text-cyan-300' :
+                  accountData.type === 'system' ? 'bg-blue-900 text-blue-300' :
+                  accountData.type === 'program' ? 'bg-purple-900 text-purple-300' :
+                  'bg-gray-900 text-gray-300'
+                }`}>
+                  {accountData.type.replace('-', ' ').toUpperCase()}
+                </span>
+                {accountData.executable && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-900 text-yellow-300">
+                    EXECUTABLE
+                  </span>
+                )}
+                {accountData.rentExempt && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-900 text-green-300">
+                    RENT EXEMPT
+                  </span>
                 )}
               </div>
             </div>
-
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-              <h3 className="text-sm font-medium text-gray-400 mb-2">Owner Program</h3>
-              <div className="flex items-center space-x-2">
-                <code className="text-sm bg-gray-900 px-2 py-1 rounded text-gray-200 font-mono break-all">
-                  {accountData.owner}
-                </code>
-                <button
-                  onClick={() => copyToClipboard(accountData.owner)}
-                  className="p-1 hover:bg-gray-700 rounded"
-                >
-                  <Copy className="h-3 w-3" />
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  autoRefresh 
+                    ? 'bg-purple-600 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+                title="Auto-refresh every 10 seconds"
+              >
+                <RefreshCw className={`h-3 w-3 inline mr-1 ${autoRefresh ? 'animate-spin' : ''}`} />
+                Auto
+              </button>
+              <button
+                onClick={() => handleSearch()}
+                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-white transition-colors"
+                title="Refresh account data"
+              >
+                <RefreshCw className="h-3 w-3 inline mr-1" />
+                Refresh
+              </button>
+              <div className="relative group">
+                <button className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-white transition-colors flex items-center">
+                  <Download className="h-3 w-3 mr-1" />
+                  Export
                 </button>
+                <div className="absolute right-0 mt-2 w-32 bg-gray-800 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  <button
+                    onClick={() => exportAccountData('json')}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 rounded-t-lg flex items-center"
+                  >
+                    <FileJson className="h-3 w-3 mr-2" />
+                    JSON
+                  </button>
+                  <button
+                    onClick={() => exportAccountData('csv')}
+                    className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-700 rounded-b-lg flex items-center"
+                  >
+                    <FileText className="h-3 w-3 mr-2" />
+                    CSV
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-              <h3 className="text-sm font-medium text-gray-400 mb-2">SOL Balance</h3>
-              <p className="text-lg font-semibold text-green-400">
-                {(accountData.lamports / 1e9).toFixed(4)} SOL
-              </p>
-            </div>
-
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-              <h3 className="text-sm font-medium text-gray-400 mb-2">Raw Data Size</h3>
-              <p className="text-lg font-semibold text-blue-400">
-                {accountData.rawData.length} bytes
-              </p>
             </div>
           </div>
 
-          {/* Parsed Data */}
-          {accountData.data && (
-            <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">Parsed Data</h3>
-              <pre className="bg-gray-900 p-3 rounded text-sm overflow-x-auto text-gray-200 font-mono">
-                {JSON.stringify(accountData.data, null, 2)}
-              </pre>
-            </div>
-          )}
-
-          {/* Raw Data */}
-          <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-400">Raw Data (Hex)</h3>
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 border-b border-gray-700">
+            {(['overview', 'data', 'transactions', 'related'] as const).map((tab) => (
               <button
-                onClick={() => copyToClipboard(accountData.rawData.toString('hex'))}
-                className="flex items-center space-x-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors"
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeTab === tab
+                    ? 'border-purple-500 text-purple-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-300'
+                }`}
               >
-                <Copy className="h-3 w-3" />
-                <span>Copy Hex</span>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'transactions' && transactionHistory.length > 0 && (
+                  <span className="ml-2 px-2 py-0.5 bg-purple-900 text-purple-300 rounded-full text-xs">
+                    {transactionHistory.length}
+                  </span>
+                )}
               </button>
-            </div>
-            <div className="bg-gray-900 p-3 rounded text-sm overflow-x-auto">
-              <code className="text-gray-200 font-mono break-all">
-                {accountData.rawData.toString('hex').match(/.{1,64}/g)?.join('\n') || accountData.rawData.toString('hex')}
-              </code>
-            </div>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="min-h-[400px]">
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-xs font-medium text-gray-400 mb-2">Address</h3>
+                    <div className="flex items-center space-x-2">
+                      <code className="text-sm bg-gray-900 px-2 py-1 rounded text-gray-200 font-mono break-all flex-1">
+                        {accountId}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(accountId)}
+                        className="p-1 hover:bg-gray-700 rounded"
+                        title="Copy address"
+                      >
+                        <Copy className="h-4 w-4 text-gray-400" />
+                      </button>
+                      <a
+                        href={`https://solscan.io/account/${encodeURIComponent(accountId)}?cluster=${network}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 hover:bg-gray-700 rounded"
+                        title="View on Solscan"
+                      >
+                        <ExternalLink className="h-4 w-4 text-gray-400" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-xs font-medium text-gray-400 mb-2">SOL Balance</h3>
+                    <p className="text-2xl font-bold text-green-400">
+                      {(accountData.lamports / 1e9).toFixed(9)} SOL
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {accountData.lamports.toLocaleString()} lamports
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-xs font-medium text-gray-400 mb-2">Owner Program</h3>
+                    <div className="flex items-center space-x-2">
+                      <code className="text-xs bg-gray-900 px-2 py-1 rounded text-gray-300 font-mono break-all flex-1">
+                        {accountData.owner.slice(0, 8)}...{accountData.owner.slice(-8)}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(accountData.owner)}
+                        className="p-1 hover:bg-gray-700 rounded"
+                        title="Copy owner"
+                      >
+                        <Copy className="h-4 w-4 text-gray-400" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-xs font-medium text-gray-400 mb-2">Rent Status</h3>
+                    <div className="space-y-1">
+                      <p className={`text-lg font-semibold ${accountData.rentExempt ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {accountData.rentExempt ? 'Exempt' : 'Not Exempt'}
+                      </p>
+                      {accountData.rentExemptMinimum && (
+                        <p className="text-xs text-gray-500">
+                          Minimum: {(accountData.rentExemptMinimum / 1e9).toFixed(9)} SOL
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-xs font-medium text-gray-400 mb-2">Data Size</h3>
+                    <p className="text-lg font-semibold text-blue-400">
+                      {accountData.rawData.length.toLocaleString()} bytes
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(accountData.rawData.length / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+
+                  {accountData.rentEpoch && (
+                    <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                      <h3 className="text-xs font-medium text-gray-400 mb-2">Rent Epoch</h3>
+                      <p className="text-lg font-semibold text-purple-400">
+                        {accountData.rentEpoch.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Account-Specific Data */}
+                {accountData.data && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <h3 className="text-sm font-medium text-gray-300 mb-3">Account Information</h3>
+                    {(accountData.type === 'token' || accountData.type === 'token-2022') && accountData.data && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {accountData.data.mint && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Mint</p>
+                            <code className="text-xs font-mono text-gray-300 break-all">
+                              {accountData.data.mint.slice(0, 8)}...{accountData.data.mint.slice(-8)}
+                            </code>
+                          </div>
+                        )}
+                        {accountData.data.uiAmount !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Balance</p>
+                            <p className="text-sm font-semibold text-green-400">
+                              {accountData.data.uiAmount.toLocaleString(undefined, { maximumFractionDigits: accountData.data.decimals })}
+                            </p>
+                          </div>
+                        )}
+                        {accountData.data.decimals !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Decimals</p>
+                            <p className="text-sm font-semibold text-gray-300">{accountData.data.decimals}</p>
+                          </div>
+                        )}
+                        {accountData.data.tokenProgram && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Token Program</p>
+                            <p className="text-sm font-semibold text-purple-400">{accountData.data.tokenProgram}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {accountData.type === 'mint' && accountData.data && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {accountData.data.uiSupply !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Total Supply</p>
+                            <p className="text-sm font-semibold text-green-400">
+                              {accountData.data.uiSupply.toLocaleString(undefined, { maximumFractionDigits: accountData.data.decimals })}
+                            </p>
+                          </div>
+                        )}
+                        {accountData.data.decimals !== undefined && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Decimals</p>
+                            <p className="text-sm font-semibold text-gray-300">{accountData.data.decimals}</p>
+                          </div>
+                        )}
+                        {accountData.data.mintAuthority && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Mint Authority</p>
+                            <code className="text-xs font-mono text-gray-300 break-all">
+                              {accountData.data.mintAuthority.slice(0, 8)}...{accountData.data.mintAuthority.slice(-8)}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Data Tab */}
+            {activeTab === 'data' && (
+              <div className="space-y-4">
+                {accountData.data && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-gray-300">Parsed Data</h3>
+                      <button
+                        onClick={() => copyToClipboard(JSON.stringify(accountData.data, null, 2))}
+                        className="flex items-center space-x-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>Copy JSON</span>
+                      </button>
+                    </div>
+                    <pre className="bg-gray-900 p-4 rounded text-sm overflow-x-auto text-gray-200 font-mono max-h-[500px] overflow-y-auto">
+                      {JSON.stringify(accountData.data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-300">Raw Data</h3>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setShowRawData(!showRawData)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors"
+                      >
+                        {showRawData ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        <span>{showRawData ? 'Hide' : 'Show'}</span>
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(accountData.rawData.toString('hex'))}
+                        className="flex items-center space-x-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>Copy Hex</span>
+                      </button>
+                    </div>
+                  </div>
+                  {showRawData && (
+                    <div className="bg-gray-900 p-4 rounded text-xs overflow-x-auto max-h-[500px] overflow-y-auto">
+                      <code className="text-gray-300 font-mono break-all whitespace-pre">
+                        {accountData.rawData.toString('hex').match(/.{1,64}/g)?.map((line, i) => (
+                          <div key={i} className="flex">
+                            <span className="text-gray-500 mr-4 w-16 text-right">{i * 32}</span>
+                            <span className="text-gray-300">{line.match(/.{1,2}/g)?.join(' ')}</span>
+                          </div>
+                        ))}
+                      </code>
+                    </div>
+                  )}
+                  {!showRawData && (
+                    <p className="text-sm text-gray-500 text-center py-8">Click "Show" to view raw hex data</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Transactions Tab */}
+            {activeTab === 'transactions' && (
+              <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium text-gray-300">Transaction History</h3>
+                  <button
+                    onClick={() => fetchTransactionHistory(accountId)}
+                    disabled={loadingTransactions}
+                    className="flex items-center space-x-1 px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${loadingTransactions ? 'animate-spin' : ''}`} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+                {loadingTransactions ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
+                    <p className="text-gray-400 mt-2">Loading transactions...</p>
+                  </div>
+                ) : transactionHistory.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No transactions found</p>
+                ) : (
+                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                    {transactionHistory.map((tx, index) => (
+                      <div
+                        key={tx.signature}
+                        className="bg-gray-900/50 p-3 rounded border border-gray-700/50 hover:border-gray-600 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <code className="text-xs font-mono text-gray-300 truncate flex-1">
+                                {tx.signature}
+                              </code>
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                tx.status === 'success' 
+                                  ? 'bg-green-900 text-green-300' 
+                                  : 'bg-red-900 text-red-300'
+                              }`}>
+                                {tx.status}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs text-gray-500">
+                              <span>Slot: {tx.slot.toLocaleString()}</span>
+                              {tx.blockTime && (
+                                <span>{new Date(tx.blockTime * 1000).toLocaleString()}</span>
+                              )}
+                              <span>Fee: {(tx.fee / 1e9).toFixed(9)} SOL</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <button
+                              onClick={() => copyToClipboard(tx.signature)}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Copy signature"
+                            >
+                              <Copy className="h-3 w-3 text-gray-400" />
+                            </button>
+                            <a
+                              href={`https://solscan.io/tx/${tx.signature}?cluster=${network}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="View on Solscan"
+                            >
+                              <ExternalLink className="h-3 w-3 text-gray-400" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Related Accounts Tab */}
+            {activeTab === 'related' && (
+              <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+                <h3 className="text-sm font-medium text-gray-300 mb-4">Related Accounts</h3>
+                {accountData.relatedAccounts && accountData.relatedAccounts.length > 0 ? (
+                  <div className="space-y-2">
+                    {accountData.relatedAccounts.map((related, index) => (
+                      <div
+                        key={index}
+                        className="bg-gray-900/50 p-3 rounded border border-gray-700/50 hover:border-gray-600 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-400 mb-1">{related.relationship}</p>
+                            <code className="text-sm font-mono text-gray-300 break-all">
+                              {related.address}
+                            </code>
+                            <span className="ml-2 px-2 py-0.5 bg-gray-700 text-gray-400 rounded text-xs">
+                              {related.type}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2 ml-4">
+                            <button
+                              onClick={() => copyToClipboard(related.address)}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Copy address"
+                            >
+                              <Copy className="h-4 w-4 text-gray-400" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setAccountId(related.address);
+                                handleSearch();
+                              }}
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="Inspect this account"
+                            >
+                              <Search className="h-4 w-4 text-gray-400" />
+                            </button>
+                            <a
+                              href={`https://solscan.io/account/${related.address}?cluster=${network}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 hover:bg-gray-700 rounded"
+                              title="View on Solscan"
+                            >
+                              <ExternalLink className="h-4 w-4 text-gray-400" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No related accounts found</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
