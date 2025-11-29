@@ -5,6 +5,7 @@ import { storeWalletEmailMapping, getWalletByEmail } from '@/app/lib/wallet-reco
 import { createEmailVerificationToken, isEmailVerified } from '@/app/lib/wallet-recovery/email-verification';
 import { checkConnection } from '@/app/lib/database/connection';
 import { encryptWalletKey } from '@/app/lib/wallet-recovery/encryption';
+import { generateMnemonicFromKeypair } from '@/app/lib/wallet-recovery/mnemonic';
 
 export const dynamic = 'force-dynamic';
 
@@ -159,6 +160,9 @@ export async function POST(request: NextRequest) {
     // or database storage with proper access controls.
     const encryptedKey = encryptWalletKey(secretKey);
     
+    // Generate mnemonic passphrase from secret key
+    const passphrase = generateMnemonicFromKeypair(secretKey);
+    
     // Base wallet data
     const walletData = {
       success: true,
@@ -167,6 +171,7 @@ export async function POST(request: NextRequest) {
         walletId,
         createdAt: new Date().toISOString(),
       },
+      passphrase, // Include passphrase in response (user should save this)
     };
 
     // Handle email-based wallet recovery (if email provided)
