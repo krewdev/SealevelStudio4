@@ -2299,7 +2299,29 @@ function AppContent() {
     );
   } else if (currentScreen === 'wallet-connect') {
     // Show wallet connect (LoginGate) - it will show until user connects
-    content = <LoginGate>{null}</LoginGate>;
+    // Prepare app content to pass to LoginGate - it will render once authenticated
+    const appContent = (
+      <div className="flex h-screen bg-gray-900">
+        <Sidebar activeView={activeView} setActiveView={setActiveView} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header
+            network={network}
+            setNetwork={setNetwork}
+            networks={NETWORKS}
+            wallet={<WalletButton />}
+            onBackToLanding={handleBackToLanding}
+          />
+          <MainContent
+            activeView={activeView}
+            setActiveView={setActiveView}
+            connection={connection}
+            network={network}
+            publicKey={publicKey}
+          />
+        </div>
+      </div>
+    );
+    content = <LoginGate>{appContent}</LoginGate>;
   } else if (currentScreen === 'disclaimer') {
     content = (
       <div className="min-h-screen bg-gray-900">
