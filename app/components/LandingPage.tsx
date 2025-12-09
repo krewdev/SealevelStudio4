@@ -689,7 +689,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
           <div className="flex flex-col items-center gap-4 mb-4">
             <div className="flex items-center gap-4">
               <a
-                href="https://discord.gg/sealevelstudios"
+                href="https://discord.gg/8a7FrYCEEc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-gray-400 hover:text-indigo-400 transition-colors"

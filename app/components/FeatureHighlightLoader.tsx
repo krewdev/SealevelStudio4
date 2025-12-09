@@ -508,7 +508,7 @@ export function FeatureHighlightLoader({
         <p className="text-gray-600 text-xs">
           Built for the Solana ecosystem • Open source • Community driven •{' '}
           <a 
-            href="https://discord.gg/sealevelstudios" 
+            href="https://discord.gg/8a7FrYCEEc" 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-indigo-400 hover:text-indigo-300 transition-colors"

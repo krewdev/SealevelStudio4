@@ -411,7 +411,7 @@ export function SocialFeatures({ onBack }: SocialFeaturesProps) {
               {/* Discord Link */}
               <div className="mb-6 p-4 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-lg border border-indigo-500/30">
                 <a
-                  href="https://discord.gg/sealevelstudios"
+                  href="https://discord.gg/8a7FrYCEEc"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-white hover:text-indigo-300 transition-colors group"

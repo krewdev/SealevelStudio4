@@ -14,7 +14,7 @@ interface LoginGateProps {
 }
 
 export function LoginGate({ children }: LoginGateProps) {
-  const { user, isLoading, createWallet } = useUser();
+  const { user, isLoading, createWallet, enterDemoMode } = useUser();
   const { publicKey, connect, disconnect, connecting, connected } = useWallet();
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
@@ -26,6 +26,13 @@ export function LoginGate({ children }: LoginGateProps) {
   const [vanityPrefix, setVanityPrefix] = useState('');
   const [walletMode, setWalletMode] = useState<'custodial' | 'hot' | null>(null);
   const [walletCreationResult, setWalletCreationResult] = useState<{ passphrase: string; privateKey?: string; walletAddress: string } | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  // Check if demo mode is active
+  useEffect(() => {
+    const demoMode = localStorage.getItem('demo_mode') === 'true';
+    setIsDemoMode(demoMode);
+  }, []);
 
   // Show loading state while checking for user
   if (isLoading) {
@@ -172,6 +179,16 @@ export function LoginGate({ children }: LoginGateProps) {
     // User is now logged in and tutorial is complete
   };
 
+  const handleEnterDemoMode = async () => {
+    try {
+      await enterDemoMode();
+      setIsDemoMode(true);
+    } catch (error) {
+      console.error('Failed to enter demo mode:', error);
+      alert('Failed to enter demo mode. Please try again.');
+    }
+  };
+
   const handleWalletEducationContinue = () => {
     setShowWalletEducation(false);
     // Show email input after education
@@ -212,14 +229,34 @@ export function LoginGate({ children }: LoginGateProps) {
               </button>
               <button
                 onClick={() => {
-                  setWalletMode('custodial');
-                  setShowWalletEducation(true);
+                  if (!isDemoMode) {
+                    setWalletMode('custodial');
+                    setShowWalletEducation(true);
+                  }
                 }}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                disabled={isDemoMode}
+                className={`w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 ${
+                  isDemoMode ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                title={isDemoMode ? 'Wallet creation disabled in demo mode' : ''}
               >
                 <Sparkles className="w-5 h-5" />
-                Create Custodial Wallet
+                Create Custodial Wallet {isDemoMode && '(Disabled)'}
               </button>
+              <button
+                onClick={handleEnterDemoMode}
+                className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 border-2 border-green-400/50"
+              >
+                <Sparkles className="w-5 h-5" />
+                Enter Demo Mode
+              </button>
+              {isDemoMode && (
+                <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-xs text-green-300 text-center">
+                    🎮 Demo mode active - Using prefunded devnet wallet
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -314,8 +351,11 @@ export function LoginGate({ children }: LoginGateProps) {
               {/* Submit Email Button */}
               <button
                 onClick={handleEmailSubmit}
-                disabled={isCreating || !email || !email.includes('@')}
-                className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 text-sm sm:text-base"
+                disabled={isCreating || !email || !email.includes('@') || isDemoMode}
+                className={`w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 text-sm sm:text-base ${
+                  isDemoMode ? 'opacity-30' : ''
+                }`}
+                title={isDemoMode ? 'Wallet creation disabled in demo mode' : ''}
               >
                 {isCreating ? (
                   <>
@@ -325,7 +365,7 @@ export function LoginGate({ children }: LoginGateProps) {
                 ) : (
                   <>
                     <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span>Verify Email & Create Wallet</span>
+                    <span>Verify Email & Create Wallet {isDemoMode && '(Disabled)'}</span>
                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </>
                 )}
@@ -379,8 +419,11 @@ export function LoginGate({ children }: LoginGateProps) {
                 </button>
                 <button
                   onClick={handleVerifyEmail}
-                  disabled={isCreating || !emailVerificationToken.trim()}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={isCreating || !emailVerificationToken.trim() || isDemoMode}
+                  className={`flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    isDemoMode ? 'opacity-30' : ''
+                  }`}
+                  title={isDemoMode ? 'Wallet creation disabled in demo mode' : ''}
                 >
                   {isCreating ? (
                     <>
@@ -390,7 +433,7 @@ export function LoginGate({ children }: LoginGateProps) {
                   ) : (
                     <>
                       <Shield className="w-4 h-4" />
-                      Verify & Create Wallet
+                      Verify & Create Wallet {isDemoMode && '(Disabled)'}
                     </>
                   )}
                 </button>
@@ -409,7 +452,7 @@ export function LoginGate({ children }: LoginGateProps) {
               </div>
               <div className="p-3 sm:p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
                 <a
-                  href="https://discord.gg/sealevelstudios"
+                  href="https://discord.gg/8a7FrYCEEc"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-xs sm:text-sm text-indigo-300 hover:text-indigo-200 transition-colors"

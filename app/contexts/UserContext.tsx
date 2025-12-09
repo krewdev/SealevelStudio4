@@ -38,6 +38,7 @@ interface UserContextType {
   addCampaign: (campaign: Campaign) => void;
   refreshBalance: (walletAddress?: string) => Promise<void>;
   createWallet: (email?: string, vanityPrefix?: string) => Promise<WalletCreationResult | null>;
+  enterDemoMode: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -411,6 +412,43 @@ export function UserProvider({ children }: { children: ReactNode }) {
     saveProfile(updated);
   };
 
+  /**
+   * Enter demo mode with a prefunded devnet wallet
+   * Uses a known devnet wallet address that should be prefunded
+   * NOTE: Replace this with your actual prefunded devnet wallet address
+   */
+  const enterDemoMode = async () => {
+    // Demo wallet address - should be prefunded on devnet
+    // TODO: Replace with actual prefunded devnet wallet address
+    // Example format: 'YourPrefundedDevnetWalletAddressHere'
+    // You can fund a devnet wallet using: https://faucet.solana.com
+    const demoWalletAddress = process.env.NEXT_PUBLIC_DEMO_WALLET_ADDRESS || 
+      '11111111111111111111111111111111'; // Placeholder - replace with real address
+    
+    const demoUser: UserProfile = {
+      walletAddress: demoWalletAddress,
+      walletId: 'demo-wallet-' + Date.now(),
+      balance: 10.0, // Default demo balance (will be updated from actual balance)
+      isTwitterLinked: false,
+      isTelegramLinked: false,
+      credits: 1000, // Demo credits
+      campaigns: []
+    };
+
+    setUser(demoUser);
+    saveProfile(demoUser);
+    localStorage.setItem('wallet_id', demoUser.walletId);
+    localStorage.setItem('demo_mode', 'true');
+    
+    // Try to fetch actual balance from devnet
+    try {
+      await refreshBalance(demoWalletAddress);
+    } catch (error) {
+      console.warn('Could not fetch demo wallet balance, using default:', error);
+      // Keep the default balance if fetch fails
+    }
+  };
+
   return (
     <UserContext.Provider value={{ 
       user,
@@ -422,7 +460,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       updateCredits,
       addCampaign,
       refreshBalance,
-      createWallet
+      createWallet,
+      enterDemoMode
     }}>
       {children}
     </UserContext.Provider>
