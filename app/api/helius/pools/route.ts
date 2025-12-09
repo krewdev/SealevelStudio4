@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateNumeric, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 import { fetchAllProgramAccountsV2 } from '@/app/lib/pools/fetchers/pagination';
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/app/lib/security/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,10 @@ const ALLOWED_PROGRAM_IDS: Record<string, { programId: string; dataSize: number 
 };
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = withRateLimit(request, RATE_LIMIT_CONFIGS.proxy);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     // Security: API keys should only come from environment variables, never from query parameters

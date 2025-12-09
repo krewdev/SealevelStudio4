@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSolanaAddress, validateNumeric, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/app/lib/security/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,10 @@ const ALLOWED_OHLCV_TYPES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '
 const ALLOWED_MODES = ['range', 'last'];
 
 export async function GET(request: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = withRateLimit(request, RATE_LIMIT_CONFIGS.proxy);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     // Security: API keys should only come from environment variables, never from query parameters

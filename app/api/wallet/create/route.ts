@@ -7,6 +7,7 @@ import { createEmailVerificationToken, isEmailVerified } from '@/app/lib/wallet-
 import { checkConnection } from '@/app/lib/database/connection';
 import { encryptWalletKey } from '@/app/lib/wallet-recovery/encryption';
 import { generateMnemonicFromKeypair } from '@/app/lib/wallet-recovery/mnemonic';
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/app/lib/security/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,10 @@ export const dynamic = 'force-dynamic';
  * - Wallet will be linked to email for recovery (after verification)
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = withRateLimit(request, RATE_LIMIT_CONFIGS.wallet);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const body = await request.json().catch(() => ({}));
     const { userId, sessionId, email, skipEmailVerification, vanityPrefix } = body;

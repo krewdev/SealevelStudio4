@@ -3,12 +3,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSolanaAddress, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/app/lib/security/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
 const BIRDEYE_API_BASE = ALLOWED_API_BASES.BIRDEYE;
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = withRateLimit(request, RATE_LIMIT_CONFIGS.proxy);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     // Security: API keys should only come from environment variables, never from request body
     const apiKey = process.env.BIRDEYE_API_KEY;

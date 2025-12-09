@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { decryptWalletKey } from '@/app/lib/wallet-recovery/encryption';
+import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/app/lib/security/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,10 @@ export const dynamic = 'force-dynamic';
  * - Transaction must be valid Solana transaction
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const rateLimitResponse = withRateLimit(request, RATE_LIMIT_CONFIGS.wallet);
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     const body = await request.json();
     const { transaction: transactionBase64, walletId: providedWalletId } = body;
