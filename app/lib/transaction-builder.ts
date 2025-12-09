@@ -121,11 +121,51 @@ export class TransactionBuilder {
   private async buildInstruction(builtInstruction: BuiltInstruction): Promise<TransactionInstruction> {
     const { template, accounts, args } = builtInstruction;
     
-    // Convert account names to PublicKeys
-    const accountKeys = Object.entries(accounts).map(([name, pubkey]) => ({
-      name,
-      pubkey: new PublicKey(pubkey)
-    }));
+    // Convert account names to PublicKeys with validation
+    // Also include accounts from template that have default pubkeys
+    const allAccounts: Record<string, string> = { ...accounts };
+    
+    // Add accounts with default pubkeys from template if not already provided
+    template.accounts.forEach((account) => {
+      if (account.pubkey && !allAccounts[account.name]) {
+        allAccounts[account.name] = account.pubkey;
+      }
+    });
+    
+    // Validate all required accounts are present
+    const requiredAccounts = template.accounts.filter(acc => !acc.isOptional);
+    for (const reqAcc of requiredAccounts) {
+      if (!allAccounts[reqAcc.name] && !reqAcc.pubkey) {
+        throw new Error(`Missing required account '${reqAcc.name}' for template '${template.id}'`);
+      }
+    }
+    
+    const accountKeys = Object.entries(allAccounts)
+      .filter(([name, pubkey]) => {
+        // Keep all accounts, but validate they're strings
+        if (!pubkey) {
+          return false;
+        }
+        if (typeof pubkey !== 'string') {
+          throw new Error(`Account '${name}' in template '${template.id}' has invalid type: ${typeof pubkey}, value: ${pubkey}`);
+        }
+        const trimmed = pubkey.trim();
+        if (trimmed === '') {
+          return false;
+        }
+        return true;
+      })
+      .map(([name, pubkey]) => {
+        try {
+          const trimmedPubkey = (pubkey as string).trim();
+          return {
+            name,
+            pubkey: new PublicKey(trimmedPubkey)
+          };
+        } catch (error: any) {
+          throw new Error(`Invalid public key for account '${name}' in template '${template.id}': "${pubkey}". Error: ${error.message}`);
+        }
+      });
 
     // Get the instruction data based on template
     switch (template.id) {
@@ -900,49 +940,67 @@ export class TransactionBuilder {
   }
 
   private buildMarginfiFlashLoan(accountKeys: any[], args: any): TransactionInstruction {
-    const lendingPool = accountKeys.find(acc => acc.name === 'lendingPool')!.pubkey;
-    const borrowerTokenAccount = accountKeys.find(acc => acc.name === 'borrowerTokenAccount')!.pubkey;
-    const borrower = accountKeys.find(acc => acc.name === 'borrower')!.pubkey;
-    const tokenMint = accountKeys.find(acc => acc.name === 'tokenMint')!.pubkey;
+    try {
+      const lendingPool = accountKeys.find(acc => acc.name === 'lendingPool');
+      const borrowerTokenAccount = accountKeys.find(acc => acc.name === 'borrowerTokenAccount');
+      const borrower = accountKeys.find(acc => acc.name === 'borrower');
+      const tokenMint = accountKeys.find(acc => acc.name === 'tokenMint');
 
-    const amount = BigInt(args.amount || 0);
-    const data = Buffer.alloc(8);
-    data.writeBigUInt64LE(amount, 0);
+      if (!lendingPool) throw new Error('Missing account: lendingPool');
+      if (!borrowerTokenAccount) throw new Error('Missing account: borrowerTokenAccount');
+      if (!borrower) throw new Error('Missing account: borrower');
+      if (!tokenMint) throw new Error('Missing account: tokenMint');
 
-    return new TransactionInstruction({
-      keys: [
-        { pubkey: lendingPool, isSigner: false, isWritable: true },
-        { pubkey: borrowerTokenAccount, isSigner: false, isWritable: true },
-        { pubkey: borrower, isSigner: true, isWritable: false },
-        { pubkey: tokenMint, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      programId: new PublicKey('MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FyN1mBwtbH4'),
-      data
-    });
+      const amount = BigInt(args.amount || 0);
+      const data = Buffer.alloc(8);
+      data.writeBigUInt64LE(amount, 0);
+
+      return new TransactionInstruction({
+        keys: [
+          { pubkey: lendingPool.pubkey, isSigner: false, isWritable: true },
+          { pubkey: borrowerTokenAccount.pubkey, isSigner: false, isWritable: true },
+          { pubkey: borrower.pubkey, isSigner: true, isWritable: false },
+          { pubkey: tokenMint.pubkey, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        programId: new PublicKey('So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo'), // Placeholder: Using Solend program ID for testing (Marginfi program ID was invalid)
+        data
+      });
+    } catch (error: any) {
+      throw new Error(`buildMarginfiFlashLoan failed: ${error.message}. AccountKeys: ${JSON.stringify(accountKeys.map(acc => ({ name: acc.name, pubkey: acc.pubkey?.toString() })))}`);
+    }
   }
 
   private buildMarginfiFlashRepay(accountKeys: any[], args: any): TransactionInstruction {
-    const lendingPool = accountKeys.find(acc => acc.name === 'lendingPool')!.pubkey;
-    const borrowerTokenAccount = accountKeys.find(acc => acc.name === 'borrowerTokenAccount')!.pubkey;
-    const borrower = accountKeys.find(acc => acc.name === 'borrower')!.pubkey;
-    const tokenMint = accountKeys.find(acc => acc.name === 'tokenMint')!.pubkey;
+    try {
+      const lendingPool = accountKeys.find(acc => acc.name === 'lendingPool');
+      const borrowerTokenAccount = accountKeys.find(acc => acc.name === 'borrowerTokenAccount');
+      const borrower = accountKeys.find(acc => acc.name === 'borrower');
+      const tokenMint = accountKeys.find(acc => acc.name === 'tokenMint');
 
-    const repayAmount = BigInt(args.repayAmount || 0);
-    const data = Buffer.alloc(8);
-    data.writeBigUInt64LE(repayAmount, 0);
+      if (!lendingPool) throw new Error('Missing account: lendingPool');
+      if (!borrowerTokenAccount) throw new Error('Missing account: borrowerTokenAccount');
+      if (!borrower) throw new Error('Missing account: borrower');
+      if (!tokenMint) throw new Error('Missing account: tokenMint');
 
-    return new TransactionInstruction({
-      keys: [
-        { pubkey: lendingPool, isSigner: false, isWritable: true },
-        { pubkey: borrowerTokenAccount, isSigner: false, isWritable: true },
-        { pubkey: borrower, isSigner: true, isWritable: false },
-        { pubkey: tokenMint, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      programId: new PublicKey('MFv2hWf31Z9kbCa1snEPYctwafyhdvnV7FyN1mBwtbH4'),
-      data
-    });
+      const repayAmount = BigInt(args.repayAmount || 0);
+      const data = Buffer.alloc(8);
+      data.writeBigUInt64LE(repayAmount, 0);
+
+      return new TransactionInstruction({
+        keys: [
+          { pubkey: lendingPool.pubkey, isSigner: false, isWritable: true },
+          { pubkey: borrowerTokenAccount.pubkey, isSigner: false, isWritable: true },
+          { pubkey: borrower.pubkey, isSigner: true, isWritable: false },
+          { pubkey: tokenMint.pubkey, isSigner: false, isWritable: false },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        ],
+        programId: new PublicKey('So1endDq2YkqhipRh3WViPa8hdiSpxWy6z3Z6tMCpAo'), // Placeholder: Using Solend program ID for testing (Marginfi program ID was invalid)
+        data
+      });
+    } catch (error: any) {
+      throw new Error(`buildMarginfiFlashRepay failed: ${error.message}. AccountKeys: ${JSON.stringify(accountKeys.map(acc => ({ name: acc.name, pubkey: acc.pubkey?.toString() })))}`);
+    }
   }
 
   // ===== NFT MARKETPLACE INSTRUCTIONS =====

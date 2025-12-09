@@ -58,27 +58,42 @@ export function CybersecurityFinder({ onBack }: CybersecurityFinderProps) {
   }, []);
 
   const formatAIResponse = (text: string, baseColor: string): string => {
+    // First escape HTML to prevent XSS
     let safeText = escapeHTML(text);
 
-    // Headings ### -> Bold and white
-    safeText = safeText.replace(/^###\s(.+)/gm, '<span class="font-bold text-white mt-2 block">$1</span>');
+    // Headings ### -> Bold and white (only after escaping)
+    safeText = safeText.replace(/^###\s(.+)/gm, (match, content) => {
+      // Content already escaped, just wrap in span
+      return `<span class="font-bold text-white mt-2 block">${content}</span>`;
+    });
     
-    // Code blocks ```...```
+    // Code blocks ```...``` (escape code content)
     safeText = safeText.replace(/```(\w*?)\n([\s\S]*?)```/g, (match, lang, code) => {
+      // Escape code content to prevent XSS
+      const escapedCode = escapeHTML(code.trim());
       const codeColor = baseColor === 'text-yellow-300' ? 'text-yellow-300' : 'text-gray-200';
-      return `<pre class="bg-gray-800 p-2 rounded-md my-2 ${codeColor} overflow-x-auto text-xs">${escapeHTML(code.trim())}</pre>`;
+      return `<pre class="bg-gray-800 p-2 rounded-md my-2 ${codeColor} overflow-x-auto text-xs">${escapedCode}</pre>`;
     });
 
-    // Inline code `...`
-    safeText = safeText.replace(/`([^`]+)`/g, `<code class="bg-gray-700 px-1 rounded ${baseColor}">$1</code>`);
+    // Inline code `...` (escape code content)
+    safeText = safeText.replace(/`([^`]+)`/g, (match, code) => {
+      // Escape code content to prevent XSS
+      const escapedCode = escapeHTML(code);
+      return `<code class="bg-gray-700 px-1 rounded ${baseColor}">${escapedCode}</code>`;
+    });
     
-    // Bullets * ...
-    safeText = safeText.replace(/^\*\s(.+)/gm, '<span class="block ml-4 relative"><span class="absolute -left-4 top-0.5">•</span>$1</span>');
+    // Bullets * ... (content already escaped)
+    safeText = safeText.replace(/^\*\s(.+)/gm, (match, content) => {
+      // Content already escaped, just wrap in span
+      return `<span class="block ml-4 relative"><span class="absolute -left-4 top-0.5">•</span>${content}</span>`;
+    });
     
     return safeText;
   };
 
   const escapeHTML = (str: string): string => {
+    if (!str) return '';
+    // Comprehensive HTML entity escaping to prevent XSS
     return str.replace(/[&<>"']/g, (m) => {
       const map: Record<string, string> = {
         '&': '&amp;',

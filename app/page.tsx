@@ -79,12 +79,12 @@ if (typeof window !== 'undefined') {
 const NETWORKS = {
   mainnet: {
     name: 'Mainnet Beta',
-    rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 'https://mainnet.helius-rpc.com/?api-key=70d2a8fe-abf2-409a-98f7-3070ec200099&rebate-address=BuPbYUeqbAuujKzZR3ncpmSCPBYRvpUXQaQQnynawxDr',
-    hasRebates: true,
+    rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 'https://api.mainnet-beta.solana.com',
+    hasRebates: false,
   },
   devnet: {
     name: 'Devnet', 
-    rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 'https://devnet.helius-rpc.com/?api-key=70d2a8fe-abf2-409a-98f7-3070ec200099',
+    rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 'https://api.devnet.solana.com',
     hasRebates: false,
   },
   testnet: {

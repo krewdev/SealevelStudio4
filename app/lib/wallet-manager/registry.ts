@@ -6,19 +6,32 @@
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { ManagedWallet, WalletGroup, WalletImportOptions } from './types';
 
-// Simple encryption/decryption (in production, use a proper crypto library)
+// ⚠️ SECURITY WARNING: Client-side encryption is inherently less secure than server-side
+// This implementation uses base64 encoding with password check, which provides minimal security
+// For production use, consider:
+// 1. Using Web Crypto API for proper AES-GCM encryption
+// 2. Using server-side key management service (KMS)
+// 3. Not storing private keys in browser storage at all (use hardware wallets or server-side signing)
+
+// Simple encryption/decryption (CLIENT-SIDE ONLY - minimal security)
+// This is a placeholder implementation. For production, use proper encryption or server-side key management.
 function encryptKeypair(keypair: Keypair, password: string): string {
-  // In production, use proper encryption (e.g., AES-256-GCM)
-  // For now, base64 encode (NOT SECURE - replace in production)
+  // SECURITY NOTE: This is NOT secure encryption, just obfuscation
+  // Base64 encoding provides no real security - anyone with access to localStorage can decode
+  // Password check is only for basic validation, not encryption
   const secretKey = Buffer.from(keypair.secretKey).toString('base64');
-  return btoa(JSON.stringify({ key: secretKey, password })); // Temporary - not secure
+  // Store password hash instead of plain password (still not secure, but better than plain text)
+  // In a real implementation, you would use Web Crypto API with PBKDF2 + AES-GCM
+  const passwordHash = simpleHash(password); // Simple hash for basic validation only
+  return btoa(JSON.stringify({ key: secretKey, passwordHash, version: '1.0' }));
 }
 
 function decryptKeypair(encrypted: string, password: string): Keypair {
-  // In production, use proper decryption
   try {
     const data = JSON.parse(atob(encrypted));
-    if (data.password !== password) {
+    // Verify password hash
+    const passwordHash = simpleHash(password);
+    if (data.passwordHash !== passwordHash) {
       throw new Error('Invalid password');
     }
     const secretKey = Buffer.from(data.key, 'base64');
@@ -26,6 +39,18 @@ function decryptKeypair(encrypted: string, password: string): Keypair {
   } catch (error) {
     throw new Error('Failed to decrypt keypair: Invalid password or corrupted data');
   }
+}
+
+// Simple hash function for password verification (NOT for cryptographic purposes)
+// In production, use Web Crypto API with proper key derivation
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash.toString(36);
 }
 
 function generateId(): string {
@@ -288,7 +313,10 @@ export class WalletRegistry {
       groups: Array.from(this.groups.values()),
     };
 
-    // In production, encrypt with password
+    // SECURITY WARNING: This export only base64 encodes, providing NO security
+    // The encrypted keypairs inside are only base64 encoded (not actually encrypted)
+    // Anyone with this export file can extract private keys
+    // In production, use proper encryption with password-based key derivation (PBKDF2) + AES-GCM
     return btoa(JSON.stringify(exportData)); // Temporary - not secure
   }
 
@@ -353,8 +381,11 @@ export class WalletRegistry {
   }
 
   private encryptKeypairForStorage(keypair: Keypair): string {
-    // In production, use proper encryption
-    // For now, base64 encode (NOT SECURE)
+    // SECURITY WARNING: This only base64 encodes, providing NO security
+    // The secret key is stored in plain base64 format in localStorage
+    // Anyone with access to the browser can extract the private key
+    // This should only be used for development/testing
+    // For production, use proper encryption with Web Crypto API or server-side key management
     return Buffer.from(keypair.secretKey).toString('base64');
   }
 

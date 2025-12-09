@@ -163,6 +163,30 @@ async function setupDatabase(): Promise<void> {
     await executeSqlFile('app/lib/database/schema.sql');
     await executeSqlFile('app/lib/database/transactions-schema.sql');
 
+    // Run migrations
+    console.log('\n🔄 Running migrations...\n');
+    const migrationsDir = path.join(scriptDir, 'app/lib/database/migrations');
+    if (fs.existsSync(migrationsDir)) {
+      const migrationFiles = fs.readdirSync(migrationsDir)
+        .filter(file => file.endsWith('.sql'))
+        .sort();
+      
+      for (const file of migrationFiles) {
+        const migrationPath = path.join('app/lib/database/migrations', file);
+        try {
+          await executeSqlFile(migrationPath);
+        } catch (error: any) {
+          // Ignore "already exists" errors for constraints
+          if (error.message.includes('already exists') || 
+              error.message.includes('duplicate key value')) {
+            console.log(`⚠️  Migration ${file} already applied (skipping)`);
+          } else {
+            throw error;
+          }
+        }
+      }
+    }
+
     // Check tables
     await checkTables();
 

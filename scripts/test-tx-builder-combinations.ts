@@ -3,7 +3,7 @@
  * Generates a comprehensive test report
  */
 
-import { Connection, PublicKey, Keypair } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, SystemProgram } from '@solana/web3.js';
 import { TransactionBuilder } from '../app/lib/transaction-builder';
 import { INSTRUCTION_TEMPLATES, getTemplatesByCategory, getTemplateById } from '../app/lib/instructions/templates';
 import { TransactionDraft, BuiltInstruction } from '../app/lib/instructions/types';
@@ -70,12 +70,21 @@ async function testAllIndividualTemplates() {
   console.log('\n📋 Testing All Individual Instruction Templates...\n');
   
   for (const template of INSTRUCTION_TEMPLATES) {
+    // Skip create_token_and_mint - it's handled via _operation flag
+    if (template.id === 'spl_token_create_mint') {
+      continue;
+    }
+    
     await runTest(`${template.category} - ${template.name}`, async () => {
       const accounts: Record<string, string> = {};
       const args: Record<string, any> = {};
 
       template.accounts.forEach((account) => {
-        if (!account.isOptional) {
+        // Always include accounts with default pubkeys, even if optional
+        if (account.pubkey) {
+          accounts[account.name] = account.pubkey;
+        } else if (!account.isOptional) {
+          // For required accounts without default pubkeys, generate one
           if (account.type === 'signer') {
             accounts[account.name] = testKeypair1.publicKey.toBase58();
           } else {
@@ -112,6 +121,11 @@ async function testAllIndividualTemplates() {
         }
       });
 
+      // For custom instructions, provide a programId
+      if (template.id === 'custom_instruction') {
+        args['programId'] = SystemProgram.programId.toBase58();
+      }
+
       const instruction = createBuiltInstruction(template.id, accounts, args);
       const draft = createTestDraft([instruction]);
       const tx = await builder.buildTransaction(draft);
@@ -130,8 +144,8 @@ async function testCategoryCombinations() {
   
   for (const cat1 of categories) {
     for (const cat2 of categories) {
-      const templates1 = getTemplatesByCategory(cat1);
-      const templates2 = getTemplatesByCategory(cat2);
+      const templates1 = getTemplatesByCategory(cat1).filter(t => t.id !== 'spl_token_create_mint');
+      const templates2 = getTemplatesByCategory(cat2).filter(t => t.id !== 'spl_token_create_mint');
       
       if (templates1.length === 0 || templates2.length === 0) {
         continue;
@@ -148,7 +162,13 @@ async function testCategoryCombinations() {
         
         template1.accounts.forEach((acc) => {
           if (!acc.isOptional) {
-            accounts1[acc.name] = testKeypair1.publicKey.toBase58();
+            if (acc.pubkey) {
+              accounts1[acc.name] = acc.pubkey;
+            } else if (acc.type === 'signer') {
+              accounts1[acc.name] = testKeypair1.publicKey.toBase58();
+            } else {
+              accounts1[acc.name] = testKeypair2.publicKey.toBase58();
+            }
           }
         });
         template1.args.forEach((arg) => {
@@ -165,7 +185,13 @@ async function testCategoryCombinations() {
         
         template2.accounts.forEach((acc) => {
           if (!acc.isOptional) {
-            accounts2[acc.name] = testKeypair2.publicKey.toBase58();
+            if (acc.pubkey) {
+              accounts2[acc.name] = acc.pubkey;
+            } else if (acc.type === 'signer') {
+              accounts2[acc.name] = testKeypair1.publicKey.toBase58();
+            } else {
+              accounts2[acc.name] = testKeypair2.publicKey.toBase58();
+            }
           }
         });
         template2.args.forEach((arg) => {
@@ -179,6 +205,14 @@ async function testCategoryCombinations() {
             }
           }
         });
+        
+        // For custom instructions, provide a programId
+        if (template1.id === 'custom_instruction') {
+          args1['programId'] = SystemProgram.programId.toBase58();
+        }
+        if (template2.id === 'custom_instruction') {
+          args2['programId'] = SystemProgram.programId.toBase58();
+        }
         
         const inst1 = createBuiltInstruction(template1.id, accounts1, args1);
         const inst2 = createBuiltInstruction(template2.id, accounts2, args2);
@@ -285,19 +319,37 @@ async function testFlashLoanCombinations() {
   // Basic flash loan pairs
   for (const { borrow, repay } of flashLoanPairs) {
     await runTest(`${borrow} + ${repay}`, async () => {
-      const borrowInst = createBuiltInstruction(borrow, {
-        lendingPool: testKeypair1.publicKey.toBase58(),
-        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
-        borrower: testKeypair1.publicKey.toBase58(),
-        tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { amount: 1000000 });
+      const borrowTemplate = getTemplateById(borrow);
+      const repayTemplate = getTemplateById(repay);
       
-      const repayInst = createBuiltInstruction(repay, {
+      const borrowAccounts: Record<string, string> = {
         lendingPool: testKeypair1.publicKey.toBase58(),
         borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
         borrower: testKeypair1.publicKey.toBase58(),
         tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { repayAmount: 1001000 });
+      };
+      
+      // Add tokenProgram if it has a default pubkey
+      const borrowTokenProgram = borrowTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (borrowTokenProgram?.pubkey) {
+        borrowAccounts.tokenProgram = borrowTokenProgram.pubkey;
+      }
+      
+      const repayAccounts: Record<string, string> = {
+        lendingPool: testKeypair1.publicKey.toBase58(),
+        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
+        borrower: testKeypair1.publicKey.toBase58(),
+        tokenMint: testKeypair3.publicKey.toBase58(),
+      };
+      
+      // Add tokenProgram if it has a default pubkey
+      const repayTokenProgram = repayTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (repayTokenProgram?.pubkey) {
+        repayAccounts.tokenProgram = repayTokenProgram.pubkey;
+      }
+      
+      const borrowInst = createBuiltInstruction(borrow, borrowAccounts, { amount: 1000000 });
+      const repayInst = createBuiltInstruction(repay, repayAccounts, { repayAmount: 1001000 });
       
       const draft = createTestDraft([borrowInst, repayInst]);
       const tx = await builder.buildTransaction(draft);
@@ -311,12 +363,34 @@ async function testFlashLoanCombinations() {
   // Flash loan arbitrage workflows
   for (const { borrow, repay } of flashLoanPairs) {
     await runTest(`${borrow} arbitrage (borrow + swap + repay)`, async () => {
-      const borrowInst = createBuiltInstruction(borrow, {
+      const borrowTemplate = getTemplateById(borrow);
+      const repayTemplate = getTemplateById(repay);
+      
+      const borrowAccounts: Record<string, string> = {
         lendingPool: testKeypair1.publicKey.toBase58(),
         borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
         borrower: testKeypair1.publicKey.toBase58(),
         tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { amount: 1000000 });
+      };
+      
+      const borrowTokenProgram = borrowTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (borrowTokenProgram?.pubkey) {
+        borrowAccounts.tokenProgram = borrowTokenProgram.pubkey;
+      }
+      
+      const repayAccounts: Record<string, string> = {
+        lendingPool: testKeypair1.publicKey.toBase58(),
+        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
+        borrower: testKeypair1.publicKey.toBase58(),
+        tokenMint: testKeypair3.publicKey.toBase58(),
+      };
+      
+      const repayTokenProgram = repayTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (repayTokenProgram?.pubkey) {
+        repayAccounts.tokenProgram = repayTokenProgram.pubkey;
+      }
+      
+      const borrowInst = createBuiltInstruction(borrow, borrowAccounts, { amount: 1000000 });
       
       const swapInst = createBuiltInstruction('jupiter_swap', {
         userTransferAuthority: testKeypair1.publicKey.toBase58(),
@@ -326,12 +400,7 @@ async function testFlashLoanCombinations() {
         destinationMint: testKeypair3.publicKey.toBase58(),
       }, { amount: 1000000, minAmountOut: 1100000 });
       
-      const repayInst = createBuiltInstruction(repay, {
-        lendingPool: testKeypair1.publicKey.toBase58(),
-        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
-        borrower: testKeypair1.publicKey.toBase58(),
-        tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { repayAmount: 1001000 });
+      const repayInst = createBuiltInstruction(repay, repayAccounts, { repayAmount: 1001000 });
       
       const draft = createTestDraft([borrowInst, swapInst, repayInst]);
       const tx = await builder.buildTransaction(draft);
@@ -345,19 +414,35 @@ async function testFlashLoanCombinations() {
   // Flash loan with priority fee
   for (const { borrow, repay } of flashLoanPairs) {
     await runTest(`${borrow} + ${repay} with priority fee`, async () => {
-      const borrowInst = createBuiltInstruction(borrow, {
-        lendingPool: testKeypair1.publicKey.toBase58(),
-        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
-        borrower: testKeypair1.publicKey.toBase58(),
-        tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { amount: 1000000 });
+      const borrowTemplate = getTemplateById(borrow);
+      const repayTemplate = getTemplateById(repay);
       
-      const repayInst = createBuiltInstruction(repay, {
+      const borrowAccounts: Record<string, string> = {
         lendingPool: testKeypair1.publicKey.toBase58(),
         borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
         borrower: testKeypair1.publicKey.toBase58(),
         tokenMint: testKeypair3.publicKey.toBase58(),
-      }, { repayAmount: 1001000 });
+      };
+      
+      const borrowTokenProgram = borrowTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (borrowTokenProgram?.pubkey) {
+        borrowAccounts.tokenProgram = borrowTokenProgram.pubkey;
+      }
+      
+      const repayAccounts: Record<string, string> = {
+        lendingPool: testKeypair1.publicKey.toBase58(),
+        borrowerTokenAccount: testKeypair2.publicKey.toBase58(),
+        borrower: testKeypair1.publicKey.toBase58(),
+        tokenMint: testKeypair3.publicKey.toBase58(),
+      };
+      
+      const repayTokenProgram = repayTemplate?.accounts.find(acc => acc.name === 'tokenProgram');
+      if (repayTokenProgram?.pubkey) {
+        repayAccounts.tokenProgram = repayTokenProgram.pubkey;
+      }
+      
+      const borrowInst = createBuiltInstruction(borrow, borrowAccounts, { amount: 1000000 });
+      const repayInst = createBuiltInstruction(repay, repayAccounts, { repayAmount: 1001000 });
       
       const draft: TransactionDraft = {
         instructions: [borrowInst, repayInst],
