@@ -406,7 +406,6 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                     playsInline
                     preload="auto"
                     controls
-                    preload="auto"
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {
                       console.error('Video failed to load:', e);
