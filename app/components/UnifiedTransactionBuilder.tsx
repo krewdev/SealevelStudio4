@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Play, 
   Save, 
@@ -266,7 +266,7 @@ function TemplateTooltip({
             <h5 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Parameters</h5>
             <div className="space-y-1.5">
               {template.args.length > 0 ? (
-                template.args.map((arg, idx) => (
+                useMemo(() => template.args.map((arg, idx) => (
                   <div key={idx} className="text-xs">
                     <span className="text-purple-400 font-mono">{arg.name}</span>
                     <span className="text-gray-500 mx-1">({arg.type})</span>

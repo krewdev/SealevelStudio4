@@ -150,7 +150,7 @@ export function DashboardView({ onSearchAddress, onNavigateToInspector }: Dashbo
                   </div>
                 </div>
                 <div className="p-2">
-                  {EXAMPLE_ADDRESSES.map((example, idx) => (
+                  {memoizedExampleAddresses.map((example, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleExampleClick(example.address)}
@@ -190,7 +190,7 @@ export function DashboardView({ onSearchAddress, onNavigateToInspector }: Dashbo
               <span className="text-xs text-gray-400">This Week</span>
             </div>
             <div className="space-y-3">
-              {MOCK_LEADERBOARD.map((entry) => (
+              {memoizedLeaderboard.map((entry) => (
                 <div
                   key={entry.rank}
                   className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700/50 hover:border-purple-500/50 transition-colors"
@@ -238,7 +238,7 @@ export function DashboardView({ onSearchAddress, onNavigateToInspector }: Dashbo
                 </button>
               </div>
               <div className="space-y-4">
-                {MOCK_NEWS.map((news) => (
+                {memoizedNews.map((news) => (
                   <div
                     key={news.id}
                     className="p-4 bg-gray-900/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors cursor-pointer"
@@ -343,7 +343,7 @@ export function DashboardView({ onSearchAddress, onNavigateToInspector }: Dashbo
               <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700/50">
                 <h3 className="text-sm font-semibold text-white mb-3">What's Included</h3>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {['Account Inspector', 'Transaction Builder', 'Arbitrage Scanner', 'AI Agents', 'API Access', 'Priority Support'].map((feature) => (
+                  {memoizedFeatures.map((feature) => (
                     <div key={feature} className="flex items-center gap-2 text-gray-300">
                       <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />
                       <span>{feature}</span>
