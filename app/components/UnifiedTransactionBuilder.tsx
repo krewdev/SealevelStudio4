@@ -556,6 +556,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
   const { connection } = useConnection();
   const { user } = useUser();
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
+  
+  // Memoize category keys to avoid recreation
+  const categoryKeys = useMemo(() => Object.keys(SIMPLE_BLOCK_CATEGORIES), []);
 
   // Helper to get wallet address (custodial or external)
   const getWalletAddress = () => {
@@ -1538,7 +1541,7 @@ ${instructionComments}
         <aside className="w-64 border-r border-slate-800 bg-slate-900/30 flex flex-col">
           <div className="p-3 border-b border-slate-800">
             <div className="flex bg-slate-800 p-1 rounded-lg">
-              {Object.keys(SIMPLE_BLOCK_CATEGORIES).map(cat => (
+              {categoryKeys.map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat as keyof typeof SIMPLE_BLOCK_CATEGORIES)}
