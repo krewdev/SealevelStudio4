@@ -156,7 +156,7 @@ export function AnalyticsDashboard({ data, timeframe = '7d' }: AnalyticsDashboar
                 <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
                 <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} tickFormatter={formatCurrency} />
                 <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
+                  formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
                   contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
                 />
                 <Line
@@ -206,7 +206,7 @@ export function AnalyticsDashboard({ data, timeframe = '7d' }: AnalyticsDashboar
               <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} tickFormatter={formatCurrency} />
               <Tooltip
-                formatter={(value: number) => formatCurrency(value)}
+                formatter={(value: number | undefined) => formatCurrency(value ?? 0)}
                 contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
               />
               <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -225,7 +225,7 @@ export function AnalyticsDashboard({ data, timeframe = '7d' }: AnalyticsDashboar
               <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} tickFormatter={formatNumber} />
               <Tooltip
-                formatter={(value: number) => formatNumber(value)}
+                formatter={(value: number | undefined) => formatNumber(value ?? 0)}
                 contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
               />
               <Line
