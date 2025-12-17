@@ -61,6 +61,12 @@ interface Web2ToolsProps {
 }
 
 export function Web2Tools({ onBack, onNavigateToSocial }: Web2ToolsProps) {
+  const toast = useToast();
+  
+  const handleComingSoon = (title: string) => {
+    toast.info(`${title} is coming soon! This feature will be available in a future update.`);
+  };
+  
   const tools = [
     {
       title: 'Analytics Dashboard',

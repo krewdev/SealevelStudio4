@@ -2116,6 +2116,18 @@ function AppContent() {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [previousView, setPreviousView] = useState<string>('');
   const [activeView, setActiveView] = useState('dashboard');
+  
+  // Listen for presale navigation from popup
+  useEffect(() => {
+    const handlePresaleNavigation = () => {
+      setActiveView('presale');
+    };
+    
+    window.addEventListener('navigate-to-presale', handlePresaleNavigation);
+    return () => {
+      window.removeEventListener('navigate-to-presale', handlePresaleNavigation);
+    };
+  }, []);
   const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
   const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const bleedingEdgeEnabled = process.env.NEXT_PUBLIC_BLEEDING_EDGE_ENABLED === 'true';

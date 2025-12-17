@@ -5,13 +5,13 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ClientOnly } from './components/ClientOnly'
 import { WalletProvider } from './components/WalletProvider'
-import { PresaleCountdown } from './components/PresaleCountdown'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChunkErrorHandler } from './components/ChunkErrorHandler'
 import { DevnetOnlyGuard } from './components/DevnetOnlyGuard'
 import { ToastProvider } from './components/ui/Toast'
+import { PresaleLivePopup } from './components/PresaleLivePopup'
 import './globals.css'
 import './styles/design-system.css'
 import './styles/animations.css'
@@ -72,7 +72,7 @@ export default function RootLayout({
           </NetworkProvider>
         </ErrorBoundary>
         <ClientOnly>
-          <PresaleCountdown />
+          <PresaleLivePopup />
         </ClientOnly>
         <Analytics />
         <SpeedInsights />
