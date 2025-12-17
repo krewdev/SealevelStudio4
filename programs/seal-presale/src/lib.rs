@@ -3,7 +3,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 use anchor_spl::associated_token::AssociatedToken;
 use solana_program::clock::Clock;
 
-declare_id!("SealPresale111111111111111111111111111");
+declare_id!("2g4two95hsPRbdQYoiyasp6cVYho8SF4puab4RyFHHnY");
 
 #[program]
 pub mod seal_presale {

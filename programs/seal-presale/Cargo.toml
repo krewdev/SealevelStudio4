@@ -1,5 +1,5 @@
 [package]
-name = "seal-presale"
+name = "seal_presale"
 version = "0.1.0"
 description = "SEAL Token Presale Smart Contract"
 edition = "2021"
