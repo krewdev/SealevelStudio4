@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "programs/seal-presale",
+    "programs/attestation-program/programs/attestation-program",
 ]
 resolver = "2"
 
@@ -13,4 +14,7 @@ codegen-units = 1
 opt-level = 3
 incremental = false
 codegen-units = 1
+
+[profile.dev]
+overflow-checks = true
 

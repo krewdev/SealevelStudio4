@@ -84,7 +84,12 @@ export function WelcomeTutorialModal({ onComplete, onSkip }: WelcomeTutorialModa
   const isLastStep = currentStep === TUTORIAL_STEPS.length - 1;
 
   const handleNext = () => {
-    setCompletedSteps(prev => new Set([...prev, currentStep]));
+    setCompletedSteps(prev => {
+      const next = new Set<number>();
+      prev.forEach((value) => next.add(value));
+      next.add(currentStep);
+      return next;
+    });
     if (isLastStep) {
       onComplete();
     } else {
