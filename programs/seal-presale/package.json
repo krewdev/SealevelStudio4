@@ -1,0 +1,18 @@
+{
+  "name": "seal-presale",
+  "version": "0.1.0",
+  "description": "SEAL Token Presale Smart Contract",
+  "main": "target/idl/seal_presale.json",
+  "scripts": {
+    "test": "anchor test"
+  },
+  "keywords": [
+    "solana",
+    "anchor",
+    "presale",
+    "seal-token"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
