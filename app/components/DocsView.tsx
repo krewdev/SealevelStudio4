@@ -7,6 +7,9 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+// Wrapper to satisfy React/TypeScript JSX element typing for SyntaxHighlighter
+const CodeBlockHighlighter: React.FC<any> = (props) => <SyntaxHighlighter {...props} />;
+
 interface DocsViewProps {
   onBack?: () => void;
 }
@@ -1453,7 +1456,7 @@ Deploy to Vercel, Railway, or any Next.js-compatible platform.
                         
                         return !inline && language ? (
                           <div className="my-4">
-                            <SyntaxHighlighter
+                            <CodeBlockHighlighter
                               language={language}
                               style={vscDarkPlus}
                               customStyle={{
@@ -1467,7 +1470,7 @@ Deploy to Vercel, Railway, or any Next.js-compatible platform.
                               {...props}
                             >
                               {codeString}
-                            </SyntaxHighlighter>
+                            </CodeBlockHighlighter>
                           </div>
                         ) : (
                           <code className="bg-gray-900 text-blue-400 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
