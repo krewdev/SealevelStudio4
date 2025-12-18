@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { SealAnimation } from './SealAnimation';
 import {
   Wrench,
@@ -133,6 +133,48 @@ const FEATURES: Feature[] = [
       'Cross-platform integration',
       'Content scheduling'
     ]
+  },
+  {
+    id: 'token-launcher',
+    title: 'Token Launcher',
+    description: 'Launch rugless tokens with automated social broadcasting',
+    icon: <Zap className="h-6 w-6" />,
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10 border-orange-500/30',
+    features: [
+      'Quick launch in under 60 seconds',
+      'Rugless launch protection',
+      'Auto-broadcast to Twitter & Telegram',
+      'Transaction signature sharing'
+    ]
+  },
+  {
+    id: 'quick-launch',
+    title: 'Quick Launch',
+    description: 'Rapid token deployment with default settings',
+    icon: <Zap className="h-6 w-6" />,
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10 border-yellow-500/30',
+    features: [
+      'One-click token creation',
+      'AI-generated token images',
+      'Automatic social media posts',
+      'Transaction broadcast everywhere'
+    ]
+  },
+  {
+    id: 'rugless-launchpad',
+    title: 'Rugless Launchpad',
+    description: 'Advanced token launch with full customization',
+    icon: <ShieldCheck className="h-6 w-6" />,
+    color: 'text-green-400',
+    bgColor: 'bg-green-500/10 border-green-500/30',
+    features: [
+      'Custom supply and liquidity',
+      'SEAL token staking',
+      '7-day liquidity lock',
+      'Full transaction broadcasting'
+    ]
   }
 ];
 
@@ -148,39 +190,19 @@ export function FeatureHighlightLoader({
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userReady, setUserReady] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const onAnimationCompleteRef = useRef(onAnimationComplete);
-  const onEnterAppRef = useRef(onEnterApp);
-
-  // Keep refs updated
-  useEffect(() => {
-    onAnimationCompleteRef.current = onAnimationComplete;
-    onEnterAppRef.current = onEnterApp;
-  }, [onAnimationComplete, onEnterApp]);
 
   const handleEnterApp = useCallback(() => {
-    // Clear any pending timers
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
     setUserReady(true);
-    setShowLoader(false);
-    
-    // Call callbacks immediately
-    if (onAnimationCompleteRef.current) {
-      onAnimationCompleteRef.current();
-    }
-    if (onEnterAppRef.current) {
-      onEnterAppRef.current();
-    }
-  }, []);
+    setTimeout(() => {
+      setShowLoader(false);
+      if (onAnimationComplete) {
+        onAnimationComplete();
+      }
+      if (onEnterApp) {
+        onEnterApp();
+      }
+    }, 500);
+  }, [onAnimationComplete, onEnterApp]);
 
   useEffect(() => {
     if (isLoading) {
@@ -188,55 +210,32 @@ export function FeatureHighlightLoader({
       setProgress(0);
       setUserReady(false);
 
-      // Allow scrolling on loader - don't lock body scroll
+      // Prevent body scroll when loader is active
+      document.body.style.overflow = 'hidden';
 
       // Animate progress bar
       const startTime = Date.now();
-      intervalRef.current = setInterval(() => {
+      const interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const newProgress = Math.min((elapsed / duration) * 100, 100);
         setProgress(newProgress);
 
         if (elapsed >= duration) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
-          // Auto-advance immediately
-          handleEnterApp();
+          clearInterval(interval);
+          // Auto-advance after a short delay
+          setTimeout(() => {
+            handleEnterApp();
+          }, 500);
         }
       }, 16);
 
-      // Failsafe: Force completion after duration + buffer
-      timeoutRef.current = setTimeout(() => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-        handleEnterApp();
-      }, duration + 1000);
-
       return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
+        clearInterval(interval);
+        document.body.style.overflow = '';
       };
     } else {
-      // Clean up when isLoading becomes false
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       setShowLoader(false);
+      document.body.style.overflow = '';
     }
   }, [isLoading, duration, handleEnterApp]);
 
@@ -258,8 +257,8 @@ export function FeatureHighlightLoader({
     if (onFeatureClick) {
       onFeatureClick(featureId);
     }
-    // For now, just start with transaction builder
-    if (featureId === 'transaction-builder') {
+    // Auto-enter for supported features
+    if (['transaction-builder', 'quick-launch', 'rugless-launchpad', 'token-launcher'].includes(featureId)) {
       handleEnterApp();
     }
   };
@@ -431,6 +430,9 @@ export function FeatureHighlightLoader({
                       {currentFeature.id === 'security-tools' && "Advanced smart contract verification can detect vulnerabilities before they cost you money!"}
                       {currentFeature.id === 'market-analytics' && "Real-time on-chain metrics provide insights that traditional exchanges can't offer!"}
                       {currentFeature.id === 'social-features' && "Automated social posting helps maintain consistent community engagement across platforms!"}
+                      {currentFeature.id === 'token-launcher' && "Every token launch automatically broadcasts the transaction signature to Twitter and Telegram for maximum visibility!"}
+                      {currentFeature.id === 'quick-launch' && "Launch tokens in under 60 seconds with automatic social media broadcasting of your transaction!"}
+                      {currentFeature.id === 'rugless-launchpad' && "Advanced token launches with rugless protection and automatic transaction broadcasting to all platforms!"}
                     </>
                   )}
                 </p>
@@ -504,7 +506,15 @@ export function FeatureHighlightLoader({
       {/* Footer */}
       <div className="mt-8 text-center relative z-10">
         <p className="text-gray-600 text-xs">
-          Built for the Solana ecosystem • Open source • Community driven
+          Built for the Solana ecosystem • Open source • Community driven •{' '}
+          <a 
+            href="https://discord.gg/sealevelstudios" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            Join Discord @sealevelstudios
+          </a>
         </p>
       </div>
       </div>

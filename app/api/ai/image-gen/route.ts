@@ -62,8 +62,10 @@ Design requirements:
     }
 
     // Rate limiting check (basic)
+    // Note: checkRateLimit increments before returning, so when it returns 10, that's the 10th request
+    // We should allow 10 requests, so reject when count > 10 (i.e., the 11th request)
     const requestCount = await checkRateLimit(request);
-    if (requestCount >= 10) {
+    if (requestCount > 10) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.' },
         { status: 429 }

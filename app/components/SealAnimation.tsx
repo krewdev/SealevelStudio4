@@ -11,10 +11,12 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>();
-  const [useVideo, setUseVideo] = useState(false);
-  const [videoChecked, setVideoChecked] = useState(false);
+  const [useVideo, setUseVideo] = useState<boolean | null>(null); // null = checking, true = use video, false = use canvas
 
   useEffect(() => {
+    // Only start canvas animation if video is not being used
+    if (useVideo) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -155,91 +157,94 @@ export function SealAnimation({ size = 200, className = '' }: SealAnimationProps
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [size]);
+  }, [size, useVideo]);
 
-  // Prioritize video over canvas animation
+  // Prioritize video over canvas animation - check immediately on mount
   useEffect(() => {
-    // Always start with canvas, then check for video in the background
-    setUseVideo(false);
-    setVideoChecked(false);
-    
     const checkVideo = async () => {
       try {
-        // Simple check - try to fetch the video file
+        // Check for MP4 video file
         const response = await fetch('/sea-lion-animation.mp4', { method: 'HEAD' });
         if (response.ok) {
           setUseVideo(true);
-          setVideoChecked(true);
+          console.log('Using sea lion MP4 animation');
           return;
         }
 
-        // Try alternate video
+        // Fallback to alternate MP4
         const altResponse = await fetch('/sea-lion-animation.1mp4', { method: 'HEAD' });
         if (altResponse.ok) {
           setUseVideo(true);
-          setVideoChecked(true);
+          console.log('Using alternate sea lion MP4 animation');
           return;
         }
 
-        setVideoChecked(true);
+        console.log('MP4 video not found, using canvas animation');
         setUseVideo(false);
       } catch (error) {
-        setVideoChecked(true);
+        console.log('Video check failed, using canvas animation:', error);
         setUseVideo(false);
       }
     };
-
-    // Check after a short delay - don't block rendering
-    const timeoutId = setTimeout(checkVideo, 200);
-    return () => clearTimeout(timeoutId);
+    checkVideo();
   }, []);
 
-  // Always render canvas, but hide it when video is available
-  return (
-    <div className={`relative flex items-center justify-center ${className}`}
-         style={{ width: size, height: size }}>
-      {/* Canvas animation - always rendered */}
-      <canvas
-        ref={canvasRef}
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          display: useVideo && videoChecked ? 'none' : 'block'
-        }}
-      />
-      
-      {/* Video - shown only when available and checked */}
-      {useVideo && videoChecked && (
+  // Show nothing while checking for video
+  if (useVideo === null) {
+    return (
+      <div className={`relative ${className}`} style={{ width: size, height: size }}>
+        {/* Placeholder while checking */}
+      </div>
+    );
+  }
+
+  // If video is available, use it
+  if (useVideo) {
+    return (
+      <div className={`relative ${className}`} style={{ width: size, height: size }}>
         <video
           ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
-          preload="auto"
           className="seal-animation"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
             width: '100%',
             height: '100%',
             display: 'block',
+            position: 'relative',
+            zIndex: 10,
             filter: 'drop-shadow(0 0 20px rgba(59, 130, 246, 0.5))',
             objectFit: 'contain',
           }}
-          onError={(e) => {
-            console.error('Video failed to load, using canvas animation');
+          onError={() => {
+            // Fallback to canvas if video fails to load
+            console.log('Video failed to load, falling back to canvas');
             setUseVideo(false);
-          }}
-          onLoadedData={() => {
-            console.log('Video loaded and ready to play');
           }}
         >
           <source src="/sea-lion-animation.mp4" type="video/mp4" />
-          <source src="/sea-lion-animation.1mp4" type="video/mp4" />
+          <source src="/sea-lion-animation.webm" type="video/webm" />
         </video>
-      )}
+      </div>
+    );
+  }
+
+  // Use canvas animation (only render when video is not available)
+  return (
+    <div className={`relative flex items-center justify-center ${className}`}
+         style={{ width: size, height: size }}>
+      <canvas
+        ref={canvasRef}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          display: 'block',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      />
     </div>
   );
 }

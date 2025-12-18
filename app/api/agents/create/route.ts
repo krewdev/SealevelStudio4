@@ -36,9 +36,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get RPC endpoint
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 
-                   'https://api.mainnet-beta.solana.com';
+    // Get RPC endpoint - use devnet for demo
+    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
+                   'https://api.devnet.solana.com';
     const connection = new Connection(rpcUrl, 'confirmed');
 
     // Create agent based on type

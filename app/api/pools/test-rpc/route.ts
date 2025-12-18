@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const network = 'mainnet';
+    const network = 'devnet';
     
     // Get RPC endpoint - prefer Helius if API key is available
     let rpcUrl: string;
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       let isHeliusHost = false;
       try {
         const apiKeyUrl = new URL(apiKey);
-        isHeliusHost = apiKeyUrl.hostname === 'mainnet.helius-rpc.com';
+        isHeliusHost = apiKeyUrl.hostname === 'devnet.helius-rpc.com';
       } catch {
         // Not a URL, treat as raw API key
         isHeliusHost = false;
@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
         const match = apiKey.match(/[?&]api-key=([^&]+)/);
         heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
       }
-      rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
+      rpcUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
     } else {
-      rpcUrl = 'https://api.mainnet-beta.solana.com';
+      rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 'https://api.devnet.solana.com';
     }
 
     const connection = new Connection(rpcUrl, 'confirmed');

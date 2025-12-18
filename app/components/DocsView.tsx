@@ -1,9 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Book, Wallet, Mail, Lock, X, CheckCircle, ArrowLeft, Search, FileText, Code, Shield, Terminal, Zap, TrendingUp } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { EmailAuth } from '../lib/auth/email-auth';
+import React, { useState } from 'react';
+import { Book, ArrowLeft, Search, FileText, Code, Shield, Terminal, Zap, TrendingUp } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -14,56 +12,8 @@ interface DocsViewProps {
 }
 
 export function DocsView({ onBack }: DocsViewProps) {
-  const { publicKey, connected } = useWallet();
-  const [emailAuth] = useState(() => new EmailAuth());
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'wallet' | 'email' | null>(null);
-  const [email, setEmail] = useState('');
-  const [verificationToken, setVerificationToken] = useState('');
-  const [showEmailForm, setShowEmailForm] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDoc, setActiveDoc] = useState<string | null>(null);
-
-  // Check authentication on mount
-  useEffect(() => {
-    if (connected && publicKey) {
-      setIsAuthenticated(true);
-      setAuthMethod('wallet');
-    } else if (emailAuth.isAuthenticated()) {
-      setIsAuthenticated(true);
-      setAuthMethod('email');
-    }
-  }, [connected, publicKey, emailAuth]);
-
-  const handleEmailAuth = async () => {
-    if (!email) return;
-
-    const result = await emailAuth.requestVerification(email);
-    if (result.success) {
-      setEmailSent(true);
-      // Auto-verify for demo (in production, user would check email)
-      setTimeout(async () => {
-        const session = emailAuth.getCurrentEmail();
-        if (session) {
-          setIsAuthenticated(true);
-          setAuthMethod('email');
-        }
-      }, 1000);
-    } else {
-      alert(result.message);
-    }
-  };
-
-  const handleLogout = () => {
-    if (authMethod === 'email') {
-      emailAuth.logout();
-    }
-    setIsAuthenticated(false);
-    setAuthMethod(null);
-    setEmail('');
-    setEmailSent(false);
-  };
 
   const docs = [
     {
@@ -776,6 +726,596 @@ We welcome contributions to training data:
 - Share Solana program patterns
 
 The model will continuously improve based on real-world usage and feedback.`
+    },
+    {
+      id: 'cli-tools',
+      title: 'Solana CLI Tools',
+      icon: <Terminal size={20} />,
+      category: 'Tools',
+      content: `# Sealevel Studio CLI Tools
+
+## Overview
+
+Sealevel Studio includes a comprehensive set of command-line tools for Solana development, deployment, and maintenance. These tools are designed to streamline your workflow and automate common tasks.
+
+## Installation
+
+All CLI tools are located in the \`scripts/\` directory. Most are executable directly:
+
+\`\`\`bash
+# Make scripts executable (if needed)
+chmod +x scripts/*.sh
+
+# TypeScript scripts require ts-node
+npm install -g ts-node
+\`\`\`
+
+## Core CLI Tools
+
+### 1. Install Solana Build Tools
+
+**Script**: \`scripts/install-solana-build-tools.sh\`
+
+Installs Solana platform tools including \`cargo build-sbf\` required for Anchor program compilation.
+
+\`\`\`bash
+./scripts/install-solana-build-tools.sh
+\`\`\`
+
+**What it does:**
+- Checks for Solana CLI installation
+- Detects macOS (Homebrew) or Linux installation
+- Installs platform tools via \`solana-install\`
+- Verifies \`cargo build-sbf\` availability
+- Provides alternative installation methods if needed
+
+**Output:**
+- Confirms installation success
+- Shows path to add to your \`PATH\` environment variable
+- Provides troubleshooting tips if installation fails
+
+### 2. Setup Merkle Tree
+
+**Script**: \`scripts/setup-merkle-tree.ts\`
+
+Creates a Metaplex Bubblegum merkle tree for compressed NFT (cNFT) minting, used for attestations.
+
+\`\`\`bash
+# Devnet (default)
+ts-node scripts/setup-merkle-tree.ts --network devnet
+
+# Mainnet
+ts-node scripts/setup-merkle-tree.ts --network mainnet --keypair ~/.config/solana/id.json
+
+# Custom options
+ts-node scripts/setup-merkle-tree.ts --network devnet --max-depth 16 --max-buffer-size 64
+\`\`\`
+
+**Options:**
+- \`--network\`: Network to deploy on (devnet, mainnet, testnet)
+- \`--max-depth\`: Merkle tree depth (default: 14)
+- \`--max-buffer-size\`: Buffer size (default: 64)
+- \`--keypair\`: Path to keypair file (required for mainnet)
+
+**Output:**
+- Merkle tree address
+- Tree authority PDA address
+- Transaction signature
+- Environment variables file (\`.env.merkle-tree.<network>\`)
+
+**Example Output:**
+\`\`\`
+✅ Merkle Tree Created!
+======================
+Merkle Tree: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+Tree Authority: 9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM
+Transaction: 5j7s8F9...xyz123
+\`\`\`
+
+### 3. Save IDL
+
+**Script**: \`scripts/save-idl.sh\`
+
+Generates and saves the Anchor program IDL with proper metadata for Solscan display.
+
+\`\`\`bash
+./scripts/save-idl.sh
+\`\`\`
+
+**What it does:**
+- Runs \`anchor idl build\` in the attestation program directory
+- Extracts JSON IDL from build output
+- Validates JSON format
+- Saves to \`programs/attestation-program/target/idl/sealevel_attestation.json\`
+- Displays metadata information
+
+**Output:**
+- IDL file location
+- Metadata summary (name, description, repository)
+
+### 4. Update Solscan Metadata
+
+**Script**: \`scripts/update-solscan-metadata.sh\`
+
+Updates Cargo.toml and Anchor.toml with Sealevel Studios metadata for proper Solscan display.
+
+\`\`\`bash
+./scripts/update-solscan-metadata.sh
+\`\`\`
+
+**What it does:**
+- Updates \`Cargo.toml\` with Sealevel Studios metadata
+- Updates \`Anchor.toml\` program name
+- Ensures consistent branding across all metadata
+
+**Metadata Updated:**
+- Package name: \`sealevel-attestation\`
+- Description: "Sealevel Studios - Attestation Program..."
+- Authors: ["Sealevel Studios"]
+- Repository, homepage, documentation URLs
+- Keywords for discoverability
+
+### 5. Check Attestation Setup
+
+**Script**: \`scripts/check-attestation-setup.ts\`
+
+Verifies that all attestation program components are properly configured and deployed.
+
+\`\`\`bash
+ts-node scripts/check-attestation-setup.ts
+\`\`\`
+
+**Checks:**
+- ✅ Program ID configured in environment
+- ✅ Program deployed on-chain
+- ✅ Merkle tree address configured
+- ✅ Merkle tree exists on-chain
+- ✅ IDL file exists
+- ✅ Environment variables set correctly
+
+**Output:**
+\`\`\`
+🔍 Checking Attestation Setup...
+================================
+
+✅ Program ID: AeK2u45NkNvAcgZuYyCWqmRuCsnXPvcutR3pziXF1cDw
+✅ Program Deployed: Yes
+✅ Merkle Tree: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+✅ Merkle Tree Exists: Yes
+✅ IDL File: Found
+✅ Environment: Configured
+
+🎉 Setup is complete and ready!
+\`\`\`
+
+### 6. Initialize Attestation Program
+
+**Script**: \`scripts/init-attestation-program.sh\`
+
+Initializes a new Anchor attestation program with boilerplate code.
+
+\`\`\`bash
+./scripts/init-attestation-program.sh
+\`\`\`
+
+**What it does:**
+- Creates Anchor program structure
+- Generates program ID
+- Sets up basic program template
+- Creates necessary directories
+
+### 7. Setup MCP Server
+
+**Script**: \`scripts/setup-mcp-server.sh\`
+
+Sets up the Model Context Protocol (MCP) server for AI agent integration.
+
+\`\`\`bash
+./scripts/setup-mcp-server.sh
+\`\`\`
+
+**What it does:**
+- Installs MCP server dependencies
+- Configures environment variables
+- Sets up Docker container (optional)
+- Verifies server health
+
+### 8. Setup Local AI
+
+**Script**: \`scripts/setup-local-ai.sh\`
+
+Configures local AI models (LM Studio, Ollama) for offline AI agent functionality.
+
+\`\`\`bash
+./scripts/setup-local-ai.sh
+\`\`\`
+
+**What it does:**
+- Checks for LM Studio or Ollama installation
+- Configures API endpoints
+- Tests AI model connectivity
+- Sets up environment variables
+
+## Testing Scripts
+
+### Test Features
+
+**Script**: \`scripts/test-features.ts\`
+
+Runs comprehensive tests on all platform features.
+
+\`\`\`bash
+ts-node scripts/test-features.ts
+\`\`\`
+
+### Test Pools API
+
+**Script**: \`scripts/test-pools-api.sh\`
+
+Tests DEX pool scanning and arbitrage detection APIs.
+
+\`\`\`bash
+./scripts/test-pools-api.sh
+\`\`\`
+
+### Test Agents API
+
+**Script**: \`scripts/test-agents-api.sh\`
+
+Tests AI agent API endpoints and functionality.
+
+\`\`\`bash
+./scripts/test-agents-api.sh
+\`\`\`
+
+### Devnet Transaction Tests
+
+**Script**: \`scripts/devnet-transaction-tests.ts\`
+
+Runs end-to-end transaction tests on devnet.
+
+\`\`\`bash
+ts-node scripts/devnet-transaction-tests.ts
+\`\`\`
+
+## Utility Scripts
+
+### Verify Merkle Tree
+
+**Script**: \`scripts/verify-merkle-tree.ts\`
+
+Verifies merkle tree configuration and on-chain status.
+
+\`\`\`bash
+ts-node scripts/verify-merkle-tree.ts --tree <tree_address> --network devnet
+\`\`\`
+
+### Setup Presale Merkle Tree
+
+**Script**: \`scripts/setup-presale-merkle-tree.ts\`
+
+Creates a separate merkle tree for presale attestations.
+
+\`\`\`bash
+ts-node scripts/setup-presale-merkle-tree.ts --network devnet
+\`\`\`
+
+### Seed Transactions
+
+**Script**: \`scripts/seed-transactions.ts\`
+
+Generates test transactions for development and testing.
+
+\`\`\`bash
+ts-node scripts/seed-transactions.ts --count 10 --network devnet
+\`\`\`
+
+## Development Workflow
+
+### Typical Setup Flow
+
+\`\`\`bash
+# 1. Install Solana build tools
+./scripts/install-solana-build-tools.sh
+
+# 2. Initialize attestation program (if new)
+./scripts/init-attestation-program.sh
+
+# 3. Build and deploy program
+cd programs/attestation-program
+anchor build
+anchor deploy --provider.cluster devnet
+
+# 4. Update metadata for Solscan
+cd ../..
+./scripts/update-solscan-metadata.sh
+
+# 5. Save IDL
+./scripts/save-idl.sh
+
+# 6. Setup merkle tree
+ts-node scripts/setup-merkle-tree.ts --network devnet
+
+# 7. Verify setup
+ts-node scripts/check-attestation-setup.ts
+\`\`\`
+
+### Quick Commands Reference
+
+\`\`\`bash
+# Check GPU availability (for AI)
+./scripts/check-gpu.sh
+
+# Start Cloudflare tunnel
+./scripts/start-cloudflare-tunnel.sh
+
+# Test webhook server
+./scripts/test-webhook.sh
+
+# Train Solana AI model
+ts-node scripts/train-solana-ai.ts
+\`\`\`
+
+## Environment Variables
+
+Most scripts use environment variables from \`.env.local\`:
+
+\`\`\`bash
+# Required for most scripts
+NEXT_PUBLIC_ATTESTATION_PROGRAM_ID=<program_id>
+NEXT_PUBLIC_BETA_TESTER_MERKLE_TREE=<tree_address>
+NEXT_PUBLIC_SOLANA_RPC_DEVNET=<rpc_url>
+
+# Optional
+HELIUS_API_KEY=<api_key>
+QUICKNODE_API_KEY=<api_key>
+\`\`\`
+
+## Troubleshooting
+
+### "build-sbf not found"
+\`\`\`bash
+./scripts/install-solana-build-tools.sh
+\`\`\`
+
+### "Program not deployed"
+\`\`\`bash
+cd programs/attestation-program
+anchor deploy --provider.cluster devnet
+\`\`\`
+
+### "Merkle tree not found"
+\`\`\`bash
+ts-node scripts/setup-merkle-tree.ts --network devnet
+\`\`\`
+
+### "IDL not found"
+\`\`\`bash
+cd programs/attestation-program
+anchor build
+cd ../..
+./scripts/save-idl.sh
+\`\`\`
+
+## Best Practices
+
+1. **Always test on devnet first** before deploying to mainnet
+2. **Check setup status** before running production scripts
+3. **Backup keypairs** before running deployment scripts
+4. **Verify environment variables** are set correctly
+5. **Read script output** for important information and warnings
+
+## Script Locations
+
+All scripts are in the \`scripts/\` directory:
+- Shell scripts (\`.sh\`): Directly executable
+- TypeScript scripts (\`.ts\`): Require \`ts-node\`
+- JavaScript scripts (\`.js\`): Node.js compatible
+
+## Contributing
+
+When adding new CLI tools:
+1. Add to \`scripts/\` directory
+2. Include usage documentation in script comments
+3. Add to this documentation
+4. Test on devnet before mainnet
+5. Include error handling and helpful messages`
+    },
+    {
+      id: 'developer-guide',
+      title: 'Developer Guide',
+      icon: <Code size={20} />,
+      category: 'Basics',
+      content: `# Sealevel Studio Developer Guide
+
+## Introduction
+
+Sealevel Studio is a comprehensive development platform for Solana blockchain applications. This guide provides in-depth technical documentation for developers.
+
+## Architecture
+
+### Core Components
+
+1. **Transaction Builder**: Visual transaction construction with code export
+2. **Account Inspector**: On-chain account data inspection
+3. **Arbitrage Scanner**: Real-time DEX opportunity detection
+4. **AI Agents**: Specialized AI assistants for different tasks
+5. **Attestation System**: Compressed NFT-based credential system
+
+### Technology Stack
+
+- **Frontend**: Next.js 14, React, TypeScript
+- **Blockchain**: Solana Web3.js, Anchor Framework
+- **AI**: OpenAI API, Local AI (LM Studio, Ollama)
+- **Storage**: LocalStorage, IndexedDB, Server-side cookies
+- **Styling**: Tailwind CSS
+
+## Solana Development
+
+### Account Model
+
+Solana uses an account-based model where:
+- Every account has an owner (program ID)
+- Accounts store data and SOL balance
+- Program accounts are owned by programs
+- System accounts are owned by System Program
+
+### Program-Derived Addresses (PDAs)
+
+PDAs are deterministic addresses derived from seeds and a program ID:
+
+\`\`\`typescript
+import { PublicKey } from '@solana/web3.js';
+
+const [pda, bump] = PublicKey.findProgramAddressSync(
+  [Buffer.from('seed'), authority.toBuffer()],
+  programId
+);
+\`\`\`
+
+### Transaction Structure
+
+Solana transactions contain:
+- **Instructions**: Array of program instructions
+- **Accounts**: All accounts referenced in instructions
+- **Signatures**: Required signers
+- **Recent Blockhash**: For transaction expiration
+
+\`\`\`typescript
+import { Transaction, SystemProgram } from '@solana/web3.js';
+
+const transaction = new Transaction().add(
+  SystemProgram.transfer({
+    fromPubkey: fromKey,
+    toPubkey: toKey,
+    lamports: amount,
+  })
+);
+\`\`\`
+
+### Instruction Building
+
+Instructions require:
+- **Program ID**: The program to invoke
+- **Accounts**: All accounts the instruction needs
+- **Data**: Instruction-specific data
+
+\`\`\`typescript
+import { TransactionInstruction } from '@solana/web3.js';
+
+const instruction = new TransactionInstruction({
+  programId: programId,
+  keys: [
+    { pubkey: account1, isSigner: true, isWritable: true },
+    { pubkey: account2, isSigner: false, isWritable: false },
+  ],
+  data: Buffer.from(instructionData),
+});
+\`\`\`
+
+## API Endpoints
+
+### Transaction Building
+
+\`POST /api/transactions/build\`
+- Builds a transaction from instruction blocks
+- Returns serialized transaction
+
+### Account Inspection
+
+\`GET /api/accounts/inspect?address=<address>\`
+- Fetches account data from blockchain
+- Attempts to parse using IDL
+
+### Arbitrage Scanning
+
+\`GET /api/pools/scan?tokenA=<mint>&tokenB=<mint>\`
+- Scans DEXs for arbitrage opportunities
+- Returns opportunities with profit calculations
+
+### Attestation
+
+\`POST /api/verisol/subscription/verify\`
+- Verifies subscription status
+- Returns eligibility for cNFT minting
+
+## CLI Tools
+
+See [Solana CLI Tools](#cli-tools) documentation for complete CLI tool reference.
+
+## Best Practices
+
+### Security
+
+1. **Never expose private keys** in client-side code
+2. **Validate all user inputs** before building transactions
+3. **Use PDAs** instead of keypairs when possible
+4. **Check account ownership** before operations
+5. **Verify transaction signatures** on-chain
+
+### Performance
+
+1. **Batch operations** when possible
+2. **Use connection pooling** for RPC calls
+3. **Cache account data** when appropriate
+4. **Optimize compute units** in transactions
+5. **Use WebSockets** for real-time data
+
+### Error Handling
+
+\`\`\`typescript
+try {
+  const signature = await connection.sendTransaction(tx, signers);
+  await connection.confirmTransaction(signature);
+} catch (error) {
+  if (error instanceof SendTransactionError) {
+    // Handle transaction errors
+  } else if (error instanceof ConfirmTransactionError) {
+    // Handle confirmation errors
+  }
+}
+\`\`\`
+
+## Testing
+
+### Unit Tests
+
+\`\`\`bash
+npm test
+\`\`\`
+
+### Integration Tests
+
+\`\`\`bash
+ts-node scripts/devnet-transaction-tests.ts
+\`\`\`
+
+### Feature Tests
+
+\`\`\`bash
+ts-node scripts/test-features.ts
+\`\`\`
+
+## Deployment
+
+### Program Deployment
+
+\`\`\`bash
+cd programs/attestation-program
+anchor build
+anchor deploy --provider.cluster devnet
+\`\`\`
+
+### Frontend Deployment
+
+Deploy to Vercel, Railway, or any Next.js-compatible platform.
+
+## Resources
+
+- [Solana Documentation](https://docs.solana.com)
+- [Anchor Book](https://www.anchor-lang.com)
+- [Web3.js Reference](https://solana-labs.github.io/solana-web3.js)
+- [Metaplex Documentation](https://docs.metaplex.com)`
     }
   ];
 
@@ -787,143 +1327,7 @@ The model will continuously improve based on real-world usage and feedback.`
 
   const selectedDoc = activeDoc ? docs.find(d => d.id === activeDoc) : null;
 
-  // Authentication Required Screen
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col h-full bg-gray-900 text-white relative">
-        {/* Background Logo Placeholder */}
-        <img
-          src="/sea-level-logo.png"
-          alt="Sealevel Studio Background"
-          className="absolute inset-0 w-full h-full object-contain opacity-[0.05] filter hue-rotate-[90deg] saturate-75 brightness-110 pointer-events-none"
-          style={{
-            objectPosition: 'center right',
-            transform: 'scale(0.6) rotate(-5deg)',
-            zIndex: 0
-          }}
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-        <div style={{ zIndex: 1, position: 'relative', height: '100%' }}>
-        <div className="border-b border-gray-700 p-4 bg-gray-800">
-          <div className="flex items-center gap-4">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-              >
-                <ArrowLeft size={18} />
-                <span>Back</span>
-              </button>
-            )}
-            <Book className="text-blue-400" size={24} />
-            <h1 className="text-2xl font-bold">Documentation</h1>
-          </div>
-        </div>
-
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="max-w-md w-full bg-gray-800 rounded-lg p-8 border border-gray-700">
-            <div className="text-center mb-6">
-              <Lock className="text-yellow-400 mx-auto mb-4" size={48} />
-              <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-              <p className="text-gray-400">
-                Please authenticate to access the documentation
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {/* Wallet Auth */}
-              {!connected && (
-                <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Wallet className="text-purple-400" size={20} />
-                    <h3 className="font-semibold">Connect Wallet</h3>
-                  </div>
-                  <p className="text-sm text-gray-400 mb-3">
-                    Connect your Solana wallet to access documentation
-                  </p>
-                  <button
-                    onClick={() => {
-                      // Wallet connection is handled by WalletButton component
-                      // This will trigger the useEffect to detect connection
-                    }}
-                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium"
-                  >
-                    Connect Wallet
-                  </button>
-                </div>
-              )}
-
-              {/* Email Auth */}
-              <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                <div className="flex items-center gap-3 mb-3">
-                  <Mail className="text-blue-400" size={20} />
-                  <h3 className="font-semibold">Email Authentication</h3>
-                </div>
-                {!showEmailForm ? (
-                  <>
-                    <p className="text-sm text-gray-400 mb-3">
-                      Sign in with your email address
-                    </p>
-                    <button
-                      onClick={() => setShowEmailForm(true)}
-                      className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium"
-                    >
-                      Sign In with Email
-                    </button>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    {!emailSent ? (
-                      <>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="your@email.com"
-                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                          onClick={handleEmailAuth}
-                          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium"
-                        >
-                          Send Verification
-                        </button>
-                      </>
-                    ) : (
-                      <div className="text-center py-4">
-                        <CheckCircle className="text-green-400 mx-auto mb-2" size={32} />
-                        <p className="text-sm text-gray-300">
-                          Verification email sent! Check your inbox.
-                        </p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          (For demo, you are automatically verified)
-                        </p>
-                      </div>
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowEmailForm(false);
-                        setEmailSent(false);
-                        setEmail('');
-                      }}
-                      className="w-full px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Authenticated - Show Documentation
+  // Show Documentation (No authentication required)
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white relative">
       {/* Background Logo Placeholder */}
@@ -955,18 +1359,8 @@ The model will continuously improve based on real-world usage and feedback.`
               </button>
             )}
             <Book className="text-blue-400" size={24} />
-            <h1 className="text-2xl font-bold">Documentation</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {authMethod === 'email' && (
-              <span className="text-sm text-gray-400">{emailAuth.getCurrentEmail()}</span>
-            )}
-            <button
-              onClick={handleLogout}
-              className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
-            >
-              Logout
-            </button>
+            <h1 className="text-2xl font-bold">Developer Documentation</h1>
+            <span className="text-sm text-gray-400 ml-2">Public Access</span>
           </div>
         </div>
 

@@ -1,6 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ClientOnly } from './components/ClientOnly'
 import { WalletProvider } from './components/WalletProvider'
 import { PresaleCountdown } from './components/PresaleCountdown'
@@ -8,6 +10,7 @@ import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChunkErrorHandler } from './components/ChunkErrorHandler'
+import { DevnetOnlyGuard } from './components/DevnetOnlyGuard'
 import './globals.css'
 import './styles/design-system.css'
 import './styles/animations.css'
@@ -50,21 +53,27 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Preload landing page video for instant playback */}
+        <link rel="preload" href="/gemini_generated_video_EBF488F6.MP4" as="video" type="video/mp4" />
       </head>
       <body className={`${inter.className} bg-gray-900 text-gray-100 antialiased`} suppressHydrationWarning>
         <ChunkErrorHandler />
         <ErrorBoundary>
           <NetworkProvider>
-            <WalletProvider>
-              <TutorialProvider>
-                {children}
-              </TutorialProvider>
-            </WalletProvider>
+            <DevnetOnlyGuard>
+              <WalletProvider>
+                <TutorialProvider>
+                  {children}
+                </TutorialProvider>
+              </WalletProvider>
+            </DevnetOnlyGuard>
           </NetworkProvider>
         </ErrorBoundary>
         <ClientOnly>
           <PresaleCountdown />
         </ClientOnly>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )

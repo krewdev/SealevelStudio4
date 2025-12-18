@@ -49,6 +49,8 @@ Vercel is the easiest and most optimized platform for Next.js applications.
 
 ### Step 3: Configure DNS
 
+#### Option A: Direct DNS (Any Provider)
+
 Add these DNS records to your domain provider:
 
 **For Root Domain (sealevelstudio.xyz):**
@@ -71,6 +73,58 @@ Type: CNAME
 Name: @
 Value: cname.vercel-dns.com
 ```
+
+#### Option B: Cloudflare DNS (Recommended)
+
+If your domain is managed by Cloudflare, you get additional benefits:
+- DDoS protection
+- CDN caching
+- SSL/TLS encryption
+- Analytics
+- Firewall rules
+
+**Setup with Cloudflare:**
+
+1. **Add Domain to Cloudflare** (if not already):
+   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
+   - Add your domain
+   - Update nameservers at your registrar
+
+2. **Configure DNS Records in Cloudflare:**
+
+   **For Root Domain (sealevelstudio.xyz):**
+   ```
+   Type: CNAME
+   Name: @
+   Target: cname.vercel-dns.com
+   Proxy status: Proxied (orange cloud) ✅
+   TTL: Auto
+   ```
+
+   **For WWW Subdomain (www.sealevelstudio.xyz):**
+   ```
+   Type: CNAME
+   Name: www
+   Target: cname.vercel-dns.com
+   Proxy status: Proxied (orange cloud) ✅
+   TTL: Auto
+   ```
+
+3. **Cloudflare SSL/TLS Settings:**
+   - Go to **SSL/TLS** → **Overview**
+   - Set encryption mode to **Full (strict)**
+   - This ensures end-to-end encryption between Cloudflare and Vercel
+
+4. **Cloudflare Speed Settings (Optional):**
+   - Enable **Auto Minify** (HTML, CSS, JS)
+   - Enable **Brotli** compression
+   - Enable **HTTP/2** and **HTTP/3**
+
+5. **Update Vercel Domain Settings:**
+   - In Vercel Dashboard → **Settings** → **Domains**
+   - Add your domain: `sealevelstudio.xyz`
+   - Vercel will verify the DNS records
+   - Once verified, SSL certificates are automatically provisioned
 
 ### Step 4: Configure Environment Variables
 
@@ -111,6 +165,44 @@ TELEGRAM_BOT_TOKEN=your_telegram_token
 If you're using Helius webhooks, update the webhook URL in Helius dashboard:
 - Old: `https://abc123.ngrok.io/api/webhooks/helius`
 - New: `https://sealevelstudio.xyz/api/webhooks/helius`
+
+### Step 6: Cloudflare Tunnel for Development (Optional)
+
+For local development with webhooks and OAuth callbacks, you can use Cloudflare Tunnel alongside Vercel:
+
+1. **Production**: Use Vercel deployment at `https://sealevelstudio.xyz`
+2. **Development**: Use Cloudflare Tunnel at `https://dev.yourdomain.com` pointing to `localhost:3000`
+
+This allows you to:
+- Test webhooks locally
+- Test OAuth callbacks locally
+- Share your dev environment securely
+
+See [CLOUDFLARE_TUNNEL_SETUP.md](./CLOUDFLARE_TUNNEL_SETUP.md) for detailed setup instructions.
+
+**Quick Start:**
+```bash
+# Install cloudflared
+brew install cloudflare/cloudflare/cloudflared
+
+# Login
+cloudflared tunnel login
+
+# Create tunnel for dev
+cloudflared tunnel create sealevel-dev
+
+# Start tunnel
+cloudflared tunnel run sealevel-dev
+```
+
+Then update your `.env.local`:
+```env
+# Development with Cloudflare Tunnel
+NEXT_PUBLIC_APP_URL=https://dev.yourdomain.com
+
+# Production (Vercel)
+# NEXT_PUBLIC_APP_URL=https://sealevelstudio.xyz
+```
 
 ---
 

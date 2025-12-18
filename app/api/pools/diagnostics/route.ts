@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const network = searchParams.get('network') || 'mainnet';
+    const network = searchParams.get('network') || 'devnet';
 
     // Get RPC endpoint
     const rpcUrl = network === 'mainnet'

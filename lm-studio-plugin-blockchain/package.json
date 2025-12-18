@@ -1,0 +1,37 @@
+{
+  "name": "lm-studio-plugin-blockchain",
+  "version": "1.0.0",
+  "description": "LM Studio plugin for Solana blockchain access - query balances, send transactions, and interact with the blockchain",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "lms dev",
+    "watch": "tsc --watch",
+    "generate-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+  },
+  "keywords": [
+    "lm-studio",
+    "plugin",
+    "blockchain",
+    "solana",
+    "crypto"
+  ],
+  "author": "Sealevel Studio",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/web3.js": "^1.87.6",
+    "@solana/spl-token": "^0.3.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "typescript": "^5.9.3"
+  },
+  "lmStudio": {
+    "pluginType": "function-calling",
+    "displayName": "Blockchain Access",
+    "description": "Access Solana blockchain - query balances, account info, and build transactions",
+    "version": "1.0.0"
+  }
+}
+

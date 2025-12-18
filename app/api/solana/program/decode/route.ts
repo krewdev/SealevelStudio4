@@ -44,10 +44,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 
+      const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
+                     process.env.NEXT_PUBLIC_RPC_URL || 
                      (process.env.NEXT_PUBLIC_HELIUS_API_KEY 
-                       ? `https://rpc.helius.xyz/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
-                       : 'https://api.mainnet-beta.solana.com');
+                       ? `https://devnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
+                       : 'https://api.devnet.solana.com');
       
       const connection = new Connection(rpcUrl, 'confirmed');
       const accountInfo = await connection.getAccountInfo(new PublicKey(accountData));

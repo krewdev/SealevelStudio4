@@ -15,8 +15,11 @@ import {
   AlertCircle,
   Clock,
   DollarSign,
+  CreditCard,
+  Wallet as WalletIcon,
 } from 'lucide-react';
 import { useNetwork } from '../contexts/NetworkContext';
+import { useUser } from '../contexts/UserContext';
 
 interface DevnetFaucetProps {
   onBack?: () => void;
@@ -35,12 +38,14 @@ const FAUCET_AMOUNT = 1; // SOL
 
 export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey: externalWallet, signTransaction, sendTransaction } = useWallet();
   const { network } = useNetwork();
+  const { user, refreshBalance, createWallet } = useUser();
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [useCustodial, setUseCustodial] = useState(true); // Default to custodial wallet
   const [faucetStatus, setFaucetStatus] = useState<FaucetStatus>({
     lastRequest: null,
     requestsToday: 0,
@@ -98,27 +103,55 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
     }
   }, [faucetStatus.cooldownSeconds]);
 
+  // Determine which wallet to use
+  const activeWallet = useCustodial && user?.walletAddress 
+    ? new PublicKey(user.walletAddress)
+    : externalWallet;
+
   // Fetch balance
   useEffect(() => {
-    if (publicKey && network === 'devnet') {
+    if (activeWallet && network === 'devnet') {
       fetchBalance();
     }
-  }, [publicKey, network]);
+  }, [activeWallet, network]);
 
   const fetchBalance = async () => {
-    if (!publicKey) return;
+    if (!activeWallet) return;
     
     try {
-      const balance = await connection.getBalance(publicKey);
+      const balance = await connection.getBalance(activeWallet);
       setBalance(balance / LAMPORTS_PER_SOL);
+      
+      // If using custodial wallet, also update user context
+      if (useCustodial && user?.walletAddress) {
+        await refreshBalance(user.walletAddress);
+      }
     } catch (err) {
       console.error('Failed to fetch balance:', err);
     }
   };
 
   const requestAirdrop = async () => {
-    if (!publicKey) {
-      setError('Please connect your wallet');
+    // Auto-create custodial wallet if needed
+    if (useCustodial && !user?.walletAddress) {
+      setRequesting(true);
+      setError(null);
+      try {
+        await createWallet();
+        setSuccess('Custodial wallet created! Please click "Request SOL" again.');
+        setRequesting(false);
+        return;
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Failed to create wallet');
+        setRequesting(false);
+        return;
+      }
+    }
+
+    if (!activeWallet) {
+      if (!useCustodial && !externalWallet) {
+        setError('Please connect your external wallet or use your custodial wallet');
+      }
       return;
     }
 
@@ -143,7 +176,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
     try {
       // Request airdrop from Solana devnet
       const signature = await connection.requestAirdrop(
-        publicKey,
+        activeWallet,
         FAUCET_AMOUNT * LAMPORTS_PER_SOL
       );
 
@@ -245,18 +278,61 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           </div>
         )}
 
-        {/* Wallet Connection */}
-        {!publicKey && (
-          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-blue-400 font-medium">Connect Wallet</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Please connect your wallet to request devnet SOL.
-              </p>
+        {/* Wallet Selection */}
+        <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-blue-400 font-medium">Select Wallet</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setUseCustodial(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  useCustodial
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <WalletIcon size={16} className="inline mr-2" />
+                Custodial Wallet
+              </button>
+              <button
+                onClick={() => setUseCustodial(false)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  !useCustodial
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <WalletIcon size={16} className="inline mr-2" />
+                External Wallet
+              </button>
             </div>
           </div>
-        )}
+          {useCustodial ? (
+            <div>
+              {user?.walletAddress ? (
+                <p className="text-sm text-gray-300">
+                  Using custodial wallet: <span className="font-mono text-xs">{user.walletAddress.slice(0, 8)}...{user.walletAddress.slice(-8)}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-yellow-400">
+                  No custodial wallet found. A wallet will be created automatically when you request SOL.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div>
+              {externalWallet ? (
+                <p className="text-sm text-gray-300">
+                  Using external wallet: <span className="font-mono text-xs">{externalWallet.toString().slice(0, 8)}...{externalWallet.toString().slice(-8)}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-yellow-400">
+                  Please connect your external wallet to use this option.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Main Card */}
         <div className="card-modern p-8 mb-6">
@@ -271,7 +347,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           </div>
 
           {/* Balance Display */}
-          {publicKey && balance !== null && (
+          {activeWallet && balance !== null && (
             <div className="mb-6 p-4 bg-gray-800/50 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Current Balance</span>
@@ -307,7 +383,7 @@ export function DevnetFaucet({ onBack }: DevnetFaucetProps) {
           {/* Request Button */}
           <button
             onClick={requestAirdrop}
-            disabled={!isDevnet || !publicKey || requesting || !faucetStatus.canRequest}
+            disabled={!isDevnet || !activeWallet || requesting || !faucetStatus.canRequest}
             className="w-full btn-modern px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-lg font-semibold"
           >
             {requesting ? (

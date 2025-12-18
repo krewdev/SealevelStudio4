@@ -53,11 +53,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get RPC connection
-    const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 
+    // Get RPC connection - use devnet for demo
+    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
+                   process.env.NEXT_PUBLIC_RPC_URL || 
                    (process.env.NEXT_PUBLIC_HELIUS_API_KEY 
-                     ? `https://rpc.helius.xyz/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
-                     : 'https://api.mainnet-beta.solana.com');
+                     ? `https://devnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
+                     : 'https://api.devnet.solana.com');
     
     const connection = new Connection(rpcUrl, commitment);
 

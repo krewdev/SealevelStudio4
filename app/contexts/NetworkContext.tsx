@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-type NetworkType = 'mainnet' | 'devnet';
+type NetworkType = 'mainnet' | 'devnet' | 'testnet';
 
 interface NetworkContextType {
   network: NetworkType;
@@ -12,23 +12,36 @@ interface NetworkContextType {
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
-  const [network, setNetwork] = useState<NetworkType>('mainnet');
+  // Force devnet-only access
+  const [network, setNetwork] = useState<NetworkType>('devnet');
 
-  // Persist network choice (client-side only)
+  // Persist network choice (client-side only) - but only allow devnet
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('sealevel-network');
-        if (saved === 'mainnet' || saved === 'devnet') {
+        // Only allow devnet or testnet, never mainnet
+        if (saved === 'devnet' || saved === 'testnet') {
           setNetwork(saved);
+        } else {
+          // Force devnet if mainnet was saved
+          setNetwork('devnet');
+          localStorage.setItem('sealevel-network', 'devnet');
         }
       } catch (error) {
         console.warn('Failed to load network preference:', error);
+        setNetwork('devnet');
       }
     }
   }, []);
 
   const handleSetNetwork = (newNetwork: NetworkType) => {
+    // Block mainnet access - only allow devnet or testnet
+    if (newNetwork === 'mainnet') {
+      console.warn('Mainnet access is disabled. This site is devnet-only.');
+      return;
+    }
+    
     setNetwork(newNetwork);
     if (typeof window !== 'undefined') {
       try {

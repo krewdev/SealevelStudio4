@@ -75,6 +75,27 @@ export function QuickLaunch({ onSuccess }: QuickLaunchProps) {
         // In a real app, we'd save this association to DB here
       }
 
+      // Broadcast transaction to all social platforms
+      try {
+        await fetch('/api/social/post-token-launch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokenSymbol,
+            tokenName,
+            tokenMintAddress: mintAddress,
+            transactionSignature: signature,
+            imageUrl: tokenImage,
+            totalSupply: SUPPLY,
+            liquidityAmount: SOL_LOCK,
+            platforms: ['twitter', 'telegram'], // Broadcast to all platforms
+          }),
+        });
+      } catch (socialError) {
+        console.error('Social media broadcast failed:', socialError);
+        // Don't fail the launch if social posting fails
+      }
+
       onSuccess?.(mintAddress, signature);
       
       // Reset form

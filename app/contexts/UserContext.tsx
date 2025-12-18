@@ -30,8 +30,8 @@ interface UserContextType {
   linkTelegram: () => Promise<void>;
   updateCredits: (amount: number) => void;
   addCampaign: (campaign: Campaign) => void;
-  refreshBalance: () => Promise<void>;
-  createWallet: () => Promise<void>;
+  refreshBalance: (walletAddress?: string) => Promise<void>;
+  createWallet: (email?: string, vanityPrefix?: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -68,7 +68,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createWallet = async () => {
+  /**
+   * Create a custodial wallet
+   * ⚠️ NOTE: This is a development/mock implementation.
+   * - Creates real Solana wallet addresses
+   * - Can receive funds and display balance
+   * - ✅ Can sign transactions via /api/wallet/sign endpoint
+   * - Note: For production, consider using a proper key management service
+   */
+  const createWallet = async (email?: string, vanityPrefix?: string) => {
     try {
       // Generate a session ID for this user
       let sessionId = localStorage.getItem('session_id');
@@ -80,7 +88,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const response = await fetch('/api/wallet/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, email, vanityPrefix }),
       });
 
       const data = await response.json();

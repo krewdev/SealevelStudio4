@@ -386,19 +386,59 @@ export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
               <span>VeriSol infrastructure ready</span>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="text-sm text-red-400 flex items-center gap-2">
                 <AlertCircle size={16} />
-                <span>Setup incomplete</span>
+                <span>Setup incomplete - Fix the issues below</span>
               </div>
-              <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside ml-4">
+              <ul className="text-xs text-slate-300 space-y-1.5 list-disc list-inside ml-4">
                 {setupStatus.errors.map((err, idx) => (
-                  <li key={idx}>{err}</li>
+                  <li key={idx} className="leading-relaxed">{err}</li>
                 ))}
               </ul>
-              <p className="text-xs text-slate-500 mt-2">
-                Note: If merkle tree is not set up, the system will use proof-only verification mode.
-              </p>
+              <div className="mt-3 p-3 bg-slate-900/50 rounded border border-slate-700">
+                <p className="text-xs font-semibold text-slate-300 mb-2">Quick Fixes:</p>
+                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
+                  {setupStatus.errors.some(e => e.includes('program') || e.includes('Program')) && (
+                    <>
+                      <li>Deploy program: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">cd programs/attestation-program && anchor deploy --provider.cluster devnet</code></li>
+                      <li>Set <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">NEXT_PUBLIC_ATTESTATION_PROGRAM_ID</code> in .env.local</li>
+                    </>
+                  )}
+                  {setupStatus.errors.some(e => e.includes('merkle tree') || e.includes('Merkle')) && (
+                    <>
+                      <li>Create merkle tree: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">npm run setup:merkle-tree</code></li>
+                      <li>Set <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">NEXT_PUBLIC_BETA_TESTER_MERKLE_TREE</code> in .env.local</li>
+                    </>
+                  )}
+                  {setupStatus.errors.some(e => e.includes('IDL') || e.includes('idl')) && (
+                    <li>Build program: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">cd programs/attestation-program && anchor build</code></li>
+                  )}
+                  {setupStatus.errors.some(e => e.includes('registry') || e.includes('Registry')) && (
+                    <li>Initialize registry by calling <code className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-200">client.initialize(merkleTree)</code> once (requires authority wallet)</li>
+                  )}
+                </ul>
+                <div className="mt-3 pt-2 border-t border-slate-700">
+                  <a 
+                    href="/docs/ATTESTATION_SETUP_GUIDE.md" 
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
+                  >
+                    📖 View Full Setup Guide
+                    <ExternalLink size={12} />
+                  </a>
+                  <span className="text-xs text-slate-500 mx-2">|</span>
+                  <button
+                    onClick={() => {
+                      window.open('https://github.com/coral-xyz/anchor', '_blank');
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Anchor Docs
+                  </button>
+                </div>
+              </div>
             </div>
           )
         ) : (

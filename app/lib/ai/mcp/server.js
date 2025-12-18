@@ -27,11 +27,21 @@ const tools = {
   // Example: get_account_info, build_transaction, etc.
 };
 
+// Load resource loader
+const { registerResources } = require('./resource-loader');
+
 // MCP Resources Registry
-const resources = {
-  // Resources would be registered here
-  // Example: solana://account/{address}
-};
+// Resources are registered by the resource loader
+let resources = {};
+
+// Initialize resources
+try {
+  resources = registerResources();
+  console.log(`[INFO] Registered ${Object.keys(resources).length} MCP resources`);
+} catch (error) {
+  console.error('[ERROR] Failed to register resources:', error.message);
+  resources = {};
+}
 
 // Health check endpoint
 function handleHealth(req, res) {
@@ -97,14 +107,59 @@ function handleResources(req, res) {
 
 // Get resource endpoint
 function handleResource(req, res, resourceUri) {
-  const resource = resources[resourceUri];
+  // Handle parameterized URIs (e.g., tx://examples/{id})
+  const parsedUrl = url.parse(req.url, true);
+  const query = parsedUrl.query || {};
+  
+  // Find matching resource (exact match or parameterized)
+  let resource = resources[resourceUri];
+  let params = {};
+  
+  // Try to find parameterized resource
+  if (!resource) {
+    for (const [uri, resData] of Object.entries(resources)) {
+      // Check if this is a parameterized URI pattern
+      const pattern = uri.replace(/\{[^}]+\}/g, '([^/]+)');
+      const regex = new RegExp(`^${pattern}$`);
+      const match = resourceUri.match(regex);
+      
+      if (match) {
+        // Extract parameters from URI pattern
+        const paramNames = (uri.match(/\{([^}]+)\}/g) || []).map(m => m.slice(1, -1));
+        paramNames.forEach((name, i) => {
+          params[name] = match[i + 1];
+        });
+        resource = resData;
+        break;
+      }
+    }
+  }
+  
+  // Merge query params with URI params
+  params = { ...params, ...query };
+  
   if (!resource) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: `Resource ${resourceUri} not found` }));
     return;
   }
 
-  // Return resource data
+  // If resource has a handler, call it
+  if (resource.handler && typeof resource.handler === 'function') {
+    Promise.resolve(resource.handler(resourceUri, params))
+      .then(data => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ resource: data }));
+      })
+      .catch(error => {
+        log('error', `Resource handler error: ${error.message}`);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message }));
+      });
+    return;
+  }
+
+  // Return resource data directly
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ resource }));
 }

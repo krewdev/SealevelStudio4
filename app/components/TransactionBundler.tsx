@@ -19,13 +19,15 @@ import {
   Info
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { PublicKey, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
 import { buildMultiSendTransaction, estimateMultiSend } from '../lib/bundler/multi-send';
 import { MultiSendConfig, MultiSendRecipient } from '../lib/bundler/types';
 import { walletRegistry } from '../lib/wallet-manager';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
 import { useRiskConsent } from '../hooks/useRiskConsent';
 import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
+import { useUser } from '../contexts/UserContext';
+import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
 
 interface TransactionBundlerProps {
   onBack?: () => void;
@@ -35,6 +37,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('bundler');
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
+  const { user } = useUser();
   const [recipients, setRecipients] = useState<MultiSendRecipient[]>([
     { address: '', amount: 0.1 }
   ]);
@@ -67,8 +70,13 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   };
 
   const handleEstimate = useCallback(async () => {
-    if (!publicKey) {
-      setError('Please connect your wallet');
+    // Use custodial wallet if available, otherwise external wallet
+    const payerPublicKey = user?.walletAddress 
+      ? new PublicKey(user.walletAddress)
+      : publicKey;
+      
+    if (!payerPublicKey) {
+      setError('Please connect your wallet or create a custodial wallet');
       return;
     }
 
@@ -110,10 +118,21 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     } finally {
       setIsBuilding(false);
     }
-  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo]);
+  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo, user]);
 
   const handleSend = useCallback(async () => {
-    if (!publicKey || !sendTransaction) {
+    // Check if we should use custodial wallet
+    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
+    const payerPublicKey = useCustodial && user?.walletAddress 
+      ? new PublicKey(user.walletAddress)
+      : publicKey;
+
+    if (!payerPublicKey) {
+      setError('Please connect your wallet or create a custodial wallet');
+      return;
+    }
+
+    if (!useCustodial && (!sendTransaction)) {
       setError('Please connect your wallet');
       return;
     }
@@ -141,7 +160,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
 
       const { transaction, signers, createdWallets } = await buildMultiSendTransaction(
         connection,
-        publicKey,
+        payerPublicKey,
         config
       );
 
@@ -158,7 +177,28 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
       }
 
       // Sign and send
-      const signature = await sendTransaction(transaction, connection, { signers });
+      let signature: string;
+      if (useCustodial && user?.walletAddress) {
+        // Sign with custodial wallet (includes signing for new keypairs)
+        const signedTx = await signTransactionWithCustodialAndSigners(
+          transaction,
+          signers,
+          {
+            userWalletAddress: user.walletAddress,
+            connection,
+          }
+        );
+        // Send already-signed transaction
+        const serialized = signedTx.serialize({ requireAllSignatures: false });
+        signature = await connection.sendRawTransaction(serialized, {
+          skipPreflight: false,
+          maxRetries: 3,
+        });
+      } else {
+        // Use external wallet
+        signature = await sendTransaction(transaction, connection, { signers });
+      }
+      
       await connection.confirmTransaction(signature, 'confirmed');
 
       setSuccess(`Transaction sent! Signature: ${signature}`);
@@ -173,7 +213,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     } finally {
       setIsSending(false);
     }
-  }, [connection, publicKey, sendTransaction, recipients, createAccounts, priorityFee, memo, estimate]);
+  }, [connection, publicKey, sendTransaction, recipients, createAccounts, priorityFee, memo, estimate, user]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);

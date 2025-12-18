@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
       tokenSymbol,
       tokenName,
       tokenMintAddress,
+      transactionSignature,
       imageUrl,
       totalSupply,
       liquidityAmount,
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
       tokenName,
       tokenSymbol,
       tokenMintAddress,
+      transactionSignature,
       totalSupply,
       liquidityAmount,
     });
@@ -106,10 +108,11 @@ function generateLaunchMessage(params: {
   tokenName: string;
   tokenSymbol: string;
   tokenMintAddress?: string;
+  transactionSignature?: string;
   totalSupply?: number;
   liquidityAmount?: number;
 }): string {
-  const { tokenName, tokenSymbol, tokenMintAddress, totalSupply, liquidityAmount } = params;
+  const { tokenName, tokenSymbol, tokenMintAddress, transactionSignature, totalSupply, liquidityAmount } = params;
 
   let message = `🚀 ${tokenName} ($${tokenSymbol}) is now LIVE on Solana!\n\n`;
 
@@ -125,7 +128,12 @@ function generateLaunchMessage(params: {
   message += `🔒 Liquidity Locked for 7 Days\n\n`;
 
   if (tokenMintAddress) {
-    message += `📍 Mint: ${tokenMintAddress}\n\n`;
+    message += `📍 Mint: ${tokenMintAddress}\n`;
+  }
+
+  if (transactionSignature) {
+    const solscanUrl = `https://solscan.io/tx/${transactionSignature}`;
+    message += `🔗 Transaction: ${solscanUrl}\n\n`;
   }
 
   message += `Built with Sealevel Studio 🌊\n`;
@@ -159,7 +167,7 @@ async function postToTwitter(params: {
   }
 
   // Call existing Twitter API endpoint
-  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/twitter/posts`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/twitter/posts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -205,7 +213,7 @@ async function postToTelegram(params: {
   }
 
   // Call existing Telegram API endpoint
-  const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/telegram/messages`, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/telegram/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

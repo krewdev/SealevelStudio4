@@ -105,26 +105,25 @@ export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
       setMintAddress(newMintAddress);
       setLaunchStatus('success');
 
-      // Auto-post to social media if enabled and image exists
-      if (autoPostToSocial && tokenImage) {
-        try {
-          await fetch('/api/social/post-token-launch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tokenSymbol,
-              tokenName,
-              tokenMintAddress: newMintAddress,
-              imageUrl: tokenImage,
-              totalSupply,
-              liquidityAmount: economics.totalLiquiditySol,
-              platforms: ['twitter', 'telegram'],
-            }),
-          });
-        } catch (socialError) {
-          console.error('Social media post failed:', socialError);
-          // Don't fail the launch if social posting fails
-        }
+      // Always broadcast transaction to all social platforms
+      try {
+        await fetch('/api/social/post-token-launch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokenSymbol,
+            tokenName,
+            tokenMintAddress: newMintAddress,
+            transactionSignature: signature, // Include transaction signature
+            imageUrl: tokenImage,
+            totalSupply,
+            liquidityAmount: economics.totalLiquiditySol,
+            platforms: ['twitter', 'telegram'], // Broadcast to all configured platforms
+          }),
+        });
+      } catch (socialError) {
+        console.error('Social media broadcast failed:', socialError);
+        // Don't fail the launch if social posting fails
       }
 
     } catch (error) {

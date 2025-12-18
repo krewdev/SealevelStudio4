@@ -18,7 +18,7 @@ export function SocialConnectButton() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center space-x-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+        className={`flex items-center space-x-1 sm:space-x-2 rounded-lg px-2 sm:px-4 py-2 text-sm font-medium transition-colors ${
           allConnected
             ? 'bg-green-600/20 text-green-400 border border-green-500/30 hover:bg-green-600/30'
             : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'

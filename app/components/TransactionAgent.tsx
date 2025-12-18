@@ -31,6 +31,22 @@ interface TransactionAgentProps {
   onOptimize?: () => void;
 }
 
+// Helper to find block by keywords
+function findBlockByKeywords(keywords: string[], availableBlocks: SimpleBlock[]): SimpleBlock | null {
+  const lowerKeywords = keywords.map(k => k.toLowerCase());
+  
+  for (const block of availableBlocks) {
+    const blockNameLower = block.name.toLowerCase();
+    const blockIdLower = block.id.toLowerCase();
+    
+    if (lowerKeywords.some(k => blockNameLower.includes(k) || blockIdLower.includes(k))) {
+      return block;
+    }
+  }
+  
+  return null;
+}
+
 export function TransactionAgent({
   simpleWorkflow = [],
   transactionDraft,
@@ -42,6 +58,11 @@ export function TransactionAgent({
   onExplainBlock,
   onOptimize
 }: TransactionAgentProps) {
+  // Store reference to onAddBlock for use in generateResponse
+  const onAddBlockRef = useRef(onAddBlock);
+  useEffect(() => {
+    onAddBlockRef.current = onAddBlock;
+  }, [onAddBlock]);
   const { trackFeatureUsage, checkFeatureAccess } = useUsageTracking();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<AgentMessage[]>([
@@ -207,7 +228,14 @@ export function TransactionAgent({
 
     // Simulate AI response (replace with actual AI API call)
     setTimeout(() => {
-      const response = generateResponse(userMessage, simpleWorkflow, errors, warnings);
+      const response = generateResponse(
+        userMessage, 
+        simpleWorkflow, 
+        errors, 
+        warnings,
+        availableBlocks,
+        onAddBlockRef.current
+      );
       addMessage('assistant', response.content, response.suggestions);
       setIsTyping(false);
     }, 1000);
@@ -402,13 +430,133 @@ function generateResponse(
   userMessage: string,
   workflow: SimpleBlock[],
   errors: string[],
-  warnings: string[]
+  warnings: string[],
+  availableBlocks: SimpleBlock[] = [],
+  onAddBlock?: (block: SimpleBlock) => void
 ): { content: string; suggestions?: AgentSuggestion[] } {
   const lowerMessage = userMessage.toLowerCase();
   const suggestions: AgentSuggestion[] = [];
   
   // Enhanced context analysis
   const context = analyzeTransactionContext(workflow);
+
+  // Natural language transaction building
+  if ((lowerMessage.includes('send') || lowerMessage.includes('transfer')) && 
+      (lowerMessage.includes('token') || lowerMessage.includes('coin'))) {
+    const tokenTransferBlock = findBlockByKeywords(['token', 'transfer'], availableBlocks);
+    if (tokenTransferBlock && onAddBlock) {
+      const newBlock: SimpleBlock = {
+        ...tokenTransferBlock,
+        instanceId: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      onAddBlock(newBlock);
+      return {
+        content: `✅ **Added Transfer Token block!**\n\nI've added a "Transfer Token" block to your workflow. Please configure:\n\n• **Destination**: The recipient's token account address\n• **Amount**: Amount to transfer (in token's smallest unit)\n• **Source**: Your token account (if not using default)\n\n💡 The block is ready for you to fill in the details!`,
+        suggestions: [
+          {
+            type: 'explain',
+            title: 'Explain Token Transfer',
+            description: 'Learn more about token transfers',
+          }
+        ]
+      };
+    }
+  }
+
+  if ((lowerMessage.includes('send') || lowerMessage.includes('transfer')) && 
+      (lowerMessage.includes('sol') || lowerMessage.includes('lamport'))) {
+    const solTransferBlock = findBlockByKeywords(['sol', 'transfer', 'system'], availableBlocks);
+    if (solTransferBlock && onAddBlock) {
+      const newBlock: SimpleBlock = {
+        ...solTransferBlock,
+        instanceId: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      onAddBlock(newBlock);
+      return {
+        content: `✅ **Added Transfer SOL block!**\n\nI've added a "Transfer SOL" block to your workflow. Please configure:\n\n• **To**: Recipient wallet address\n• **Amount**: Amount in lamports (1 SOL = 1,000,000,000 lamports)\n\n💡 Example: 0.1 SOL = 100,000,000 lamports`,
+        suggestions: [
+          {
+            type: 'explain',
+            title: 'Explain SOL Transfer',
+            description: 'Learn more about SOL transfers',
+          }
+        ]
+      };
+    }
+  }
+
+  if (lowerMessage.includes('stake') || lowerMessage.includes('staking') || lowerMessage.includes('delegate')) {
+    const stakeBlock = findBlockByKeywords(['stake', 'delegate'], availableBlocks);
+    if (stakeBlock && onAddBlock) {
+      const newBlock: SimpleBlock = {
+        ...stakeBlock,
+        instanceId: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      onAddBlock(newBlock);
+      return {
+        content: `✅ **Added Staking block!**\n\nI've added a staking/delegation block to your workflow. Please configure:\n\n• **Validator**: Validator public key\n• **Amount**: SOL to stake (in lamports)\n• **Stake Account**: Your stake account (if creating new, leave empty)\n\n💡 Staking SOL helps secure the Solana network and earns rewards!`,
+        suggestions: [
+          {
+            type: 'explain',
+            title: 'Explain Staking',
+            description: 'Learn more about Solana staking',
+          }
+        ]
+      };
+    } else {
+      return {
+        content: `📌 **Staking Tokens**\n\nTo stake SOL on Solana, you'll need to:\n\n1. **Create Stake Account**: Use the "Create Stake Account" block\n2. **Delegate Stake**: Use the "Delegate Stake" block\n   - Set validator public key\n   - Set amount to stake\n\n💡 Staking helps secure the network and earns you rewards!`,
+      };
+    }
+  }
+
+  if (lowerMessage.includes('collect') && lowerMessage.includes('rent') || 
+      lowerMessage.includes('close') && lowerMessage.includes('account')) {
+    return {
+      content: `💰 **Collecting Rent**\n\nTo collect rent from closed accounts:\n\n1. **Close Account**: Use the "Close Account" block\n   - This closes an account and returns rent to the owner\n   - Specify the account to close\n   - Set the destination for the rent (usually your wallet)\n\n💡 Closing unused accounts returns the rent-exempt balance to you!`,
+      suggestions: [
+        {
+          type: 'explain',
+          title: 'Explain Rent Collection',
+          description: 'Learn more about Solana rent',
+        }
+      ]
+    };
+  }
+
+  if (lowerMessage.includes('swap') || lowerMessage.includes('trade') || lowerMessage.includes('exchange')) {
+    const swapBlock = findBlockByKeywords(['swap', 'jupiter'], availableBlocks);
+    if (swapBlock && onAddBlock) {
+      const newBlock: SimpleBlock = {
+        ...swapBlock,
+        instanceId: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+      onAddBlock(newBlock);
+      return {
+        content: `✅ **Added Jupiter Swap block!**\n\nI've added a "Jupiter Swap" block for token swapping. Please configure:\n\n• **Input Token**: Token mint address to swap from\n• **Output Token**: Token mint address to swap to\n• **Amount**: Input amount (in token's smallest unit)\n• **Min Amount Out**: Minimum output (slippage protection)\n\n💡 Jupiter provides the best rates across all Solana DEXs!`,
+        suggestions: [
+          {
+            type: 'explain',
+            title: 'Explain Jupiter Swap',
+            description: 'Learn more about Jupiter aggregator',
+          }
+        ]
+      };
+    }
+  }
+
+  if (lowerMessage.includes('bridge') || lowerMessage.includes('cross-chain') || lowerMessage.includes('wormhole')) {
+    return {
+      content: `🌉 **Bridging Tokens**\n\nTo bridge tokens across chains:\n\n1. **Wormhole Bridge**: Use Wormhole protocol for cross-chain transfers\n   - Supports: Ethereum, BSC, Polygon, Avalanche, and more\n   - Bridge SOL or SPL tokens\n\n2. **Steps**:\n   - Lock tokens on source chain\n   - Wait for confirmation\n   - Redeem on destination chain\n\n💡 Available via Wormhole integration. Would you like me to add a bridge block?`,
+      suggestions: [
+        {
+          type: 'explain',
+          title: 'Explain Bridging',
+          description: 'Learn more about cross-chain bridges',
+        }
+      ]
+    };
+  }
 
   // Context-aware responses
   if (lowerMessage.includes('transfer') || lowerMessage.includes('send')) {

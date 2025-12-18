@@ -146,16 +146,44 @@ export function createAttestationClient(
         let idl: any;
         
         if (typeof window === 'undefined') {
-          // Server-side: use fs
-          const { readFileSync } = await import('fs');
+          // Server-side: use fs with multiple path attempts
+          const { readFileSync, existsSync } = await import('fs');
           const { join } = await import('path');
-          const idlPath = join(process.cwd(), 'programs/attestation-program/target/idl/sealevel_attestation.json');
-          idl = JSON.parse(readFileSync(idlPath, 'utf-8'));
+          
+          const possiblePaths = [
+            join(process.cwd(), 'programs/attestation-program/target/idl/sealevel_attestation.json'),
+            join(process.cwd(), 'programs/attestation-program/target/idl/attestation_program.json'),
+            join(process.cwd(), 'programs/attestation-program/target/idl/attestation-program.json'),
+            join(process.cwd(), 'target/idl/sealevel_attestation.json'),
+            join(process.cwd(), 'target/idl/attestation_program.json'),
+          ];
+
+          let found = false;
+          for (const idlPath of possiblePaths) {
+            if (existsSync(idlPath)) {
+              try {
+                idl = JSON.parse(readFileSync(idlPath, 'utf-8'));
+                found = true;
+                console.log(`✅ Server-side IDL loaded from: ${idlPath}`);
+                break;
+              } catch (parseError) {
+                console.warn(`Failed to parse IDL at ${idlPath}:`, parseError);
+              }
+            }
+          }
+
+          if (!found) {
+            throw new Error(`IDL not found. Searched: ${possiblePaths.join(', ')}`);
+          }
         } else {
           // Client-side: fetch from API
           const idlResponse = await fetch('/api/attestation/idl');
           if (!idlResponse.ok) {
-            throw new Error('Failed to fetch IDL');
+            const errorData = await idlResponse.json().catch(() => ({}));
+            throw new Error(
+              errorData.error || 'Failed to fetch IDL. ' +
+              'Ensure the program is built: cd programs/attestation-program && anchor build'
+            );
           }
           idl = await idlResponse.json();
         }

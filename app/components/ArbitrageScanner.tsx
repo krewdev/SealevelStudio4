@@ -82,17 +82,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
     setShowExecutionModal(true);
   };
 
-  // Auto-refresh effect
-  useEffect(() => {
-    if (!config.autoRefresh || isScanning) return;
-
-    const interval = setInterval(() => {
-      handleScan();
-    }, config.refreshInterval);
-
-    return () => clearInterval(interval);
-  }, [config.autoRefresh, config.refreshInterval, isScanning]);
-
+  // Define handleScan BEFORE the useEffect that uses it to avoid stale closure issues
   const handleScan = useCallback(async () => {
     if (isScanning) return;
 
@@ -191,7 +181,18 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
     } finally {
       setIsScanning(false);
     }
-  }, [connection, config, isScanning, scanner]);
+  }, [connection, config, isScanning, scanner, checkFeatureAccess, trackFeatureUsage]);
+
+  // Auto-refresh effect - defined AFTER handleScan to ensure it's available
+  useEffect(() => {
+    if (!config.autoRefresh || isScanning) return;
+
+    const interval = setInterval(() => {
+      handleScan();
+    }, config.refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [config.autoRefresh, config.refreshInterval, isScanning, handleScan]);
 
   const filteredOpportunities = useMemo(() => {
     let filtered = [...opportunities];

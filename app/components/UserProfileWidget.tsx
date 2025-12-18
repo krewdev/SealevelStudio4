@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../contexts/UserContext';
-import { Twitter, Send, LogOut, User as UserIcon, Wallet, Coins, Loader2, ChevronDown, Mail, Sparkles } from 'lucide-react';
+import { Twitter, Send, LogOut, User as UserIcon, Wallet, Coins, Loader2, ChevronDown, Mail, Sparkles, Settings } from 'lucide-react';
 import { DepositWallet } from './DepositWallet';
+import { Settings as SettingsComponent } from './Settings';
 
 export function UserProfileWidget() {
   const { user, isLoading, linkTwitter, linkTelegram, logout, refreshBalance, createWallet } = useUser();
@@ -9,6 +10,7 @@ export function UserProfileWidget() {
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [email, setEmail] = useState('');
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
   // Compact header version - social connect is handled by SocialConnectButton in header
@@ -49,7 +51,7 @@ export function UserProfileWidget() {
 
     setIsCreatingWallet(true);
     try {
-      await createWallet();
+      await createWallet(email);
       setShowEmailModal(false);
       setEmail('');
     } catch (error) {
@@ -65,10 +67,10 @@ export function UserProfileWidget() {
       <>
         <button
           onClick={() => setShowEmailModal(true)}
-          className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-4 py-2 text-sm font-medium text-white transition-all shadow-lg hover:shadow-purple-500/20"
+          className="flex items-center space-x-1 sm:space-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-2 sm:px-4 py-2 text-sm font-medium text-white transition-all shadow-lg hover:shadow-purple-500/20"
         >
           <Sparkles className="w-4 h-4" />
-          <span>Generate Wallet</span>
+          <span className="hidden sm:inline">Generate Wallet</span>
         </button>
 
         {/* Email Collection Modal */}
@@ -151,10 +153,10 @@ export function UserProfileWidget() {
       {/* Compact Header Button */}
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-purple-600/20 to-blue-600/20 px-3 py-2 text-sm font-medium text-gray-200 hover:from-purple-600/30 hover:to-blue-600/30 transition-all border border-purple-500/30 hover:border-purple-400/50 shadow-lg hover:shadow-purple-500/20 backdrop-blur-sm"
+        className="flex items-center space-x-1 sm:space-x-2 rounded-lg bg-gradient-to-r from-purple-600/20 to-blue-600/20 px-2 sm:px-3 py-2 text-sm font-medium text-gray-200 hover:from-purple-600/30 hover:to-blue-600/30 transition-all border border-purple-500/30 hover:border-purple-400/50 shadow-lg hover:shadow-purple-500/20 backdrop-blur-sm"
       >
-        <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-          <UserIcon className="w-4 h-4 text-white" />
+        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+          <UserIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
         </div>
         <div className="text-left hidden sm:block">
           <div className="text-xs font-semibold text-white">
@@ -164,7 +166,7 @@ export function UserProfileWidget() {
             {user.balance !== undefined ? `${user.balance.toFixed(2)} SOL` : '---'}
           </div>
         </div>
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Menu */}
@@ -229,7 +231,7 @@ export function UserProfileWidget() {
             </div>
 
             {/* Credits / Status */}
-            <div className="p-4">
+            <div className="p-4 border-b border-gray-700/50">
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700/50">
                 <div className="flex items-center space-x-2">
                   <Coins className="w-4 h-4 text-yellow-500" />
@@ -238,8 +240,27 @@ export function UserProfileWidget() {
                 <span className="text-sm font-bold text-white">{user.credits.toLocaleString()}</span>
               </div>
             </div>
+
+            {/* Settings Button */}
+            <div className="p-4">
+              <button
+                onClick={() => {
+                  setShowSettings(true);
+                  setShowDropdown(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium text-sm transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
+            </div>
           </div>
         </>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <SettingsComponent onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

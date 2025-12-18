@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const network = searchParams.get('network') || 'mainnet';
+    const network = searchParams.get('network') || 'devnet';
     const dexesParam = searchParams.get('dexes');
     const dexes = dexesParam ? dexesParam.split(',') : undefined;
     const includeOpportunities = searchParams.get('opportunities') === 'true';
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { tokenA, tokenB, network = 'mainnet' } = body;
+    const { tokenA, tokenB, network = 'devnet' } = body;
 
     if (!tokenA || !tokenB) {
       return NextResponse.json(

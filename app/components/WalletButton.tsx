@@ -35,8 +35,8 @@ export const WalletButton = () => {
   // Show external wallet connection options
   if (publicKey) {
     return (
-      <div className="flex items-center space-x-2">
-        <div className="flex items-center space-x-2 bg-gray-800 px-4 py-2 rounded-lg text-sm font-medium text-gray-300">
+      <div className="flex items-center space-x-1 sm:space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2 bg-gray-800 px-2 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-300">
           <Wallet className="h-4 w-4" />
           <span className="hidden sm:inline">
             {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
@@ -44,7 +44,7 @@ export const WalletButton = () => {
         </div>
         <button
           onClick={() => disconnect()}
-          className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+          className="flex items-center space-x-1 sm:space-x-2 bg-red-600 hover:bg-red-700 px-2 sm:px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
           title="Disconnect Wallet"
         >
           <LogOut className="h-4 w-4" />
@@ -54,11 +54,11 @@ export const WalletButton = () => {
   }
 
   return (
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center space-x-1 sm:space-x-2">
       <WalletMultiButton 
-        className="!bg-gradient-to-r !from-purple-500 !to-indigo-600 hover:!from-purple-600 hover:!to-indigo-700 !transition-all !rounded-lg !px-4 !py-2 !text-sm !font-medium !text-white !border-0"
+        className="!bg-gradient-to-r !from-purple-500 !to-indigo-600 hover:!from-purple-600 hover:!to-indigo-700 !transition-all !rounded-lg !px-2 sm:!px-4 !py-2 !text-sm !font-medium !text-white !border-0"
       />
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-gray-400 hidden sm:inline">
         ({network})
       </span>
     </div>

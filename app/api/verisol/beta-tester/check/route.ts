@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Get RPC endpoint
     const heliusApiKey = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-    const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
+    const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
     
     let hasAttestation = false;
     let cNFTAddress: string | null = null;
@@ -61,9 +61,9 @@ export async function GET(request: NextRequest) {
     // Method 1: Use Helius DAS API to query tree directly (most efficient)
     if (heliusApiKey) {
       try {
-        const heliusUrl = network === 'devnet' 
-          ? `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`
-          : `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+        const heliusUrl = network === 'mainnet' || network === 'mainnet-beta'
+          ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
+          : `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`;
 
         // Query assets by owner, filtered by tree or collection
         const dasResponse = await fetch(heliusUrl, {
@@ -146,10 +146,11 @@ export async function GET(request: NextRequest) {
     // Method 2: Query tree directly using RPC (if DAS API not available)
     if (!hasAttestation) {
       try {
-        const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 
-                       heliusApiKey 
-                         ? `https://rpc.helius.xyz/?api-key=${heliusApiKey}`
-                         : 'https://api.mainnet-beta.solana.com';
+        const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
+                       process.env.NEXT_PUBLIC_RPC_URL || 
+                       (heliusApiKey 
+                         ? `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`
+                         : 'https://api.devnet.solana.com');
 
         const connection = new Connection(rpcUrl, 'confirmed');
 

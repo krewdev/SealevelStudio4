@@ -15,7 +15,7 @@ interface PriceDataPoint {
   close?: number;
 }
 
-// CoinGecko API (free, no API key needed for basic usage)
+// CoinGecko API (free, no API key needed for basic usage, but Pro tier requires API key)
 const COINGECKO_API = 'https://api.coingecko.com/api/v3';
 
 /**
@@ -99,10 +99,26 @@ export async function GET(request: NextRequest) {
       interval = 'hourly';
     }
 
+    // Get CoinGecko API key if available (for Pro tier with higher rate limits)
+    const coingeckoApiKey = process.env.COIN_GECKO_API_KEY;
+    
+    // Build headers with API key if available
+    const headers: HeadersInit = {
+      'Accept': 'application/json',
+    };
+    
+    if (coingeckoApiKey) {
+      headers['x-cg-pro-api-key'] = coingeckoApiKey;
+    }
+
     // Fetch market data with price history
     const [marketDataResponse, historyResponse] = await Promise.all([
-      fetch(`${COINGECKO_API}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`),
-      fetch(`${COINGECKO_API}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`),
+      fetch(`${COINGECKO_API}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`, {
+        headers,
+      }),
+      fetch(`${COINGECKO_API}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`, {
+        headers,
+      }),
     ]);
 
     if (!marketDataResponse.ok || !historyResponse.ok) {

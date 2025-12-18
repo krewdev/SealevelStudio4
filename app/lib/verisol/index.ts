@@ -9,6 +9,7 @@ export * from './setup-guide';
 export * from './commitment-proof'; // Hash-based commitment alternative to ZK (⚠️ requires trust)
 export * from './transparent-commitment'; // Transparent commitments to reduce trust
 export * from './hybrid-proof'; // Hybrid system supporting both ZK and commitments
+export * from './subscription'; // Subscription verification and minting
 export { IDL as VeriSolIDL } from './aletheia_protocol';
 export type { AletheiaProtocol as VeriSolProgram } from './aletheia_protocol';
 

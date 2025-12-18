@@ -41,10 +41,11 @@ export async function GET(request: NextRequest) {
     const walletPubkey = new PublicKey(walletAddress);
 
     // Get RPC endpoint from environment or use default
-    const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 
-                   process.env.NEXT_PUBLIC_HELIUS_API_KEY 
-                     ? `https://rpc.helius.xyz/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
-                     : 'https://api.mainnet-beta.solana.com';
+    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 
+                   process.env.NEXT_PUBLIC_RPC_URL || 
+                   (process.env.NEXT_PUBLIC_HELIUS_API_KEY 
+                     ? `https://devnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
+                     : 'https://api.devnet.solana.com');
 
     const connection = new Connection(rpcUrl, 'confirmed');
 
@@ -118,10 +119,10 @@ export async function GET(request: NextRequest) {
     if (process.env.NEXT_PUBLIC_HELIUS_API_KEY || process.env.HELIUS_API_KEY) {
       try {
         const heliusApiKey = process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'mainnet-beta';
-        const heliusUrl = network === 'devnet' 
-          ? `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`
-          : `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`;
+        const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+        const heliusUrl = network === 'mainnet' || network === 'mainnet-beta'
+          ? `https://mainnet.helius-rpc.com/?api-key=${heliusApiKey}`
+          : `https://devnet.helius-rpc.com/?api-key=${heliusApiKey}`;
 
         // Use Helius DAS API to get assets by owner
         const dasResponse = await fetch(heliusUrl, {

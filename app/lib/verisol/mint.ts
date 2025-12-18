@@ -30,6 +30,17 @@ export interface MintAttestationParams {
   };
 }
 
+export interface MintSubscriptionAttestationParams {
+  connection: Connection;
+  wallet: WalletContextState;
+  subscriptionTier: 'basic' | 'pro';
+  metadata?: {
+    name?: string;
+    symbol?: string;
+    uri?: string;
+  };
+}
+
 /**
  * Mint a compressed NFT attestation using custom attestation program
  * Replaces VeriSol with custom Anchor program
@@ -222,5 +233,83 @@ export async function checkVeriSolSetup(connection: Connection): Promise<{
     ready,
     errors,
   };
+}
+
+/**
+ * Mint a subscription-based attestation cNFT
+ * Verifies subscription payment and mints cNFT with tier information
+ */
+export async function mintSubscriptionAttestation(
+  params: MintSubscriptionAttestationParams
+): Promise<string> {
+  const { connection, wallet, subscriptionTier, metadata } = params;
+
+  if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
+    throw new Error('Wallet not connected or missing required methods');
+  }
+
+  // Check if custom attestation program is deployed
+  const isDeployed = await checkAttestationProgramDeployed(connection);
+  if (!isDeployed) {
+    throw new Error(
+      'Custom attestation program not deployed. ' +
+      'Please build and deploy the program first. ' +
+      'See docs/ATTESTATION_PROGRAM_SETUP.md for instructions.'
+    );
+  }
+
+  // Get merkle tree and tree authority
+  const { getBetaTesterMerkleTree } = await import('./config');
+  const merkleTree = getBetaTesterMerkleTree() || getMerkleTree();
+  if (!merkleTree) {
+    throw new Error('Merkle tree not configured. Please set NEXT_PUBLIC_BETA_TESTER_MERKLE_TREE or NEXT_PUBLIC_VERISOL_MERKLE_TREE environment variable.');
+  }
+
+  // Create attestation client
+  const client = createAttestationClient(connection, wallet);
+
+  // Map subscription tier to usage count for attestation
+  // We use a high usage count to represent subscription tiers
+  const subscriptionUsageMap = {
+    basic: 100, // Basic subscription = 100 usage count
+    pro: 500,   // Pro subscription = 500 usage count
+  };
+
+  const usageCount = subscriptionUsageMap[subscriptionTier];
+
+  // Create tier-specific metadata
+  const tierInfo = {
+    basic: { name: 'Basic Subscriber', rarity: 'Common', color: '#3B82F6' },
+    pro: { name: 'Pro Subscriber', rarity: 'Rare', color: '#8B5CF6' },
+  };
+
+  const tier = tierInfo[subscriptionTier];
+  const tierMetadata = {
+    name: metadata?.name || `Sealevel Studio ${tier.name}`,
+    symbol: metadata?.symbol || `SUB-${subscriptionTier.toUpperCase().slice(0, 1)}`,
+    uri: metadata?.uri || `https://sealevel.studio/metadata/subscription-${subscriptionTier}.json`,
+    attributes: [
+      { trait_type: 'Type', value: 'Subscription' },
+      { trait_type: 'Tier', value: tier.name },
+      { trait_type: 'Rarity', value: tier.rarity },
+      { trait_type: 'Platform', value: 'Sealevel Studio' },
+      { trait_type: 'Subscription Tier', value: subscriptionTier },
+    ],
+  };
+
+  try {
+    // Mint attestation with subscription tier
+    const result = await client.mintAttestation(
+      usageCount,
+      tierMetadata
+    );
+
+    return result.txSignature;
+  } catch (mintError: any) {
+    console.error('Subscription attestation minting failed:', mintError);
+    throw new Error(
+      `Failed to mint subscription attestation: ${mintError.message || 'Unknown error'}`
+    );
+  }
 }
 
