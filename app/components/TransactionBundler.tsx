@@ -224,7 +224,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   const importRecipients = (text: string) => {
     try {
       const lines = text.split('\n').filter(l => l.trim());
-      const imported = lines.map(line => {
+      const imported = lines.map((line: string) => {
         const parts = line.split(/[\s,]+/);
         const address = parts[0];
         const amount = parseFloat(parts[1] || '0.1');
