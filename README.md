@@ -349,6 +349,27 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📚 Documentation
+
+### Core Documentation
+- [User Guide](./docs/USER_GUIDE.md) - Complete user guide
+- [API Documentation](./docs/API.md) - API reference
+- [Deployment Guide](./docs/GOING_LIVE.md) - Going live checklist
+
+### Blockchain Support
+- **MultiverX**: 
+  - [Quick Start](./docs/MULTIVERX_QUICK_START.md) - Get started in 5 minutes
+  - [Complete Guide](./docs/MULTIVERX_GUIDE.md) - Comprehensive MultiverX documentation
+  - [Architecture Deep Dive](./docs/MULTIVERX_ARCHITECTURE.md) - Technical architecture details
+
+### Feature Documentation
+- [Arbitrage Scanner](./docs/ADVANCED_ARBITRAGE.md) - Advanced arbitrage features
+- [AI Agents](./docs/AGENT_HIERARCHY.md) - AI agent system
+- [Wallet Recovery](./docs/WALLET_RECOVERY_SETUP.md) - Wallet recovery setup
+- [Attestation System](./docs/ATTESTATION_SETUP_GUIDE.md) - VeriSol attestation
+
+See the [docs](./docs/) directory for complete documentation.
+
 ## 📞 Contact
 
 - **Project Lead**: James Young 
