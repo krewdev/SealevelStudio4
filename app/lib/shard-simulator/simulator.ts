@@ -240,6 +240,8 @@ export class ShardTransactionSimulator {
 
   /**
    * Get statistics about shard distribution
+   * Calculates cross-shard ratio by comparing shard assignments, not relying on tx.type
+   * which is only set after simulation
    */
   getShardStatistics(transactions: ShardTransaction[]): {
     shardDistribution: Record<number, number>;
@@ -250,10 +252,16 @@ export class ShardTransactionSimulator {
     let crossShardCount = 0;
 
     transactions.forEach(tx => {
-      const shard = this.getShardForAddress(tx.from);
-      distribution[shard] = (distribution[shard] || 0) + 1;
+      // Calculate shard assignments for from and to addresses
+      const fromShard = this.getShardForAddress(tx.from);
+      const toShard = this.getShardForAddress(tx.to);
       
-      if (tx.type === 'cross-shard') {
+      // Count distribution by source shard
+      distribution[fromShard] = (distribution[fromShard] || 0) + 1;
+      
+      // Determine if this is a cross-shard transaction by comparing shards
+      // This works even before simulation runs
+      if (fromShard !== toShard) {
         crossShardCount++;
       }
     });

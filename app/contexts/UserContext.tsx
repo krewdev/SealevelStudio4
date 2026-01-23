@@ -200,15 +200,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
             return updated;
           } else {
             // If no user state yet, try to load from localStorage and update
-            const storedProfile = localStorage.getItem('user_profile');
-            if (storedProfile) {
-              try {
-                const profile = JSON.parse(storedProfile);
-                const updated = { ...profile, balance: data.wallet.balance };
-                saveProfile(updated);
-                return updated;
-              } catch (e) {
-                console.error('Failed to parse stored profile:', e);
+            // Check if localStorage is available (client-side only)
+            if (typeof window !== 'undefined' && localStorage) {
+              const storedProfile = localStorage.getItem('user_profile');
+              if (storedProfile) {
+                try {
+                  const profile = JSON.parse(storedProfile);
+                  const updated = { ...profile, balance: data.wallet.balance };
+                  saveProfile(updated);
+                  return updated;
+                } catch (e) {
+                  console.error('Failed to parse stored profile:', e);
+                }
               }
             }
             return null;
