@@ -136,7 +136,9 @@ A. Funding: $150,000 Pre-Seed / Grant
 
 This 6-month runway will be allocated to:
 
-Core Team (2 Engineers): To build the frontend, simulation backend, and deserialization engine.
+- **Core Team (2 Engineers)**: To build the frontend, simulation backend, and deserialization engine.
+- **Design (1 Part-Time)**: To ensure a world-class, intuitive UX.
+- **Infrastructure Costs**: For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.
 
 
 **Solana Integration:**
@@ -190,12 +192,6 @@ Core Team (2 Engineers): To build the frontend, simulation backend, and deserial
 2. **Drop & Verify**: Drag cNFTs onto the console with instant ZK verification
 3. **Compose Transaction**: Select functions and configure parameters
 4. **Simulate & Execute**: Test with state diffs, then sign and send
-
-This 6-month runway will be allocated to:
-
-- **Core Team (2 Engineers)**: To build the frontend, simulation backend, and deserialization engine.
-- **Design (1 Part-Time)**: To ensure a world-class, intuitive UX.
-- **Infrastructure Costs**: For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.
 
 ### Phase 1: Foundation (Months 1-2)
 **Goal:** Core infrastructure and account inspector
@@ -386,13 +382,4 @@ See the [docs](./docs/) directory for complete documentation.
 ---
 
 *Built with ❤️ for the Solana ecosystem - Trust through Zero-Knowledge*
-
-### Strategic Partnerships
-
-We are seeking partnerships, not just capital. Our ideal partners are:
-
-- **L1 Foundations (Solana Foundation)**: For grant funding, ecosystem promotion, and inclusion in official developer documentation and bootcamps.
-- **Infrastructure Providers (Helius, Triton, QuickNode)**: For access to high-fidelity simulation RPCs and co-marketing to developer audiences.
-- **Core Tooling Teams (Anchor, Metaplex)**: To ensure first-class, "out-of-the-box" support for the most-used IDLs and program standards.
-- **Security & Audit Firms (Ottersec, Neodyme)**: As a "design partner" power-user group to provide critical feedback and ensure the tool meets security-critical standards.
 

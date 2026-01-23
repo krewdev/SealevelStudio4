@@ -240,8 +240,9 @@ export class ShardTransactionSimulator {
 
   /**
    * Get statistics about shard distribution
-   * Calculates cross-shard ratio by comparing shard assignments, not relying on tx.type
-   * which is only set after simulation
+   * Uses stored shard assignments from transactions (set during simulation) to ensure
+   * statistics reflect the shard configuration that was active during simulation,
+   * even if adaptive sharding has since changed the shard count.
    */
   getShardStatistics(transactions: ShardTransaction[]): {
     shardDistribution: Record<number, number>;
@@ -252,15 +253,31 @@ export class ShardTransactionSimulator {
     let crossShardCount = 0;
 
     transactions.forEach(tx => {
-      // Calculate shard assignments for from and to addresses
-      const fromShard = this.getShardForAddress(tx.from);
-      const toShard = this.getShardForAddress(tx.to);
+      // Use stored shard assignments from simulation to preserve accuracy
+      // even if adaptive sharding has since changed the shard count.
+      // Only recalculate if transaction appears unsimulated (default initialization).
+      let fromShard: number;
+      let toShard: number;
+      
+      // Check if transaction has been simulated by verifying type consistency with shard assignments
+      const isSimulated = (tx.shardFrom === tx.shardTo && tx.type === 'intra-shard') ||
+                          (tx.shardFrom !== tx.shardTo && tx.type === 'cross-shard');
+      
+      // Use stored values if they're consistent (transaction has been simulated)
+      // This preserves the shard configuration that was active during simulation
+      if (isSimulated) {
+        fromShard = tx.shardFrom;
+        toShard = tx.shardTo;
+      } else {
+        // Transaction hasn't been simulated yet, calculate using current shard count
+        fromShard = this.getShardForAddress(tx.from);
+        toShard = this.getShardForAddress(tx.to);
+      }
       
       // Count distribution by source shard
       distribution[fromShard] = (distribution[fromShard] || 0) + 1;
       
       // Determine if this is a cross-shard transaction by comparing shards
-      // This works even before simulation runs
       if (fromShard !== toShard) {
         crossShardCount++;
       }
