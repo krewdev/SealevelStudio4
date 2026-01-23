@@ -38,14 +38,40 @@ export function LoginGate({ children }: LoginGateProps) {
 
     setIsCreating(true);
     try {
+      // Validate email if provided
+      if (showEmailInput && email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          alert('Please enter a valid email address');
+          setIsCreating(false);
+          return;
+        }
+      }
+
+      // Validate vanity prefix if provided
+      if (vanityPrefix.trim()) {
+        const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+        if (!base58Regex.test(vanityPrefix.toUpperCase())) {
+          alert('Vanity prefix contains invalid characters. Use only Base58 characters (no 0, O, I, l).');
+          setIsCreating(false);
+          return;
+        }
+        if (vanityPrefix.length > 8) {
+          alert('Vanity prefix must be 8 characters or less');
+          setIsCreating(false);
+          return;
+        }
+      }
+
       // Pass vanity prefix if user has entered one
       await createWallet(
-        showEmailInput && email ? email : undefined,
+        showEmailInput && email ? email.trim() : undefined,
         vanityPrefix.trim() || undefined
       );
     } catch (error) {
       console.error('Failed to create wallet:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create wallet. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet. Please try again.';
+      alert(`Error: ${errorMessage}\n\nPlease check your connection and try again.`);
     } finally {
       setIsCreating(false);
     }

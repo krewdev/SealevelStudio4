@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket } from 'lucide-react';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket, Network } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import WalletButton from './components/WalletButton';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
@@ -58,6 +58,7 @@ import { PumpFunSniper } from './components/PumpFunSniper';
 import { BleedingEdgeWrapper } from './components/BleedingEdgeWrapper';
 import { PricingBanner } from './components/PricingBanner';
 import { CustodialWalletTool } from './components/CustodialWalletTool';
+import { ShardTransactionSimulatorComponent } from './components/ShardTransactionSimulator';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -778,6 +779,7 @@ function Sidebar({
     { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
     { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
     { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
+    { id: 'shard-simulator', label: 'Shard Simulator', icon: <Network className="h-4 w-4" />, section: 'core', badge: 'MultiversX' },
     { id: 'quick-launch', label: 'Quick Launch', icon: <Rocket className="h-4 w-4" />, section: 'core', badge: 'New' },
     { id: 'pumpfun-sniper', label: 'Pump.fun Sniper', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
     { id: 'marketing-bot', label: 'Marketing Bot', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
@@ -1112,6 +1114,22 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
     return <TransactionBundler onBack={() => setActiveView('inspector')} />;
   }
 
+  // Shard Transaction Simulator has its own full-screen layout
+  if (activeView === 'shard-simulator') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <button 
+          onClick={() => setActiveView('inspector')} 
+          className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+        <ShardTransactionSimulatorComponent />
+      </div>
+    );
+  }
+
   // Quick Launch has its own layout
   if (activeView === 'quick-launch') {
     return (
@@ -1417,7 +1435,7 @@ function AppContent() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sealevel-blockchain');
-      if (saved && ['polkadot', 'solana', 'ethereum', 'polygon', 'avalanche', 'base', 'arbitrum', 'optimism', 'sui', 'aptos'].includes(saved)) {
+      if (saved && ['polkadot', 'solana', 'ethereum', 'polygon', 'avalanche', 'base', 'arbitrum', 'optimism', 'sui', 'aptos', 'multiverx'].includes(saved)) {
         setSelectedBlockchain(saved as BlockchainType);
       } else {
         // Default to Solana if nothing saved
@@ -1586,7 +1604,7 @@ function AppContent() {
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'pumpfun-sniper' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts' || activeView === 'custodial-wallet';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'pumpfun-sniper' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts' || activeView === 'custodial-wallet' || activeView === 'shard-simulator';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {

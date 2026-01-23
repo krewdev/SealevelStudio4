@@ -134,6 +134,27 @@ export class ProviderRegistry {
   }
 }
 
-// Global registry instance
-export const providerRegistry = new ProviderRegistry();
+// Global registry instance - lazy initialization
+let providerRegistryInstance: ProviderRegistry | null = null;
+
+/**
+ * Get the provider registry instance (lazy initialization)
+ * Only initializes when first accessed
+ */
+export function getProviderRegistry(): ProviderRegistry {
+  if (!providerRegistryInstance) {
+    providerRegistryInstance = new ProviderRegistry();
+  }
+  return providerRegistryInstance;
+}
+
+/**
+ * Legacy export for backward compatibility
+ * @deprecated Use getProviderRegistry() instead
+ */
+export const providerRegistry = new Proxy({} as ProviderRegistry, {
+  get(_target, prop) {
+    return getProviderRegistry()[prop as keyof ProviderRegistry];
+  }
+});
 

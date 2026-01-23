@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-export type BlockchainType = 'polkadot' | 'solana' | 'ethereum' | 'polygon' | 'avalanche' | 'base' | 'arbitrum' | 'optimism' | 'sui' | 'aptos';
+export type BlockchainType = 'polkadot' | 'solana' | 'ethereum' | 'polygon' | 'avalanche' | 'base' | 'arbitrum' | 'optimism' | 'sui' | 'aptos' | 'multiverx';
 
 interface BlockchainInfo {
   id: BlockchainType;
@@ -115,6 +115,16 @@ const BLOCKCHAINS: BlockchainInfo[] = [
     gradient: 'bg-gradient-to-r from-green-500 to-emerald-600',
     status: 'coming-soon',
     features: ['Transaction Builder', 'Coming Soon'],
+  },
+  {
+    id: 'multiverx',
+    name: 'MultiversX',
+    description: 'Adaptive state sharding blockchain with high throughput',
+    logo: 'https://cryptologos.cc/logos/multiversx-egld-egld-logo.png?v=032',
+    color: 'from-orange-500 to-yellow-600',
+    gradient: 'bg-gradient-to-r from-orange-500 to-yellow-600',
+    status: 'available',
+    features: ['Transaction Builder', 'Shard Simulator', 'Cross-Shard', 'Full Support'],
   },
 ];
 

@@ -10,7 +10,7 @@ let resend: Resend | null = null;
 /**
  * Initialize email service
  */
-function getEmailService(): Resend | null {
+export function getEmailService(): Resend | null {
   if (!resend) {
     const apiKey = process.env.RESEND_API_KEY;
     

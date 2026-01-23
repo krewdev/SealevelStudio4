@@ -4,7 +4,7 @@
  */
 
 import { LocalAIProvider, LocalModelConfig } from './consensus/providers/local';
-import { providerRegistry } from './consensus/providers/registry';
+import { getProviderRegistry } from './consensus/providers/registry';
 import { executeConsensus } from './consensus/engine';
 import { ExpressionFactory, expressionStore } from './expressions';
 
@@ -44,9 +44,9 @@ export class CoreAIModel {
 
     this.provider = new LocalAIProvider(localConfig);
     
-    // Register with consensus system
+    // Register with consensus system (lazy initialization)
     if (this.provider.enabled) {
-      providerRegistry.register(this.provider);
+      getProviderRegistry().register(this.provider);
       console.log(`✅ Core AI Model initialized: ${this.provider.name}`);
     }
   }
@@ -248,10 +248,8 @@ export function getCoreModel(): CoreAIModel | null {
 }
 
 /**
- * Auto-initialize on module load if enabled
+ * Lazy initialization - only initialize when getCoreModel() is called
+ * This prevents eager initialization on module load
+ * Services should call getCoreModel() or initializeCoreModel() when needed
  */
-if (typeof window === 'undefined' && (process.env.LOCAL_AI_ENABLED === 'true' || process.env.LOCAL_AI_ENDPOINT)) {
-  // Server-side only - initialize on module load
-  initializeCoreModel();
-}
 

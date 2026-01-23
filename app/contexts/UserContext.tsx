@@ -48,21 +48,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const initializeUser = async () => {
     setIsLoading(true);
     try {
+      // Check if localStorage is available (client-side only)
+      if (typeof window === 'undefined' || !localStorage) {
+        console.warn('localStorage not available, skipping wallet initialization');
+        setIsLoading(false);
+        return;
+      }
+
       // Check if user has a wallet in localStorage
       const storedWalletId = localStorage.getItem('wallet_id');
       const storedProfile = localStorage.getItem('user_profile');
 
       if (storedProfile && storedWalletId) {
-        const profile = JSON.parse(storedProfile);
-        setUser(profile);
-        // Refresh balance - pass walletAddress directly to avoid state timing issue
-        await refreshBalance(profile.walletAddress);
+        try {
+          const profile = JSON.parse(storedProfile);
+          // Validate profile has required fields
+          if (profile.walletAddress && profile.walletId) {
+            setUser(profile);
+            // Refresh balance - pass walletAddress directly to avoid state timing issue
+            await refreshBalance(profile.walletAddress);
+          } else {
+            // Invalid profile, create new wallet
+            console.warn('Invalid profile in localStorage, creating new wallet');
+            await createWallet();
+          }
+        } catch (parseError) {
+          console.error('Failed to parse stored profile:', parseError);
+          // Clear invalid data and create new wallet
+          localStorage.removeItem('user_profile');
+          localStorage.removeItem('wallet_id');
+          await createWallet();
+        }
       } else {
         // Create a new wallet
         await createWallet();
       }
     } catch (error) {
       console.error('Failed to initialize user:', error);
+      // Don't leave user in loading state if initialization fails
+      // They can retry by refreshing the page
     } finally {
       setIsLoading(false);
     }
@@ -78,6 +102,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
    */
   const createWallet = async (email?: string, vanityPrefix?: string) => {
     try {
+      // Check if localStorage is available (client-side only)
+      if (typeof window === 'undefined' || !localStorage) {
+        throw new Error('localStorage is not available. Please ensure you are running this in a browser environment.');
+      }
+
       // Generate a session ID for this user
       let sessionId = localStorage.getItem('session_id');
       if (!sessionId) {
@@ -90,6 +119,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, email, vanityPrefix }),
       });
+
+      // Check if response is OK before parsing
+      if (!response.ok) {
+        let errorMessage = `Failed to create wallet: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If JSON parsing fails, use the default error message
+        }
+        throw new Error(errorMessage);
+      }
 
       const data = await response.json();
       
@@ -110,6 +151,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setUser(newUser);
       saveProfile(newUser);
       localStorage.setItem('wallet_id', data.wallet.walletId);
+      
+      // Refresh balance after wallet creation
+      await refreshBalance(newUser.walletAddress);
     } catch (error) {
       console.error('Failed to create wallet:', error);
       throw error;
@@ -122,30 +166,56 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const saveProfile = (profile: UserProfile) => {
-    localStorage.setItem('user_profile', JSON.stringify(profile));
+    if (typeof window !== 'undefined' && localStorage) {
+      localStorage.setItem('user_profile', JSON.stringify(profile));
+    }
     setUser(profile);
   };
 
   const refreshBalance = async (walletAddress?: string) => {
     // Use provided walletAddress or fall back to user state
     const address = walletAddress || user?.walletAddress;
-    if (!address) return;
+    if (!address) {
+      console.warn('refreshBalance called without wallet address');
+      return;
+    }
     
     try {
-      const response = await fetch(`/api/wallet/info?address=${address}`);
+      const response = await fetch(`/api/wallet/info?address=${encodeURIComponent(address)}`);
+      
+      // Check if response is OK before parsing
+      if (!response.ok) {
+        console.error(`Failed to fetch wallet info: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success && data.wallet) {
-        // If we have a user state, update it; otherwise just return the balance
-        if (user) {
-          const updated = { ...user, balance: data.wallet.balance };
-          setUser(updated);
-          saveProfile(updated);
-        } else {
-          // If called during initialization, we'll need to update the profile that was just loaded
-          // This will be handled by the caller
-          return data.wallet.balance;
-        }
+        // Update user state if it exists, or update the profile in localStorage
+        setUser((currentUser) => {
+          if (currentUser) {
+            const updated = { ...currentUser, balance: data.wallet.balance };
+            saveProfile(updated);
+            return updated;
+          } else {
+            // If no user state yet, try to load from localStorage and update
+            const storedProfile = localStorage.getItem('user_profile');
+            if (storedProfile) {
+              try {
+                const profile = JSON.parse(storedProfile);
+                const updated = { ...profile, balance: data.wallet.balance };
+                saveProfile(updated);
+                return updated;
+              } catch (e) {
+                console.error('Failed to parse stored profile:', e);
+              }
+            }
+            return null;
+          }
+        });
+      } else {
+        console.error('Wallet info API returned unsuccessful response:', data.error);
       }
     } catch (error) {
       console.error('Failed to refresh balance:', error);
