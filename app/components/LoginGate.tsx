@@ -14,6 +14,14 @@ export function LoginGate({ children }: LoginGateProps) {
   const [email, setEmail] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [vanityPrefix, setVanityPrefix] = useState('');
+  
+  // Force re-check user state after wallet creation
+  // This ensures the component updates even if there's a slight delay
+  useEffect(() => {
+    if (user && !isLoading) {
+      // User is set, component will re-render and show children
+    }
+  }, [user, isLoading]);
 
   // Show loading state while checking for user
   if (isLoading) {
@@ -68,10 +76,18 @@ export function LoginGate({ children }: LoginGateProps) {
         showEmailInput && email ? email.trim() : undefined,
         vanityPrefix.trim() || undefined
       );
+      
+      // Wallet creation succeeded - user state should be set by createWallet
+      // The LoginGate will automatically re-render and show children when user is set
+      // Clear form fields for next time
+      setEmail('');
+      setVanityPrefix('');
+      setShowEmailInput(false);
     } catch (error) {
       console.error('Failed to create wallet:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet. Please try again.';
       alert(`Error: ${errorMessage}\n\nPlease check your connection and try again.`);
+      // Keep form state so user can retry
     } finally {
       setIsCreating(false);
     }

@@ -66,27 +66,44 @@ export function UserProvider({ children }: { children: ReactNode }) {
           if (profile.walletAddress && profile.walletId) {
             setUser(profile);
             // Refresh balance - pass walletAddress directly to avoid state timing issue
-            await refreshBalance(profile.walletAddress);
+            // Non-blocking: don't fail initialization if balance refresh fails
+            try {
+              await refreshBalance(profile.walletAddress);
+            } catch (balanceError) {
+              console.warn('Failed to refresh balance during initialization, but continuing:', balanceError);
+              // Continue - user can still use the app
+            }
           } else {
             // Invalid profile, create new wallet
             console.warn('Invalid profile in localStorage, creating new wallet');
-            await createWallet();
+            try {
+              await createWallet();
+            } catch (createError) {
+              console.error('Failed to create wallet during initialization:', createError);
+              // Don't throw - let user see LoginGate to manually create wallet
+            }
           }
         } catch (parseError) {
           console.error('Failed to parse stored profile:', parseError);
           // Clear invalid data and create new wallet
           localStorage.removeItem('user_profile');
           localStorage.removeItem('wallet_id');
-          await createWallet();
+          try {
+            await createWallet();
+          } catch (createError) {
+            console.error('Failed to create wallet after clearing invalid data:', createError);
+            // Don't throw - let user see LoginGate to manually create wallet
+          }
         }
       } else {
-        // Create a new wallet
-        await createWallet();
+        // No stored wallet - don't auto-create, let user manually create via LoginGate
+        // This gives users control and prevents silent failures
+        console.log('No stored wallet found, user will create wallet via LoginGate');
       }
     } catch (error) {
       console.error('Failed to initialize user:', error);
       // Don't leave user in loading state if initialization fails
-      // They can retry by refreshing the page
+      // They can retry by refreshing the page or use LoginGate
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +155,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Failed to create wallet');
       }
 
+      // Validate required wallet data
+      if (!data.wallet.address || !data.wallet.walletId) {
+        throw new Error('Invalid wallet data received from server');
+      }
+
       const newUser: UserProfile = {
         walletAddress: data.wallet.address,
         walletId: data.wallet.walletId,
@@ -148,12 +170,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
         campaigns: []
       };
 
+      // Set user state and save to localStorage FIRST to ensure user can proceed
+      // This must happen synchronously before any async operations
       setUser(newUser);
       saveProfile(newUser);
       localStorage.setItem('wallet_id', data.wallet.walletId);
       
-      // Refresh balance after wallet creation
-      await refreshBalance(newUser.walletAddress);
+      // Verify localStorage was saved (defensive check)
+      if (typeof window !== 'undefined' && localStorage) {
+        const verifySaved = localStorage.getItem('user_profile');
+        if (!verifySaved) {
+          console.warn('Profile not saved to localStorage, retrying...');
+          // Retry saving
+          localStorage.setItem('user_profile', JSON.stringify(newUser));
+          localStorage.setItem('wallet_id', data.wallet.walletId);
+        }
+      }
+      
+      // Refresh balance after wallet creation (non-blocking - don't fail if this errors)
+      // This ensures users can proceed even if balance check fails
+      try {
+        await refreshBalance(newUser.walletAddress);
+      } catch (balanceError) {
+        console.warn('Failed to refresh balance after wallet creation, but wallet was created successfully:', balanceError);
+        // Don't throw - wallet creation was successful, user can proceed
+      }
     } catch (error) {
       console.error('Failed to create wallet:', error);
       throw error;
