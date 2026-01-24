@@ -57,10 +57,47 @@ export const SEAL_TOKEN_CONFIG = {
   },
 
   // Vesting Configuration for presale allocations
+  // Structured vesting schedule to ensure maximum token sentiment and gain
   vestingPeriods: {
     week1: { duration: 7 * 24 * 60 * 60 * 1000, label: '1 Week' },
     week3: { duration: 21 * 24 * 60 * 60 * 1000, label: '3 Weeks' },
     month1: { duration: 30 * 24 * 60 * 60 * 1000, label: '1 Month' },
+  },
+  
+  // Presale Vesting Schedule (Structured for maximum token sentiment)
+  presaleVesting: {
+    // Tier-based vesting: Higher tiers get better vesting terms
+    tiers: {
+      tier1: {
+        // Tier 1: 1-9.99 SOL (15% bonus)
+        unlockSchedule: [
+          { unlockAt: 0, percent: 20 },      // 20% unlocked immediately at presale end
+          { unlockAt: 30, percent: 30 },     // 30% unlocked after 30 days
+          { unlockAt: 60, percent: 30 },     // 30% unlocked after 60 days
+          { unlockAt: 90, percent: 20 },     // Final 20% unlocked after 90 days
+        ],
+      },
+      tier2: {
+        // Tier 2: 10-49.99 SOL (25% bonus)
+        unlockSchedule: [
+          { unlockAt: 0, percent: 25 },      // 25% unlocked immediately at presale end
+          { unlockAt: 30, percent: 35 },      // 35% unlocked after 30 days
+          { unlockAt: 60, percent: 25 },      // 25% unlocked after 60 days
+          { unlockAt: 90, percent: 15 },      // Final 15% unlocked after 90 days
+        ],
+      },
+      tier3: {
+        // Tier 3: 50+ SOL (35% bonus)
+        unlockSchedule: [
+          { unlockAt: 0, percent: 30 },      // 30% unlocked immediately at presale end
+          { unlockAt: 30, percent: 40 },     // 40% unlocked after 30 days
+          { unlockAt: 60, percent: 20 },      // 20% unlocked after 60 days
+          { unlockAt: 90, percent: 10 },       // Final 10% unlocked after 90 days
+        ],
+      },
+    },
+    // All vesting periods are relative to presale end date
+    startDate: null as Date | null, // Will be set to presale end date
   },
   
   // Metaplex Metadata

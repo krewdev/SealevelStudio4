@@ -21,7 +21,11 @@ export function PresaleCountdown() {
       if (process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP) {
         const timestamp = parseInt(process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP, 10);
         if (!isNaN(timestamp) && timestamp > 0) {
-          return new Date(timestamp);
+          const date = new Date(timestamp);
+          // Validate the date is in the future (or allow past dates if explicitly set)
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
         }
       }
       // Try NEXT_PUBLIC_PRESALE_DATE (ISO 8601 date string)
@@ -32,6 +36,8 @@ export function PresaleCountdown() {
         }
       }
     }
+    // Default: return a future date (2 weeks from now) to ensure countdown shows
+    // This prevents the presale from appearing "live" when no config is set
     return DEFAULT_PRESALE_CONFIG.startTime;
   }, []);
 

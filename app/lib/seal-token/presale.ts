@@ -59,11 +59,16 @@ export interface PresaleConfig {
 
 /**
  * Default Presale Configuration
+ * 
+ * Presale Structure:
+ * - Duration: 3 months (90 days)
+ * - Three progressive tiers with increasing bonuses
+ * - Structured tokenomics with vested launch
  */
 export const DEFAULT_PRESALE_CONFIG: PresaleConfig = {
-  startTime: new Date('2025-12-02T00:00:00Z'), // Starts Dec 2, 2025 (One week from now)
-  endTime: new Date(Date.now() + 150 * 24 * 60 * 60 * 1000), // 5 months duration
-  isActive: true,
+  startTime: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // Default: 2 weeks from now (requires env var to be set)
+  endTime: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 months duration (90 days)
+  isActive: false, // Inactive by default until start time is reached
 
   presaleSupply: 300_000_000, // 300M SEAL tokens for presale
   minPurchase: 0.1, // Minimum 0.1 SOL
@@ -71,12 +76,12 @@ export const DEFAULT_PRESALE_CONFIG: PresaleConfig = {
   totalRaiseCap: 10_000, // Maximum 10,000 SOL total raise
 
   pricePerSeal: 0.00002, // 0.00002 SOL per SEAL (50,000 SEAL per SOL)
+  
+  // Three progressive tiers with increasing bonuses
   bonusTiers: [
-    { amount: 1, bonusPercent: 10 },    // 1+ SOL = 10% bonus
-    { amount: 10, bonusPercent: 15 },   // 10+ SOL = 15% bonus
-    { amount: 50, bonusPercent: 20 },   // 50+ SOL = 20% bonus
-    { amount: 100, bonusPercent: 25 },  // 100+ SOL = 25% bonus
-    { amount: 500, bonusPercent: 30 },  // 500+ SOL = 30% bonus
+    { amount: 1, bonusPercent: 15 },    // Tier 1: 1+ SOL = 15% bonus
+    { amount: 10, bonusPercent: 25 },  // Tier 2: 10+ SOL = 25% bonus
+    { amount: 50, bonusPercent: 35 },   // Tier 3: 50+ SOL = 35% bonus
   ],
 
   whitelistEnabled: false,
@@ -320,17 +325,95 @@ export function getWalletContribution(
   sealTokens: number;
   canContribute: boolean;
   remainingAllowance: number;
+  tier: 'tier1' | 'tier2' | 'tier3' | null;
 } {
   const contributed = config.contributions.get(wallet.toString()) || 0;
   const { totalTokens } = calculateSealTokens(contributed, config);
   const remainingAllowance = config.maxPurchase - contributed;
   const canContribute = remainingAllowance > 0 && config.isActive;
   
+  // Determine tier based on contribution
+  let tier: 'tier1' | 'tier2' | 'tier3' | null = null;
+  if (contributed >= 50) {
+    tier = 'tier3';
+  } else if (contributed >= 10) {
+    tier = 'tier2';
+  } else if (contributed >= 1) {
+    tier = 'tier1';
+  }
+  
   return {
     contributed,
     sealTokens: totalTokens,
     canContribute,
     remainingAllowance,
+    tier,
+  };
+}
+
+/**
+ * Calculate vested tokens for a wallet based on presale tier and time
+ */
+export function calculateVestedTokens(
+  totalTokens: number,
+  tier: 'tier1' | 'tier2' | 'tier3',
+  presaleEndDate: Date,
+  currentDate: Date = new Date()
+): {
+  vested: number;
+  locked: number;
+  nextUnlock: { date: Date; amount: number } | null;
+  unlockSchedule: { date: Date; amount: number; percent: number }[];
+} {
+  const { SEAL_TOKEN_CONFIG } = require('./config');
+  const vestingConfig = SEAL_TOKEN_CONFIG.presaleVesting.tiers[tier];
+  
+  if (!vestingConfig || currentDate < presaleEndDate) {
+    // Presale hasn't ended yet, no tokens vested
+    const firstUnlock = vestingConfig?.unlockSchedule[0];
+    return {
+      vested: 0,
+      locked: totalTokens,
+      nextUnlock: firstUnlock ? {
+        date: new Date(presaleEndDate.getTime() + firstUnlock.unlockAt * 24 * 60 * 60 * 1000),
+        amount: totalTokens * (firstUnlock.percent / 100),
+      } : null,
+      unlockSchedule: vestingConfig?.unlockSchedule.map(schedule => ({
+        date: new Date(presaleEndDate.getTime() + schedule.unlockAt * 24 * 60 * 60 * 1000),
+        amount: totalTokens * (schedule.percent / 100),
+        percent: schedule.percent,
+      })) || [],
+    };
+  }
+  
+  // Calculate days since presale ended
+  const daysSinceEnd = Math.floor((currentDate.getTime() - presaleEndDate.getTime()) / (24 * 60 * 60 * 1000));
+  
+  let vested = 0;
+  let nextUnlock: { date: Date; amount: number } | null = null;
+  const unlockSchedule = vestingConfig.unlockSchedule.map(schedule => {
+    const unlockDate = new Date(presaleEndDate.getTime() + schedule.unlockAt * 24 * 60 * 60 * 1000);
+    const amount = totalTokens * (schedule.percent / 100);
+    const isUnlocked = daysSinceEnd >= schedule.unlockAt;
+    
+    if (isUnlocked) {
+      vested += amount;
+    } else if (!nextUnlock) {
+      nextUnlock = { date: unlockDate, amount };
+    }
+    
+    return {
+      date: unlockDate,
+      amount,
+      percent: schedule.percent,
+    };
+  });
+  
+  return {
+    vested: Math.floor(vested),
+    locked: Math.floor(totalTokens - vested),
+    nextUnlock,
+    unlockSchedule,
   };
 }
 

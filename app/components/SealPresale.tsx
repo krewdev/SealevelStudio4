@@ -479,25 +479,108 @@ export function SealPresale({ onBack }: SealPresaleProps) {
           </div>
         </div>
 
-        {/* Vesting Information */}
+          {/* Three Tier Structure */}
         <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 mb-8">
-          <h2 className="text-2xl font-bold text-center mb-6">Token Vesting Schedule</h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Three Progressive Tiers</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-900/50 to-blue-800/50 rounded-xl border border-blue-700">
+              <Crown className="text-blue-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-blue-300">Tier 1</h3>
+              <p className="text-gray-300 font-semibold mb-2">1 - 9.99 SOL</p>
+              <p className="text-blue-400 text-2xl font-bold mb-2">15% Bonus</p>
+              <p className="text-gray-400 text-sm">Entry level tier with solid bonus</p>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-purple-900/50 to-purple-800/50 rounded-xl border border-purple-700">
+              <Star className="text-purple-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-purple-300">Tier 2</h3>
+              <p className="text-gray-300 font-semibold mb-2">10 - 49.99 SOL</p>
+              <p className="text-purple-400 text-2xl font-bold mb-2">25% Bonus</p>
+              <p className="text-gray-400 text-sm">Premium tier with enhanced rewards</p>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-yellow-900/50 to-orange-800/50 rounded-xl border border-yellow-700">
+              <Flame className="text-yellow-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-yellow-300">Tier 3</h3>
+              <p className="text-gray-300 font-semibold mb-2">50+ SOL</p>
+              <p className="text-yellow-400 text-2xl font-bold mb-2">35% Bonus</p>
+              <p className="text-gray-400 text-sm">Elite tier with maximum benefits</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Structured Vesting Schedule */}
+        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 mb-8">
+          <h2 className="text-2xl font-bold text-center mb-6">Structured Vesting Schedule</h2>
+          <p className="text-center text-gray-400 mb-6">Progressive unlock schedule based on tier - Higher tiers unlock faster</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-blue-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Week 1</h3>
-              <p className="text-gray-400 text-sm">25% tokens unlocked immediately</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-blue-300">Tier 1 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-blue-400 font-semibold">20%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-blue-400 font-semibold">+30% (50% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-blue-400 font-semibold">+30% (80% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-blue-400 font-semibold">+20% (100% vested)</span>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-purple-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Week 3</h3>
-              <p className="text-gray-400 text-sm">Additional 25% unlocked</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-purple-300">Tier 2 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-purple-400 font-semibold">25%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-purple-400 font-semibold">+35% (60% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-purple-400 font-semibold">+25% (85% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-purple-400 font-semibold">+15% (100% vested)</span>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-green-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Month 1</h3>
-              <p className="text-gray-400 text-sm">Final 50% fully vested</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-yellow-300">Tier 3 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-yellow-400 font-semibold">30%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-yellow-400 font-semibold">+40% (70% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-yellow-400 font-semibold">+20% (90% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-yellow-400 font-semibold">+10% (100% vested)</span>
+                </div>
+              </div>
             </div>
+          </div>
+          <div className="mt-6 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+            <p className="text-sm text-green-300 text-center">
+              <Shield className="inline w-4 h-4 mr-2" />
+              All vesting schedules are enforced on-chain via smart contracts for maximum security and transparency
+            </p>
           </div>
         </div>
 
@@ -645,7 +728,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <div className="text-gray-400">Duration</div>
-                    <div className="font-medium">5 Months</div>
+                    <div className="font-medium">3 Months (90 days)</div>
                   </div>
                   <div>
                     <div className="text-gray-400">Total Tokens</div>
