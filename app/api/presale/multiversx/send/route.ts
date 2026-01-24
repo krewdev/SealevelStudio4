@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const network = process.env.MULTIVERX_NETWORK ?? process.env.NEXT_PUBLIC_MULTIVERX_NETWORK ?? 'mainnet';
+    const network = process.env.MULTIVERSX_NETWORK ?? process.env.NEXT_PUBLIC_MULTIVERSX_NETWORK ?? 'mainnet';
     const baseUrl = network === 'devnet' ? DEVNET_GATEWAY : MAINNET_GATEWAY;
     const url = `${baseUrl}/transaction/send`;
 

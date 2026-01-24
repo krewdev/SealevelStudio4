@@ -523,7 +523,14 @@ We're excited to partner with MultiversX to accelerate ecosystem growth and brin
 
 ---
 
-**Contact Information:**
+### Team Members
+
+| Name | Role | Bio |
+|------|------|-----|
+| **Jay Young** | Founder & CEO | Full-stack developer with 5+ years of experience in blockchain development, specializing in MultiversX and sharded architectures. Led the development of Sealevel Studio from concept to current beta, with focus on MultiversX shard simulation and developer tooling. |
+
+### Contact Information
+** www.sealevelstudio.xyz ** 
 - **Project Lead**: Jay Young
 - **Email**: 300jayblackout@gmail.com
 - **Project**: Sealevel Studio (MultiversX Platform)

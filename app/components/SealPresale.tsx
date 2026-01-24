@@ -281,13 +281,15 @@ export function SealPresale({ onBack }: SealPresaleProps) {
       );
 
       // Update config (in a real app, this would come from on-chain data)
-      const updatedConfig = { ...config };
-      const existing = updatedConfig.contributions.get(publicKey.toString()) || 0;
-      updatedConfig.contributions.set(publicKey.toString(), existing + amount);
-      updatedConfig.totalRaised += amount;
-      if (existing === 0) {
-        updatedConfig.totalContributors += 1;
-      }
+      const existing = config.contributions.get(publicKey.toString()) || 0;
+      const updatedContributions = new Map(config.contributions);
+      updatedContributions.set(publicKey.toString(), existing + amount);
+      const updatedConfig = {
+        ...config,
+        contributions: updatedContributions,
+        totalRaised: config.totalRaised + amount,
+        totalContributors: existing === 0 ? config.totalContributors + 1 : config.totalContributors,
+      };
       setConfig(updatedConfig);
 
       const sealAmountFormatted = (sealAmount / Math.pow(10, 9)).toLocaleString();
@@ -350,11 +352,15 @@ export function SealPresale({ onBack }: SealPresaleProps) {
         return;
       }
       const { totalTokens } = calculateSealTokensMultiversX(amount, configMx);
-      const updated = { ...configMx };
-      const existing = updated.contributions.get(multiversXWallet.address) ?? 0;
-      updated.contributions.set(multiversXWallet.address, existing + amount);
-      updated.totalRaised += amount;
-      if (existing === 0) updated.totalContributors += 1;
+      const existing = configMx.contributions.get(multiversXWallet.address) ?? 0;
+      const updatedContributions = new Map(configMx.contributions);
+      updatedContributions.set(multiversXWallet.address, existing + amount);
+      const updated = {
+        ...configMx,
+        contributions: updatedContributions,
+        totalRaised: configMx.totalRaised + amount,
+        totalContributors: existing === 0 ? configMx.totalContributors + 1 : configMx.totalContributors,
+      };
       setConfigMx(updated);
       setSuccess(
         `Successfully contributed ${amount} EGLD! You will receive ${Math.floor(totalTokens).toLocaleString()} SEAL tokens. Tx: ${sendData.txHash.slice(0, 10)}...`
