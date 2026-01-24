@@ -171,3 +171,22 @@ export function weiToEgld(wei: string | bigint): number {
   const w = typeof wei === 'string' ? BigInt(wei) : wei;
   return Number(w) / Number(DENOMINATION);
 }
+
+/**
+ * Create a new PresaleMultiversXConfig instance with fresh Map and Set instances.
+ * This ensures each component instance has its own mutable collections, preventing
+ * shared state issues across component instances.
+ */
+export function createPresaleMultiversXConfig(
+  overrides?: Partial<PresaleMultiversXConfig>
+): PresaleMultiversXConfig {
+  return {
+    ...DEFAULT_PRESALE_MULTIVERX_CONFIG,
+    // Apply overrides first
+    ...overrides,
+    // Always create new instances of mutable collections to prevent shared state
+    // This overrides any collections that might have been in overrides
+    whitelist: overrides?.whitelist ? new Set(overrides.whitelist) : new Set(DEFAULT_PRESALE_MULTIVERX_CONFIG.whitelist),
+    contributions: overrides?.contributions ? new Map(overrides.contributions) : new Map(DEFAULT_PRESALE_MULTIVERX_CONFIG.contributions),
+  };
+}

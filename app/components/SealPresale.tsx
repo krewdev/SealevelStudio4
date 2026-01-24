@@ -47,6 +47,7 @@ import {
   getPresaleStatsMultiversX,
   getWalletContributionMultiversX,
   isWhitelistedMultiversX,
+  createPresaleMultiversXConfig,
 } from '../lib/seal-token/presale-multiversx';
 import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 import { SEAL_TOKEN_CONFIG } from '../lib/seal-token/config';
@@ -71,11 +72,14 @@ export function SealPresale({ onBack }: SealPresaleProps) {
   const multiversXWallet = useMultiversXWallet();
 
   const [presaleChain, setPresaleChain] = useState<PresaleChain>('solana');
-  const [config, setConfig] = useState<PresaleConfig>({
+  const [config, setConfig] = useState<PresaleConfig>(() => ({
     ...DEFAULT_PRESALE_CONFIG,
     treasuryWallet: publicKey || PublicKey.default, // Set to user's wallet
-  });
-  const [configMx, setConfigMx] = useState<PresaleMultiversXConfig>({ ...DEFAULT_PRESALE_MULTIVERX_CONFIG });
+    // Create new instances of mutable collections to prevent shared state
+    whitelist: new Set(DEFAULT_PRESALE_CONFIG.whitelist),
+    contributions: new Map(DEFAULT_PRESALE_CONFIG.contributions),
+  }));
+  const [configMx, setConfigMx] = useState<PresaleMultiversXConfig>(() => createPresaleMultiversXConfig());
   const [solAmount, setSolAmount] = useState<string>('1');
   const [egldAmount, setEgldAmount] = useState<string>('1');
   const [isProcessing, setIsProcessing] = useState(false);
