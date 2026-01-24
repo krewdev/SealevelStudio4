@@ -254,7 +254,10 @@ function generateTestReport() {
   console.log(`✅ Passed: ${passed}`);
   console.log(`❌ Failed: ${failed}`);
   console.log(`⏭️  Skipped: ${skipped}`);
-  console.log(`Success Rate: ${((passed / testResults.length) * 100).toFixed(1)}%`);
+  const successRate = testResults.length === 0
+    ? '0.0'
+    : ((passed / testResults.length) * 100).toFixed(1);
+  console.log(`Success Rate: ${successRate}%`);
   console.log('='.repeat(60));
   
   if (failed > 0) {

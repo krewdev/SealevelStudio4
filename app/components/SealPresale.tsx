@@ -25,6 +25,7 @@ import {
   PiggyBank,
   TrendingDown,
   Activity,
+  Link2,
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -38,6 +39,17 @@ import {
   getWalletContribution,
   isWhitelisted,
 } from '../lib/seal-token/presale';
+import {
+  DEFAULT_PRESALE_MULTIVERX_CONFIG,
+  PresaleMultiversXConfig,
+  calculateSealTokensMultiversX,
+  validateContributionMultiversX,
+  getPresaleStatsMultiversX,
+  getWalletContributionMultiversX,
+  isWhitelistedMultiversX,
+  createPresaleMultiversXConfig,
+} from '../lib/seal-token/presale-multiversx';
+import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 import { SEAL_TOKEN_CONFIG } from '../lib/seal-token/config';
 
 interface BuyNotification {
@@ -52,45 +64,69 @@ interface SealPresaleProps {
   onBack?: () => void;
 }
 
+type PresaleChain = 'solana' | 'multiversx';
+
 export function SealPresale({ onBack }: SealPresaleProps) {
   const { publicKey, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
+  const multiversXWallet = useMultiversXWallet();
 
-  const [config, setConfig] = useState<PresaleConfig>({
+  const [presaleChain, setPresaleChain] = useState<PresaleChain>('solana');
+  const [config, setConfig] = useState<PresaleConfig>(() => ({
     ...DEFAULT_PRESALE_CONFIG,
     treasuryWallet: publicKey || PublicKey.default, // Set to user's wallet
-  });
+    // Create new instances of mutable collections to prevent shared state
+    whitelist: new Set(DEFAULT_PRESALE_CONFIG.whitelist),
+    contributions: new Map(DEFAULT_PRESALE_CONFIG.contributions),
+  }));
+  const [configMx, setConfigMx] = useState<PresaleMultiversXConfig>(() => createPresaleMultiversXConfig());
   const [solAmount, setSolAmount] = useState<string>('1');
+  const [egldAmount, setEgldAmount] = useState<string>('1');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [stats, setStats] = useState(getPresaleStats(DEFAULT_PRESALE_CONFIG));
+  const [statsMx, setStatsMx] = useState(() => getPresaleStatsMultiversX(DEFAULT_PRESALE_MULTIVERX_CONFIG));
   const [buyNotifications, setBuyNotifications] = useState<BuyNotification[]>([]);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [isStarted, setIsStarted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
-  // Update isActive based on presale timing
+  // Set MultiversX treasury from env
+  useEffect(() => {
+    const treasury = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_MULTIVERX_TREASURY_ADDRESS
+      ? process.env.NEXT_PUBLIC_MULTIVERX_TREASURY_ADDRESS
+      : '';
+    if (treasury) setConfigMx(prev => ({ ...prev, treasuryAddress: treasury }));
+  }, []);
+
+  // Update isActive based on presale timing (Solana config)
   useEffect(() => {
     const updateActiveStatus = () => {
       const now = new Date();
       const isCurrentlyActive = now >= config.startTime && now <= config.endTime;
-      
       if (config.isActive !== isCurrentlyActive) {
-        setConfig(prev => ({
-          ...prev,
-          isActive: isCurrentlyActive,
-        }));
+        setConfig(prev => ({ ...prev, isActive: isCurrentlyActive }));
       }
     };
-
     updateActiveStatus();
     const activeCheckInterval = setInterval(updateActiveStatus, 1000);
-
-    return () => {
-      clearInterval(activeCheckInterval);
-    };
+    return () => clearInterval(activeCheckInterval);
   }, [config.startTime, config.endTime, config.isActive]);
+
+  // Update isActive for MultiversX config (same timing)
+  useEffect(() => {
+    const updateActiveStatus = () => {
+      const now = new Date();
+      const isCurrentlyActive = now >= configMx.startTime && now <= configMx.endTime;
+      if (configMx.isActive !== isCurrentlyActive) {
+        setConfigMx(prev => ({ ...prev, isActive: isCurrentlyActive }));
+      }
+    };
+    updateActiveStatus();
+    const activeCheckInterval = setInterval(updateActiveStatus, 1000);
+    return () => clearInterval(activeCheckInterval);
+  }, [configMx.startTime, configMx.endTime, configMx.isActive]);
 
   // Countdown timer
   useEffect(() => {
@@ -169,19 +205,29 @@ export function SealPresale({ onBack }: SealPresaleProps) {
   useEffect(() => {
     setStats(getPresaleStats(config));
   }, [config]);
+  useEffect(() => {
+    setStatsMx(getPresaleStatsMultiversX(configMx));
+  }, [configMx]);
 
   // Calculate tokens for current input
   const tokenCalculation = solAmount
     ? calculateSealTokens(parseFloat(solAmount) || 0, config)
+    : { baseTokens: 0, bonusTokens: 0, totalTokens: 0, bonusPercent: 0 };
+  const tokenCalculationMx = egldAmount
+    ? calculateSealTokensMultiversX(parseFloat(egldAmount) || 0, configMx)
     : { baseTokens: 0, bonusTokens: 0, totalTokens: 0, bonusPercent: 0 };
 
   // Get wallet contribution info
   const walletInfo = publicKey
     ? getWalletContribution(publicKey, config)
     : { contributed: 0, sealTokens: 0, canContribute: false, remainingAllowance: 0 };
+  const walletInfoMx = multiversXWallet.address
+    ? getWalletContributionMultiversX(multiversXWallet.address, configMx)
+    : { contributed: 0, sealTokens: 0, canContribute: false, remainingAllowance: 0 };
 
   // Check whitelist status
   const whitelisted = publicKey ? isWhitelisted(publicKey, config) : true;
+  const whitelistedMx = multiversXWallet.address ? isWhitelistedMultiversX(multiversXWallet.address, configMx) : true;
 
   // Handle contribution
   const handleContribute = useCallback(async () => {
@@ -239,13 +285,15 @@ export function SealPresale({ onBack }: SealPresaleProps) {
       );
 
       // Update config (in a real app, this would come from on-chain data)
-      const updatedConfig = { ...config };
-      const existing = updatedConfig.contributions.get(publicKey.toString()) || 0;
-      updatedConfig.contributions.set(publicKey.toString(), existing + amount);
-      updatedConfig.totalRaised += amount;
-      if (existing === 0) {
-        updatedConfig.totalContributors += 1;
-      }
+      const existing = config.contributions.get(publicKey.toString()) || 0;
+      const updatedContributions = new Map(config.contributions);
+      updatedContributions.set(publicKey.toString(), existing + amount);
+      const updatedConfig = {
+        ...config,
+        contributions: updatedContributions,
+        totalRaised: config.totalRaised + amount,
+        totalContributors: existing === 0 ? config.totalContributors + 1 : config.totalContributors,
+      };
       setConfig(updatedConfig);
 
       const sealAmountFormatted = (sealAmount / Math.pow(10, 9)).toLocaleString();
@@ -262,6 +310,73 @@ export function SealPresale({ onBack }: SealPresaleProps) {
       setIsProcessing(false);
     }
   }, [publicKey, connected, solAmount, config, connection, sendTransaction]);
+
+  const handleContributeMultiversX = useCallback(async () => {
+    if (!multiversXWallet.address || !multiversXWallet.isConnected) {
+      setError('Please connect your MultiversX wallet');
+      return;
+    }
+    const amount = parseFloat(egldAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setError('Please enter a valid EGLD amount');
+      return;
+    }
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const validation = validateContributionMultiversX(multiversXWallet.address, amount, configMx);
+      if (!validation.valid) {
+        setError(validation.error ?? 'Invalid contribution');
+        setIsProcessing(false);
+        return;
+      }
+      const buildRes = await fetch('/api/presale/multiversx/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: multiversXWallet.address, egldAmount: amount }),
+      });
+      const buildData = await buildRes.json();
+      if (!buildData.success || !buildData.transaction) {
+        setError(buildData.error ?? 'Failed to build transaction');
+        setIsProcessing(false);
+        return;
+      }
+      const signed = await multiversXWallet.signTransaction(buildData.transaction);
+      const txToSend = typeof signed === 'object' && signed !== null ? signed : buildData.transaction;
+      const sendRes = await fetch('/api/presale/multiversx/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(txToSend),
+      });
+      const sendData = await sendRes.json();
+      if (!sendData.success || !sendData.txHash) {
+        setError(sendData.error ?? 'Failed to send transaction');
+        setIsProcessing(false);
+        return;
+      }
+      const { totalTokens } = calculateSealTokensMultiversX(amount, configMx);
+      const existing = configMx.contributions.get(multiversXWallet.address) ?? 0;
+      const updatedContributions = new Map(configMx.contributions);
+      updatedContributions.set(multiversXWallet.address, existing + amount);
+      const updated = {
+        ...configMx,
+        contributions: updatedContributions,
+        totalRaised: configMx.totalRaised + amount,
+        totalContributors: existing === 0 ? configMx.totalContributors + 1 : configMx.totalContributors,
+      };
+      setConfigMx(updated);
+      setSuccess(
+        `Successfully contributed ${amount} EGLD! You will receive ${Math.floor(totalTokens).toLocaleString()} SEAL tokens. Tx: ${sendData.txHash.slice(0, 10)}...`
+      );
+      setEgldAmount('');
+      setTimeout(() => setSuccess(null), 8000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Transaction failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [multiversXWallet.address, multiversXWallet.isConnected, multiversXWallet.signTransaction, egldAmount, configMx]);
 
   // Format date
   const formatDate = (date: Date) => {
@@ -613,25 +728,69 @@ export function SealPresale({ onBack }: SealPresaleProps) {
             <p className="text-gray-400">Secure your discounted membership and unlock premium DeFi tools</p>
           </div>
 
+          {/* Chain toggle: Solana (SOL) | MultiversX (EGLD) */}
+          <div className="flex justify-center gap-3 mb-8">
+            <button
+              type="button"
+              onClick={() => setPresaleChain('solana')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all border ${
+                presaleChain === 'solana'
+                  ? 'bg-violet-600/30 border-violet-500 text-violet-300'
+                  : 'bg-slate-800/50 border-slate-700 text-gray-400 hover:border-slate-600'
+              }`}
+            >
+              <Activity className="w-5 h-5" />
+              Solana (SOL)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresaleChain('multiversx')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all border ${
+                presaleChain === 'multiversx'
+                  ? 'bg-orange-600/30 border-orange-500 text-orange-300'
+                  : 'bg-slate-800/50 border-slate-700 text-gray-400 hover:border-slate-600'
+              }`}
+            >
+              <Link2 className="w-5 h-5" />
+              MultiversX (EGLD)
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Contribution Form */}
             <div className="space-y-6">
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Wallet className="text-purple-400" size={24} />
-                  Make Your Contribution
+                  Make Your Contribution {presaleChain === 'multiversx' && <span className="text-orange-400 text-sm">(MultiversX)</span>}
                 </h3>
 
-                {!connected && (
+                {presaleChain === 'solana' && !connected && (
                   <div className="p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-yellow-400">
                       <AlertCircle size={20} />
-                      <span>Please connect your wallet to contribute</span>
+                      <span>Please connect your Solana wallet to contribute</span>
+                    </div>
+                  </div>
+                )}
+                {presaleChain === 'multiversx' && !multiversXWallet.isConnected && (
+                  <div className="p-4 bg-orange-900/30 border border-orange-700 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <AlertCircle size={20} />
+                      <span>Please connect your MultiversX wallet (xPortal / DeFi) to contribute with EGLD</span>
                     </div>
                   </div>
                 )}
 
-                {connected && !whitelisted && config.whitelistEnabled && (
+                {presaleChain === 'solana' && connected && !whitelisted && config.whitelistEnabled && (
+                  <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 text-red-400">
+                      <AlertCircle size={20} />
+                      <span>Your wallet is not whitelisted for this presale</span>
+                    </div>
+                  </div>
+                )}
+                {presaleChain === 'multiversx' && multiversXWallet.isConnected && !whitelistedMx && configMx.whitelistEnabled && (
                   <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-red-400">
                       <AlertCircle size={20} />
@@ -640,7 +799,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
                   </div>
                 )}
 
-                {walletInfo.contributed > 0 && (
+                {presaleChain === 'solana' && walletInfo.contributed > 0 && (
                   <div className="p-4 bg-blue-900/30 border border-blue-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-blue-400 mb-2">
                       <CheckCircle size={20} />
