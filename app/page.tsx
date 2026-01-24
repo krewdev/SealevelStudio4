@@ -1424,6 +1424,18 @@ function AppContent() {
     }
   }, [activeView]);
 
+  // Listen for presale navigation event from PresaleCountdown banner
+  useEffect(() => {
+    const handleNavigateToPresale = () => {
+      setActiveView('presale');
+    };
+
+    window.addEventListener('navigateToPresale', handleNavigateToPresale);
+    return () => {
+      window.removeEventListener('navigateToPresale', handleNavigateToPresale);
+    };
+  }, []);
+
   // Store selected blockchain in localStorage
   useEffect(() => {
     if (selectedBlockchain && typeof window !== 'undefined') {
