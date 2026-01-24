@@ -8,6 +8,7 @@ import { WalletProvider } from './components/WalletProvider'
 import { PresaleCountdown } from './components/PresaleCountdown'
 import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
+import { MultiversXWalletProvider } from './contexts/MultiversXWalletContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChunkErrorHandler } from './components/ChunkErrorHandler'
 import { DevnetOnlyGuard } from './components/DevnetOnlyGuard'
@@ -62,9 +63,11 @@ export default function RootLayout({
           <NetworkProvider>
             <DevnetOnlyGuard>
               <WalletProvider>
-                <TutorialProvider>
-                  {children}
-                </TutorialProvider>
+                <MultiversXWalletProvider>
+                  <TutorialProvider>
+                    {children}
+                  </TutorialProvider>
+                </MultiversXWalletProvider>
               </WalletProvider>
             </DevnetOnlyGuard>
           </NetworkProvider>

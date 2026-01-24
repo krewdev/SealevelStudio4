@@ -1436,10 +1436,12 @@ function AppContent() {
     };
   }, []);
 
-  // Store selected blockchain in localStorage
+  // Store selected blockchain in localStorage and notify other components
   useEffect(() => {
     if (selectedBlockchain && typeof window !== 'undefined') {
       localStorage.setItem('sealevel-blockchain', selectedBlockchain);
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('blockchainChanged'));
     }
   }, [selectedBlockchain]);
 
@@ -1482,8 +1484,9 @@ function AppContent() {
       
       // Set blockchain first
       const targetBlockchain = blockchain || 'solana';
-      if (targetBlockchain !== 'polkadot' && targetBlockchain !== 'solana') {
-        alert(`${targetBlockchain.charAt(0).toUpperCase() + targetBlockchain.slice(1)} support is coming soon! For now, you can use Polkadot or Solana which have full feature support.`);
+      // Only allow Solana, Polkadot, and MultiversX
+      if (targetBlockchain !== 'polkadot' && targetBlockchain !== 'solana' && targetBlockchain !== 'multiverx') {
+        alert(`${targetBlockchain.charAt(0).toUpperCase() + targetBlockchain.slice(1)} support is coming soon! For now, you can use Solana, Polkadot, or MultiversX which have full feature support.`);
         setSelectedBlockchain('solana');
       } else {
         setSelectedBlockchain(targetBlockchain);
