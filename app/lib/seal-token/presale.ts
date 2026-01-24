@@ -58,6 +58,46 @@ export interface PresaleConfig {
 }
 
 /**
+ * Calculate presale end time based on start time
+ * Ensures endTime is always 90 days after startTime
+ * @param startTime - The presale start time
+ * @returns The presale end time (90 days after startTime)
+ */
+export function calculatePresaleEndTime(startTime: Date): Date {
+  const PRESALE_DURATION_DAYS = 90;
+  return new Date(startTime.getTime() + PRESALE_DURATION_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Get presale start time from environment variables or default
+ * Checks NEXT_PUBLIC_PRESALE_TIMESTAMP and NEXT_PUBLIC_PRESALE_DATE
+ * @returns The presale start time
+ */
+export function getPresaleStartTime(): Date {
+  if (typeof window !== 'undefined') {
+    // Try NEXT_PUBLIC_PRESALE_TIMESTAMP (timestamp in milliseconds)
+    if (process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP) {
+      const timestamp = parseInt(process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP, 10);
+      if (!isNaN(timestamp) && timestamp > 0) {
+        const date = new Date(timestamp);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+    }
+    // Try NEXT_PUBLIC_PRESALE_DATE (ISO 8601 date string)
+    if (process.env.NEXT_PUBLIC_PRESALE_DATE) {
+      const date = new Date(process.env.NEXT_PUBLIC_PRESALE_DATE);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+  // Default: 2 weeks from now
+  return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+}
+
+/**
  * Default Presale Configuration
  * 
  * Presale Structure:
@@ -65,9 +105,10 @@ export interface PresaleConfig {
  * - Three progressive tiers with increasing bonuses
  * - Structured tokenomics with vested launch
  */
+const defaultStartTime = getPresaleStartTime();
 export const DEFAULT_PRESALE_CONFIG: PresaleConfig = {
-  startTime: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // Default: 2 weeks from now (requires env var to be set)
-  endTime: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 3 months duration (90 days)
+  startTime: defaultStartTime,
+  endTime: calculatePresaleEndTime(defaultStartTime), // 90 days after startTime
   isActive: false, // Inactive by default until start time is reached
 
   presaleSupply: 300_000_000, // 300M SEAL tokens for presale

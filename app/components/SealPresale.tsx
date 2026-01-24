@@ -70,6 +70,28 @@ export function SealPresale({ onBack }: SealPresaleProps) {
   const [isStarted, setIsStarted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
+  // Update isActive based on presale timing
+  useEffect(() => {
+    const updateActiveStatus = () => {
+      const now = new Date();
+      const isCurrentlyActive = now >= config.startTime && now <= config.endTime;
+      
+      if (config.isActive !== isCurrentlyActive) {
+        setConfig(prev => ({
+          ...prev,
+          isActive: isCurrentlyActive,
+        }));
+      }
+    };
+
+    updateActiveStatus();
+    const activeCheckInterval = setInterval(updateActiveStatus, 1000);
+
+    return () => {
+      clearInterval(activeCheckInterval);
+    };
+  }, [config.startTime, config.endTime, config.isActive]);
+
   // Countdown timer
   useEffect(() => {
     const updateCountdown = () => {
