@@ -353,6 +353,43 @@ This presale smart contract design implements a secure, fair, and transparent to
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: January 23, 2026  
-**Status**: Ready for Implementation
+**Document Version**: 1.1  
+**Last Updated**: January 25, 2026  
+**Status**: Security Fixes Applied
+
+---
+
+## Changelog
+
+### v1.1 (January 25, 2026) - Security Fixes
+
+The following security issues were identified and fixed in the Solana attestation program:
+
+#### Fixed Issues
+
+1. **Missing `mut` on Account Constraints** (HIGH)
+   - `MintAttestation.registry` - Added `mut` constraint to persist state changes
+   - `MintPresaleAttestation.presale_registry` - Added `mut` constraint to persist state changes
+   - `UpdateThreshold.registry` - Added `mut` constraint to persist state changes
+
+2. **Duplicate Attestation Prevention** (HIGH)
+   - Added new `PresaleContributor` account struct to track per-wallet attestation status
+   - Added `contributor_record` PDA account to `MintPresaleAttestation` context
+   - Added `AlreadyMinted` error check before minting
+
+3. **Hardcoded Minimum Contribution** (MEDIUM)
+   - Changed from hardcoded `100_000_000` to `registry.minimum_contribution`
+   - Now uses configurable value set during registry initialization
+   - Added `update_minimum_contribution` function for authority to update
+
+4. **New Functions Added**
+   - `update_minimum_contribution` - Authority can update minimum contribution threshold
+   - `has_minted_presale_attestation` - Check if wallet has already minted
+
+5. **New Account Contexts Added**
+   - `UpdatePresaleConfig` - For updating presale registry configuration
+   - `CheckPresaleMinted` - For checking attestation status
+
+6. **New Error Codes Added**
+   - `AlreadyMinted` - Wallet has already minted attestation
+   - `InvalidMinimum` - New minimum must be at least 0.01 SOL

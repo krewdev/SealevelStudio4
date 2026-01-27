@@ -162,9 +162,10 @@ pub mod sealevel_attestation {
     pub fn mint_presale_attestation(
         ctx: Context<MintPresaleAttestation>,
         sol_contributed: u64, // SOL amount contributed (in lamports)
-        metadata: AttestationMetadata,
+        _metadata: AttestationMetadata,
     ) -> Result<()> {
         let registry = &mut ctx.accounts.presale_registry;
+        let contributor = &mut ctx.accounts.contributor_record;
         
         // Verify wallet address matches signer
         require!(
@@ -172,15 +173,23 @@ pub mod sealevel_attestation {
             AttestationError::InvalidWallet
         );
         
-        // Verify minimum contribution (0.1 SOL = 100_000_000 lamports)
+        // Check if already minted (prevent duplicates)
         require!(
-            sol_contributed >= 100_000_000,
+            !contributor.has_minted,
+            AttestationError::AlreadyMinted
+        );
+        
+        // Verify minimum contribution using configurable value from registry
+        require!(
+            sol_contributed >= registry.minimum_contribution,
             AttestationError::InsufficientContribution
         );
         
-        // Check if already minted (prevent duplicates)
-        // In a real implementation, you'd check on-chain state
-        // For now, we'll allow multiple mints but track them
+        // Mark contributor as having minted
+        contributor.wallet = ctx.accounts.wallet.key();
+        contributor.sol_contributed = sol_contributed;
+        contributor.has_minted = true;
+        contributor.bump = ctx.bumps.contributor_record;
         
         // Increment presale attestation count
         registry.total_presale_attestations = registry.total_presale_attestations
@@ -190,6 +199,7 @@ pub mod sealevel_attestation {
         msg!("Sealevel Studios: Presale attestation minted");
         msg!("Wallet: {:?}", ctx.accounts.wallet.key());
         msg!("SOL Contributed: {} lamports", sol_contributed);
+        msg!("Minimum Required: {} lamports", registry.minimum_contribution);
         msg!("Total Presale Attestations: {}", registry.total_presale_attestations);
         
         // Note: cNFT minting via Bubblegum would happen here
@@ -203,15 +213,54 @@ pub mod sealevel_attestation {
         ctx: Context<VerifyPresaleEligibility>,
         sol_contributed: u64,
     ) -> Result<bool> {
-        // Verify minimum contribution
-        let eligible = sol_contributed >= 100_000_000; // 0.1 SOL minimum
+        let registry = &ctx.accounts.presale_registry;
+        
+        // Verify minimum contribution using configurable value from registry
+        let eligible = sol_contributed >= registry.minimum_contribution;
         
         msg!("Sealevel Studios: Presale eligibility check");
         msg!("Wallet: {:?}", ctx.accounts.wallet.key());
         msg!("SOL Contributed: {} lamports", sol_contributed);
+        msg!("Minimum Required: {} lamports", registry.minimum_contribution);
         msg!("Eligible: {}", eligible);
         
         Ok(eligible)
+    }
+
+    /// Update minimum contribution threshold (authority only)
+    pub fn update_minimum_contribution(
+        ctx: Context<UpdatePresaleConfig>,
+        new_minimum: u64,
+    ) -> Result<()> {
+        let registry = &mut ctx.accounts.presale_registry;
+        
+        // Sanity check: minimum should be at least 10_000_000 lamports (0.01 SOL)
+        require!(
+            new_minimum >= 10_000_000,
+            AttestationError::InvalidMinimum
+        );
+        
+        let old_minimum = registry.minimum_contribution;
+        registry.minimum_contribution = new_minimum;
+        
+        msg!("Sealevel Studios: Minimum contribution updated");
+        msg!("Old Minimum: {} lamports", old_minimum);
+        msg!("New Minimum: {} lamports", new_minimum);
+        
+        Ok(())
+    }
+
+    /// Check if a wallet has already minted a presale attestation
+    pub fn has_minted_presale_attestation(
+        ctx: Context<CheckPresaleMinted>,
+    ) -> Result<bool> {
+        let contributor = &ctx.accounts.contributor_record;
+        
+        msg!("Sealevel Studios: Check presale attestation status");
+        msg!("Wallet: {:?}", ctx.accounts.wallet.key());
+        msg!("Has Minted: {}", contributor.has_minted);
+        
+        Ok(contributor.has_minted)
     }
 }
 
@@ -234,6 +283,15 @@ pub struct PresaleAttestationRegistry {
     pub total_presale_attestations: u64,
     pub minimum_contribution: u64, // Minimum SOL contribution in lamports (default: 0.1 SOL)
     pub bump: u8,
+}
+
+/// Tracks individual presale contributor to prevent duplicate attestations
+#[account]
+pub struct PresaleContributor {
+    pub wallet: Pubkey,           // Contributor's wallet address
+    pub sol_contributed: u64,     // Amount contributed in lamports
+    pub has_minted: bool,         // Whether attestation has been minted
+    pub bump: u8,                 // PDA bump
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -270,6 +328,7 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 pub struct MintAttestation<'info> {
     #[account(
+        mut,
         seeds = [b"attestation_registry"],
         bump = registry.bump
     )]
@@ -299,6 +358,7 @@ pub struct VerifyEligibility<'info> {
 #[derive(Accounts)]
 pub struct UpdateThreshold<'info> {
     #[account(
+        mut,
         seeds = [b"attestation_registry"],
         bump = registry.bump,
         has_one = authority @ AttestationError::Unauthorized
@@ -328,10 +388,21 @@ pub struct InitializePresaleRegistry<'info> {
 #[derive(Accounts)]
 pub struct MintPresaleAttestation<'info> {
     #[account(
+        mut,
         seeds = [b"presale_registry"],
         bump = presale_registry.bump
     )]
     pub presale_registry: Account<'info, PresaleAttestationRegistry>,
+    
+    /// Contributor record to prevent duplicate attestations
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + 32 + 8 + 1 + 1,
+        seeds = [b"presale_contributor", presale_registry.key().as_ref(), wallet.key().as_ref()],
+        bump
+    )]
+    pub contributor_record: Account<'info, PresaleContributor>,
     
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -354,6 +425,39 @@ pub struct VerifyPresaleEligibility<'info> {
     pub wallet: AccountInfo<'info>,
 }
 
+/// Account validation for updating presale configuration (authority only)
+#[derive(Accounts)]
+pub struct UpdatePresaleConfig<'info> {
+    #[account(
+        mut,
+        seeds = [b"presale_registry"],
+        bump = presale_registry.bump,
+        has_one = authority @ AttestationError::Unauthorized
+    )]
+    pub presale_registry: Account<'info, PresaleAttestationRegistry>,
+    
+    pub authority: Signer<'info>,
+}
+
+/// Account validation for checking if wallet has minted presale attestation
+#[derive(Accounts)]
+pub struct CheckPresaleMinted<'info> {
+    #[account(
+        seeds = [b"presale_registry"],
+        bump = presale_registry.bump
+    )]
+    pub presale_registry: Account<'info, PresaleAttestationRegistry>,
+    
+    #[account(
+        seeds = [b"presale_contributor", presale_registry.key().as_ref(), wallet.key().as_ref()],
+        bump = contributor_record.bump
+    )]
+    pub contributor_record: Account<'info, PresaleContributor>,
+    
+    /// CHECK: Wallet address to check
+    pub wallet: AccountInfo<'info>,
+}
+
 #[error_code]
 pub enum AttestationError {
     #[msg("Insufficient usage to qualify for attestation")]
@@ -366,6 +470,10 @@ pub enum AttestationError {
     Overflow,
     #[msg("Invalid thresholds: tier_1 must be < tier_2 < tier_3")]
     InvalidThresholds,
-    #[msg("Insufficient contribution: Minimum 0.1 SOL required for presale attestation")]
+    #[msg("Insufficient contribution: Minimum SOL required for presale attestation")]
     InsufficientContribution,
+    #[msg("Attestation already minted for this wallet")]
+    AlreadyMinted,
+    #[msg("Invalid minimum: Must be at least 0.01 SOL")]
+    InvalidMinimum,
 }
