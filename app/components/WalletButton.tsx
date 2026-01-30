@@ -11,7 +11,14 @@ import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 export const WalletButton = () => {
   const { publicKey, disconnect, wallet } = useWallet();
   const { network } = useNetwork();
-  const { user, isLoading } = useUser();
+  const { user, isLoading, loginWithExternalWallet } = useUser();
+
+  // When user connects with Phantom/Solflare in the app (e.g. after logout), log them in
+  useEffect(() => {
+    if (publicKey && !user && !isLoading) {
+      loginWithExternalWallet(publicKey.toBase58());
+    }
+  }, [publicKey, user, isLoading, loginWithExternalWallet]);
   
   // Get selected blockchain from localStorage and listen for changes
   const [selectedBlockchain, setSelectedBlockchain] = useState<string | null>('solana');

@@ -230,3 +230,4 @@ training-data/*.csv
 # Chrome binaries (testing/downloaded) #
 #########################################
 chrome/
+.env*.local

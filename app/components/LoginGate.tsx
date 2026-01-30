@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useUser } from '../contexts/UserContext';
 import { Wallet, Loader2, Sparkles, ArrowRight } from 'lucide-react';
 
@@ -9,19 +11,20 @@ interface LoginGateProps {
 }
 
 export function LoginGate({ children }: LoginGateProps) {
-  const { user, isLoading, createWallet } = useUser();
+  const { publicKey } = useWallet();
+  const { user, isLoading, createWallet, loginWithExternalWallet } = useUser();
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [vanityPrefix, setVanityPrefix] = useState('');
-  
-  // Force re-check user state after wallet creation
-  // This ensures the component updates even if there's a slight delay
+  const [showGenerateWallet, setShowGenerateWallet] = useState(false);
+
+  // When user connects with Phantom/Solflare/etc., log them in
   useEffect(() => {
-    if (user && !isLoading) {
-      // User is set, component will re-render and show children
+    if (publicKey && !user) {
+      loginWithExternalWallet(publicKey.toBase58());
     }
-  }, [user, isLoading]);
+  }, [publicKey, user, loginWithExternalWallet]);
 
   // Show loading state while checking for user
   if (isLoading) {
@@ -112,85 +115,127 @@ export function LoginGate({ children }: LoginGateProps) {
               Welcome to Sea Level Studio
             </h1>
             <p className="text-gray-400 text-sm sm:text-base">
-              Create a wallet or login to get started
+              Connect your wallet or create one to get started
             </p>
           </div>
 
-          {/* Email Input (Optional) */}
-          {showEmailInput && (
-            <div className="mb-4 sm:mb-6 space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                  Email (Optional - for wallet recovery)
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+          {/* Connect Wallet (Phantom, Solflare, etc.) - Primary option */}
+          <div className="mb-4">
+            <WalletMultiButton
+              className="!w-full !py-3 sm:!py-3.5 !bg-gradient-to-r !from-purple-600 !to-indigo-600 hover:!from-purple-500 hover:!to-indigo-500 !text-white !rounded-lg !font-semibold !transition-all !duration-200 !shadow-lg hover:!shadow-xl !border-0 !flex !items-center !justify-center !gap-2 !text-sm sm:!text-base"
+            />
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Phantom, Solflare, or other Solana wallets
+            </p>
+          </div>
 
-              {/* Vanity Address Generation */}
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
-                  🎨 Vanity Address (Optional - for fun!)
-                </label>
-                <input
-                  type="text"
-                  value={vanityPrefix}
-                  onChange={(e) => {
-                    const value = e.target.value.toUpperCase().replace(/[^1-9A-HJ-NP-Za-km-z]/g, '');
-                    setVanityPrefix(value);
-                  }}
-                  placeholder="Type prefix (e.g., 'SEAL', 'ABC')"
-                  maxLength={8}
-                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Your wallet address will start with this prefix! Shorter prefixes (1-3 chars) are faster.
-                </p>
-              </div>
+          {/* Or divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-600" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-gray-800/90 px-3 text-xs text-gray-500">or</span>
+            </div>
+          </div>
+
+          {/* Optional: Generate custodial wallet */}
+          {!showGenerateWallet ? (
+            <button
+              onClick={() => setShowGenerateWallet(true)}
+              className="w-full text-sm text-gray-400 hover:text-gray-300 transition-colors py-2 flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" />
+              Generate a custodial wallet instead
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <button
+                onClick={() => setShowGenerateWallet(false)}
+                className="text-xs text-gray-500 hover:text-gray-400 mb-2"
+              >
+                ← Back to connect wallet
+              </button>
+
+              {/* Email Input (Optional) */}
+              {showEmailInput && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
+                      Email (Optional - for wallet recovery)
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Vanity Address Generation */}
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-2">
+                      🎨 Vanity Address (Optional - for fun!)
+                    </label>
+                    <input
+                      type="text"
+                      value={vanityPrefix}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().replace(/[^1-9A-HJ-NP-Za-km-z]/g, '');
+                        setVanityPrefix(value);
+                      }}
+                      placeholder="Type prefix (e.g., 'SEAL', 'ABC')"
+                      maxLength={8}
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white text-sm sm:text-base placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Your wallet address will start with this prefix! Shorter prefixes (1-3 chars) are faster.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Create Wallet Button */}
+              <button
+                onClick={handleCreateWallet}
+                disabled={isCreating}
+                className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600/80 to-indigo-600/80 hover:from-purple-600 hover:to-indigo-600 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm sm:text-base border border-purple-500/30"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                    <span>Creating Wallet...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>Create New Wallet</span>
+                    <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </>
+                )}
+              </button>
+
+              {/* Email Toggle */}
+              <button
+                onClick={() => setShowEmailInput(!showEmailInput)}
+                className="w-full text-xs sm:text-sm text-gray-400 hover:text-gray-300 transition-colors py-1"
+              >
+                {showEmailInput ? 'Skip email (create wallet without recovery)' : 'Add email for wallet recovery'}
+              </button>
             </div>
           )}
 
-          {/* Create Wallet Button */}
-          <button
-            onClick={handleCreateWallet}
-            disabled={isCreating}
-            className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base"
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                <span>Creating Wallet...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Create New Wallet</span>
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
-              </>
-            )}
-          </button>
-
-          {/* Email Toggle */}
-          <button
-            onClick={() => setShowEmailInput(!showEmailInput)}
-            className="w-full text-xs sm:text-sm text-gray-400 hover:text-gray-300 transition-colors py-1"
-          >
-            {showEmailInput ? 'Skip email (create wallet without recovery)' : 'Add email for wallet recovery'}
-          </button>
-
           {/* Info */}
           <div className="mt-4 sm:mt-6 space-y-3">
-            <div className="p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-              <p className="text-xs sm:text-sm text-blue-300">
-                <strong className="text-blue-200">🔒 Secure:</strong> Your wallet is created securely and stored server-side. 
-                You can access it anytime by logging in.
-              </p>
-            </div>
+            {showGenerateWallet && (
+              <div className="p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-xs sm:text-sm text-blue-300">
+                  <strong className="text-blue-200">🔒 Secure:</strong> Your wallet is created securely and stored server-side. 
+                  You can access it anytime by logging in.
+                </p>
+              </div>
+            )}
             <div className="p-3 sm:p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
               <a
                 href="https://discord.gg/sealevelstudios"

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useUser } from '../contexts/UserContext';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useUser, isExternalWallet } from '../contexts/UserContext';
 import { Twitter, Send, LogOut, User as UserIcon, Wallet, Coins, Loader2, ChevronDown, Mail, Sparkles, Settings } from 'lucide-react';
 import { DepositWallet } from './DepositWallet';
 import { Settings as SettingsComponent } from './Settings';
 
 export function UserProfileWidget() {
+  const { disconnect } = useWallet();
   const { user, isLoading, linkTwitter, linkTelegram, logout, refreshBalance, createWallet } = useUser();
   const [isLinkingTwitter, setIsLinkingTwitter] = useState(false);
   const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
@@ -60,6 +62,23 @@ export function UserProfileWidget() {
     } finally {
       setIsCreatingWallet(false);
     }
+  };
+
+  const handleLogout = async () => {
+    if (user && isExternalWallet(user)) {
+      try {
+        await disconnect();
+      } catch (e) {
+        console.warn('Failed to disconnect wallet:', e);
+      }
+      // Clear stored profile so we don't restore a disconnected external wallet on refresh
+      if (typeof window !== 'undefined' && localStorage) {
+        localStorage.removeItem('user_profile');
+        localStorage.removeItem('wallet_id');
+      }
+    }
+    setShowDropdown(false);
+    logout();
   };
 
   if (!user) {
@@ -193,7 +212,7 @@ export function UserProfileWidget() {
                   </div>
                 </div>
                 <button 
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
                   title="Logout"
                 >

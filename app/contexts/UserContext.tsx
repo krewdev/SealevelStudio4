@@ -21,11 +21,17 @@ export interface Campaign {
   budget: number; // In SOL
 }
 
+/** Returns true if the profile is from an external wallet (Phantom, Solflare, etc.) */
+export function isExternalWallet(profile: UserProfile): boolean {
+  return profile.walletId.startsWith('ext-');
+}
+
 interface UserContextType {
   user: UserProfile | null;
   isLoading: boolean;
   login: () => Promise<void>;
   logout: () => void;
+  loginWithExternalWallet: (address: string) => void;
   linkTwitter: () => Promise<void>;
   linkTelegram: () => Promise<void>;
   updateCredits: (amount: number) => void;
@@ -199,6 +205,28 @@ export function UserProvider({ children }: { children: ReactNode }) {
       console.error('Failed to create wallet:', error);
       throw error;
     }
+  };
+
+  /**
+   * Login with an external wallet (Phantom, Solflare, etc.).
+   * Use when the user connects via the Solana wallet adapter.
+   */
+  const loginWithExternalWallet = (address: string) => {
+    if (typeof window === 'undefined' || !localStorage) return;
+    const walletId = `ext-${address}`;
+    const newUser: UserProfile = {
+      walletAddress: address,
+      walletId,
+      balance: 0,
+      isTwitterLinked: false,
+      isTelegramLinked: false,
+      credits: 0,
+      campaigns: [],
+    };
+    setUser(newUser);
+    saveProfile(newUser);
+    localStorage.setItem('wallet_id', walletId);
+    refreshBalance(address).catch((e) => console.warn('Failed to refresh balance after external wallet login:', e));
   };
 
   const loadProfile = (profile: UserProfile) => {
@@ -510,6 +538,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       isLoading,
       login, 
       logout, 
+      loginWithExternalWallet,
       linkTwitter, 
       linkTelegram,
       updateCredits,
