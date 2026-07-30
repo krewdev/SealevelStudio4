@@ -139,8 +139,16 @@ export class JupiterFetcher extends BasePoolFetcher {
     amount: string
   ): Promise<{ price: number; fee: number } | null> {
     try {
-      // Use Next.js API route to proxy requests (fixes CORS issues)
-      const url = `/api/jupiter/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
+      // Browser: same-origin proxy (CORS). Server: absolute app URL or Jupiter lite API.
+      const origin =
+        typeof window !== 'undefined'
+          ? ''
+          : process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+      const url = origin
+        ? `${origin.replace(/\/$/, '')}/api/jupiter/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`
+        : typeof window !== 'undefined'
+          ? `/api/jupiter/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`
+          : `https://lite-api.jup.ag/swap/v1/quote?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=50`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -148,9 +156,15 @@ export class JupiterFetcher extends BasePoolFetcher {
       }
 
       const data = await response.json();
-      
+
       if (data && data.price !== undefined) {
-        return { price: data.price, fee: data.fee || 30 };
+        return { price: Number(data.price), fee: Number(data.fee) || 30 };
+      }
+
+      // Direct Jupiter lite/swap API shape
+      if (data?.outAmount && data?.inAmount) {
+        const price = Number(data.outAmount) / Number(data.inAmount);
+        return { price, fee: 30 };
       }
 
       return null;

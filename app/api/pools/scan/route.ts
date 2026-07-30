@@ -11,6 +11,20 @@ import { DEFAULT_SCANNER_CONFIG } from '@/app/lib/pools/types';
 
 export const dynamic = 'force-dynamic';
 
+function jsonSafe(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = jsonSafe(v);
+    }
+    return out;
+  }
+  return value;
+}
+
 /**
  * Scan for pools on-chain
  * GET /api/pools/scan?network=mainnet&dexes=orca,raydium,meteora
@@ -59,12 +73,11 @@ export async function GET(request: NextRequest) {
     console.log(`[Pool Scan API] Using RPC: ${rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')}`);
     const connection = new Connection(rpcUrl, 'confirmed');
 
-    // Create scanner with config and pass RPC URL
-    const scanner = new PoolScanner({ rpcUrl } as any);
     const config = {
       ...DEFAULT_SCANNER_CONFIG,
-      ...(dexes && { enabledDexes: dexes as any }),
+      ...(dexes && { enabledDEXs: dexes as any }),
     };
+    const scanner = new PoolScanner({ ...config, rpcUrl });
 
     // Scan for pools
     const startTime = Date.now();
@@ -130,7 +143,9 @@ export async function GET(request: NextRequest) {
       const config = DEFAULT_SCANNER_CONFIG;
       
       const detector = new ArbitrageDetector(pools, config, connection);
-      opportunities = await detector.detectOpportunities();
+      const detected = await detector.detectOpportunities();
+      // Keep payload small for the UI — full path objects are large.
+      opportunities = detected.slice(0, 75);
     }
 
     // Group pools by DEX
@@ -163,9 +178,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       stats,
-      pools,
-      poolsByDex,
-      opportunities,
+      pools: jsonSafe(pools),
+      poolsByDex: jsonSafe(poolsByDex),
+      opportunities: jsonSafe(opportunities),
       errors: scanResult.errors,
     });
   } catch (error) {

@@ -86,11 +86,13 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
   const handleScan = useCallback(async () => {
     if (isScanning) return;
 
-    // Check if user can use scanner (free trial or subscription)
-    const access = checkFeatureAccess('scanner_scan');
-    if (!access.allowed) {
-      alert(access.reason || 'Scanner scan not available. Please check your subscription or free trial status.');
-      return;
+    // Wallet is only required to execute trades. Scanning is read-only.
+    if (wallet.publicKey) {
+      const access = checkFeatureAccess('scanner_scan');
+      if (!access.allowed) {
+        alert(access.reason || 'Scanner scan not available. Please check your subscription or free trial status.');
+        return;
+      }
     }
 
     setIsScanning(true);
@@ -107,11 +109,29 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       });
 
       scanner.updateConfig(config);
-      const state = await scanner.scan(connection);
-      
-      setPools(state.pools);
-      setLastScanTime(state.lastScanTime);
-      setErrors(state.errors || []);
+      const dexes = (config.enabledDEXs || []).join(',');
+      const scanUrl = `/api/pools/scan?network=mainnet&dexes=${encodeURIComponent(dexes)}&opportunities=true`;
+      const scanRes = await fetch(scanUrl);
+      if (!scanRes.ok) {
+        throw new Error(`Scan API ${scanRes.status}`);
+      }
+      const scanJson = await scanRes.json();
+      const apiPools = (scanJson.pools || []) as PoolData[];
+      const apiOpps = (scanJson.opportunities || []) as ArbitrageOpportunity[];
+      const apiErrors = (scanJson.errors || []) as string[];
+
+      setPools(apiPools);
+      setLastScanTime(scanJson.stats?.timestamp ? new Date(scanJson.stats.timestamp) : new Date());
+      setErrors(apiErrors);
+
+      if (apiOpps.length > 0) {
+        setOpportunities(apiOpps);
+        setSelectedOpportunity(apiOpps[0]);
+        return;
+      }
+
+      // Fall through to local detection if API returned pools but no opportunities
+      const state = { pools: apiPools, errors: apiErrors, lastScanTime: new Date() };
 
       // Detect arbitrage opportunities (with Birdeye optimization if available)
       if (state.pools.length > 0) {
@@ -181,7 +201,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
     } finally {
       setIsScanning(false);
     }
-  }, [connection, config, isScanning, scanner, checkFeatureAccess, trackFeatureUsage]);
+  }, [connection, config, isScanning, scanner, checkFeatureAccess, trackFeatureUsage, wallet.publicKey]);
 
   // Auto-refresh effect - defined AFTER handleScan to ensure it's available
   useEffect(() => {

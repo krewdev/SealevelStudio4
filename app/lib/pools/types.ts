@@ -118,7 +118,7 @@ export const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
   minProfitThreshold: 0.001, // 0.001 SOL minimum
   minProfitPercent: 0.1, // 0.1% minimum
   maxHops: 5,
-  enabledDEXs: ['raydium', 'orca', 'jupiter', 'meteora', 'lifinity'],
+  enabledDEXs: ['raydium', 'orca', 'jupiter'],
   showUnprofitable: true, // Show all results for training context
 };
 
