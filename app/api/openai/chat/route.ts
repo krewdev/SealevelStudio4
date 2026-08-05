@@ -16,14 +16,39 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
  */
 export async function POST(request: NextRequest) {
   try {
+    const grokKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
     const apiKey = process.env.OPENAI_API_KEY;
     const localAiEndpoint = process.env.LOCAL_AI_ENDPOINT;
+
+    // Prefer Grok / xAI when configured
+    if (grokKey) {
+      const body = await request.json().catch(() => ({}));
+      const upstream = await fetch(new URL('/api/ai/grok', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await upstream.json().catch(() => ({}));
+      if (!upstream.ok) {
+        return NextResponse.json(data, { status: upstream.status });
+      }
+      return NextResponse.json({
+        success: true,
+        message: data.content,
+        content: data.content,
+        model: data.model,
+        provider: 'grok',
+        pendingClientTools: data.pendingClientTools,
+        resumeMessages: data.resumeMessages,
+        clientActions: data.clientActions,
+      });
+    }
     
     if (!apiKey && !localAiEndpoint) {
       return NextResponse.json(
         { 
           error: 'No AI provider configured',
-          suggestion: 'Please set either OPENAI_API_KEY or LOCAL_AI_ENDPOINT in your environment variables',
+          suggestion: 'Set XAI_API_KEY (Grok) in .env.local, or OPENAI_API_KEY / LOCAL_AI_ENDPOINT.',
           requiresConfiguration: true
         },
         { status: 503 } // Service Unavailable

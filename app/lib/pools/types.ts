@@ -80,6 +80,10 @@ export interface ArbitrageOpportunity {
   requiresFlashLoan?: boolean;
   jitoBundleId?: string;
   signalType?: 'new_pool' | 'large_swap' | 'lsd_depeg' | 'oracle_update';
+  /** heuristic = CP/TVL estimate; quote_verified = Jupiter round-trip checked */
+  accuracy?: 'heuristic' | 'quote_verified';
+  profitTokenSymbol?: string;
+  warnings?: string[];
 }
 
 export interface ScannerConfig {

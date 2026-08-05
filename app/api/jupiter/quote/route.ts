@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
       const fee = data.routePlan?.[0]?.swapInfo?.feeAmount || 30;
       
       return NextResponse.json({
+        ...data,
         price,
         fee,
         inAmount: data.inAmount,

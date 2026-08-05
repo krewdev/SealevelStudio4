@@ -4,19 +4,11 @@
 import {
   Connection,
   Transaction,
-  PublicKey,
-  Keypair,
-  SystemProgram,
-  sendAndConfirmTransaction,
+  VersionedTransaction,
 } from '@solana/web3.js';
-import {
-  TOKEN_PROGRAM_ID,
-  getAssociatedTokenAddress,
-  createAssociatedTokenAccountInstruction,
-  createTransferInstruction,
-} from '@solana/spl-token';
 import { ArbitrageOpportunity } from './types';
 import { WalletContextState } from '@solana/wallet-adapter-react';
+import { buildAtomicArbTransaction } from '../arbitrage/atomic-build';
 
 export interface ExecutionResult {
   success: boolean;
@@ -60,34 +52,41 @@ export async function executeArbitrage(
   }
 
   try {
-    // Build transaction based on opportunity type
-    const transaction = await buildArbitrageTransaction(
-      connection,
-      wallet.publicKey,
+    const built = await buildAtomicArbTransaction({
       opportunity,
-      execConfig
-    );
+      userPublicKey: wallet.publicKey.toBase58(),
+      connection,
+      slippageBps: Math.floor(execConfig.slippageTolerance * 100),
+    });
 
-    // Sign transaction
-    const signedTx = await wallet.signTransaction(transaction);
+    if (!built.profitableAfterQuotes) {
+      return {
+        success: false,
+        error: `Not profitable after live Jupiter quotes. ${built.warnings.join(' ')}`,
+      };
+    }
 
-    // Send transaction
-    const signature = await wallet.sendTransaction(signedTx, connection, {
+    if (!built.simulationOk) {
+      return {
+        success: false,
+        error: `Atomic simulation failed. ${built.warnings.join(' ')}`,
+      };
+    }
+
+    const signature = await wallet.sendTransaction(built.transaction, connection, {
       skipPreflight: false,
       maxRetries: execConfig.maxRetries,
     });
 
-    // Wait for confirmation
     await connection.confirmTransaction(signature, 'confirmed');
 
-    // Calculate actual profit (would need to check balances after)
-    // For now, return estimated profit
+    const profitUi = Number(built.expectedProfitRaw) / 1e9;
     return {
       success: true,
       signature,
-      profit: opportunity.profit,
-      actualProfit: opportunity.profit, // Would be calculated from actual balance changes
-      slippage: 0, // Would be calculated from actual execution
+      profit: profitUi,
+      actualProfit: profitUi,
+      slippage: execConfig.slippageTolerance,
     };
   } catch (error) {
     return {

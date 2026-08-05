@@ -11,42 +11,37 @@ interface NetworkContextType {
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
-export function NetworkProvider({ children }: { children: ReactNode }) {
-  // Force devnet-only access
-  const [network, setNetwork] = useState<NetworkType>('devnet');
+function envDefault(): NetworkType {
+  const fromEnv = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || '').toLowerCase();
+  if (fromEnv === 'mainnet' || fromEnv === 'mainnet-beta') return 'mainnet';
+  if (fromEnv === 'testnet') return 'testnet';
+  return 'devnet';
+}
 
-  // Persist network choice (client-side only) - but only allow devnet
+export function NetworkProvider({ children }: { children: ReactNode }) {
+  const [network, setNetwork] = useState<NetworkType>(envDefault());
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('sealevel-network');
-        // Only allow devnet or testnet, never mainnet
-        if (saved === 'devnet' || saved === 'testnet') {
-          setNetwork(saved);
-        } else {
-          // Force devnet if mainnet was saved
-          setNetwork('devnet');
-          localStorage.setItem('sealevel-network', 'devnet');
-        }
-      } catch (error) {
-        console.warn('Failed to load network preference:', error);
-        setNetwork('devnet');
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('sealevel-network');
+      if (saved === 'mainnet' || saved === 'devnet' || saved === 'testnet') {
+        setNetwork(saved);
+        return;
       }
+      const fallback = envDefault();
+      setNetwork(fallback);
+      localStorage.setItem('sealevel-network', fallback);
+    } catch (error) {
+      console.warn('Failed to load network preference:', error);
     }
   }, []);
 
   const handleSetNetwork = (newNetwork: NetworkType) => {
-    // Block mainnet access - only allow devnet or testnet
-    if (newNetwork === 'mainnet') {
-      console.warn('Mainnet access is disabled. This site is devnet-only.');
-      return;
-    }
-    
     setNetwork(newNetwork);
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('sealevel-network', newNetwork);
-        // Force page reload to ensure wallet reconnects to new network
         window.location.reload();
       } catch (error) {
         console.warn('Failed to save network preference:', error);
@@ -55,10 +50,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NetworkContext.Provider value={{ 
-      network, 
-      setNetwork: handleSetNetwork 
-    }}>
+    <NetworkContext.Provider value={{ network, setNetwork: handleSetNetwork }}>
       {children}
     </NetworkContext.Provider>
   );

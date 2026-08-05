@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SealAnimation } from './SealAnimation';
 import {
   Wrench,
@@ -190,31 +190,45 @@ export function FeatureHighlightLoader({
   const [showLoader, setShowLoader] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userReady, setUserReady] = useState(false);
+  const enteringRef = useRef(false);
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+  const onEnterAppRef = useRef(onEnterApp);
+
+  useEffect(() => {
+    onAnimationCompleteRef.current = onAnimationComplete;
+    onEnterAppRef.current = onEnterApp;
+  }, [onAnimationComplete, onEnterApp]);
 
   const handleEnterApp = useCallback(() => {
+    if (enteringRef.current) return;
+    enteringRef.current = true;
     setUserReady(true);
-    setTimeout(() => {
-      setShowLoader(false);
-      if (onAnimationComplete) {
-        onAnimationComplete();
-      }
-      if (onEnterApp) {
-        onEnterApp();
-      }
-    }, 500);
-  }, [onAnimationComplete, onEnterApp]);
+    setProgress(100);
+    // Keep the overlay visible until the parent unmounts/navigates.
+    // Hiding first left a blank screen when navigation used a stale screen check.
+    try {
+      onAnimationCompleteRef.current?.();
+    } catch (err) {
+      console.error('[FeatureHighlightLoader] onAnimationComplete failed', err);
+    }
+    try {
+      onEnterAppRef.current?.();
+    } catch (err) {
+      console.error('[FeatureHighlightLoader] onEnterApp failed', err);
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoading) {
+      enteringRef.current = false;
       setShowLoader(true);
       setProgress(0);
       setUserReady(false);
 
-      // Prevent body scroll when loader is active
       document.body.style.overflow = 'hidden';
 
-      // Animate progress bar
       const startTime = Date.now();
+      let autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
       const interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const newProgress = Math.min((elapsed / duration) * 100, 100);
@@ -222,15 +236,15 @@ export function FeatureHighlightLoader({
 
         if (elapsed >= duration) {
           clearInterval(interval);
-          // Auto-advance after a short delay
-          setTimeout(() => {
+          autoAdvanceTimer = setTimeout(() => {
             handleEnterApp();
-          }, 500);
+          }, 400);
         }
       }, 16);
 
       return () => {
         clearInterval(interval);
+        if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
         document.body.style.overflow = '';
       };
     } else {
@@ -239,19 +253,19 @@ export function FeatureHighlightLoader({
     }
   }, [isLoading, duration, handleEnterApp]);
 
-  // Handle Enter key press
   useEffect(() => {
     if (!showLoader) return;
 
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && (progress >= 100 || userReady)) {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
         handleEnterApp();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [showLoader, progress, userReady, handleEnterApp]);
+  }, [showLoader, handleEnterApp]);
 
   const handleFeatureClick = (featureId: string) => {
     if (onFeatureClick) {
@@ -275,7 +289,7 @@ export function FeatureHighlightLoader({
         opacity: showLoader ? 1 : 0,
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && (progress >= 100 || userReady)) {
+        if (e.key === 'Enter' || e.key === 'Escape') {
           handleEnterApp();
         }
       }}
@@ -473,33 +487,21 @@ export function FeatureHighlightLoader({
       {/* Enter App Button */}
       <div className="relative z-10">
         <button
+          type="button"
           onClick={handleEnterApp}
-          disabled={progress < 100 && !userReady}
-          className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 ${
-            progress >= 100 || userReady
-              ? `${currentFeature.bgColor} hover:opacity-90 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border border-opacity-50`
-              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300 cursor-pointer ${currentFeature.bgColor} hover:opacity-90 text-white shadow-lg hover:shadow-xl transform hover:scale-105 border border-opacity-50`}
         >
-          {progress >= 100 || userReady ? (
-            <span className="flex items-center gap-3">
-              {currentFeature.icon}
-              Launch {context?.featureName || currentFeature.title}
-              <ArrowRight className="h-5 w-5" />
-            </span>
-          ) : (
-            <span className="flex items-center gap-3">
-              <div className="w-5 h-5 border-2 border-gray-500 border-t-current rounded-full animate-spin"></div>
-              Loading {context?.featureName || currentFeature.title}...
-            </span>
-          )}
+          <span className="flex items-center gap-3">
+            {currentFeature.icon}
+            Enter Site
+            <ArrowRight className="h-5 w-5" />
+          </span>
         </button>
 
         <p className="text-gray-500 text-xs text-center mt-3 max-w-md">
           {progress >= 100 || userReady
-            ? `Ready to explore ${context?.featureName || currentFeature.title}! Press Enter to continue`
-            : "Setting up your personalized Solana development environment..."
-          }
+            ? `Ready — click Enter Site or press Enter`
+            : `Loading ${context?.featureName || currentFeature.title}… click Enter Site anytime to skip`}
         </p>
       </div>
 

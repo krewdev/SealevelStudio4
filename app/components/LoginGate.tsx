@@ -6,9 +6,10 @@ import { Wallet, Loader2, Sparkles, ArrowRight } from 'lucide-react';
 
 interface LoginGateProps {
   children: React.ReactNode;
+  onSkip?: () => void;
 }
 
-export function LoginGate({ children }: LoginGateProps) {
+export function LoginGate({ children, onSkip }: LoginGateProps) {
   const { user, isLoading, createWallet } = useUser();
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
@@ -174,6 +175,16 @@ export function LoginGate({ children }: LoginGateProps) {
               </>
             )}
           </button>
+
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="w-full py-3 sm:py-3.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all border border-gray-600 mb-3 sm:mb-4 text-sm sm:text-base"
+            >
+              Enter Site without wallet
+            </button>
+          )}
 
           {/* Email Toggle */}
           <button

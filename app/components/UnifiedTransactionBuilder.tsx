@@ -45,7 +45,9 @@ import { useTransactionLogger } from '../hooks/useTransactionLogger';
 import { RecentTransactions } from './RecentTransactions';
 import { useUser } from '../contexts/UserContext';
 import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
-import { Connection } from '@solana/web3.js';
+import { Connection, VersionedTransaction } from '@solana/web3.js';
+import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
+import { buildAtomicArbTransaction } from '../lib/arbitrage/atomic-build';
 
 // --- Block to Instruction Template Mapping ---
 const BLOCK_TO_TEMPLATE: Record<string, string> = {
@@ -498,9 +500,10 @@ function BlockTooltip({
 interface UnifiedTransactionBuilderProps {
   onTransactionBuilt?: (transaction: any, cost: any) => void;
   onBack?: () => void;
+  initialOpportunity?: ArbitrageOpportunity | null;
 }
 
-export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: UnifiedTransactionBuilderProps) {
+export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
@@ -542,11 +545,103 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
 
   // Arbitrage panel state
   const [showArbitragePanel, setShowArbitragePanel] = useState(false);
+  const [arbOpportunity, setArbOpportunity] = useState<ArbitrageOpportunity | null>(null);
+  const [arbStatus, setArbStatus] = useState<string | null>(null);
+  const [arbWarnings, setArbWarnings] = useState<string[]>([]);
+  const [jitoTipLamports, setJitoTipLamports] = useState(0);
+  const arbLoadRef = useRef(false);
 
   // Import state
   const [importSignature, setImportSignature] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  useEffect(() => {
+    if (arbLoadRef.current) return;
+    const pending = initialOpportunity || consumePendingArbOpportunity();
+    if (!pending) return;
+    arbLoadRef.current = true;
+    void loadArbitrageOpportunity(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOpportunity]);
+
+  const loadArbitrageOpportunity = async (opportunity: ArbitrageOpportunity) => {
+    setArbOpportunity(opportunity);
+    setViewMode('simple');
+    const hops = opportunity.steps?.length ? opportunity.steps : opportunity.path?.steps || [];
+    setSimpleWorkflow(
+      hops.map((step, i) => ({
+        id: 'jup_swap',
+        name: `${step.tokenIn.symbol} → ${step.tokenOut.symbol}`,
+        icon: 'Zap',
+        color: i === 0 ? 'bg-teal-500' : i === hops.length - 1 ? 'bg-orange-500' : 'bg-indigo-500',
+        verified: true,
+        params: {
+          amount: step.amountIn.toString(),
+          minAmountOut: step.amountOut.toString(),
+          dex: String(step.dex),
+          pool: step.pool?.poolAddress || '',
+        },
+        instanceId: `arb-hop-${i}-${step.dex}`,
+      }))
+    );
+    setTransactionDraft({
+      instructions: [],
+      memo: `Atomic arb ${opportunity.type} ${opportunity.id}`,
+    });
+    setArbStatus('Loading opportunity into builder…');
+    setArbWarnings(opportunity.warnings || []);
+    addLog(`Loaded arb opportunity ${opportunity.id}`, 'info');
+    (opportunity.steps?.length ? opportunity.steps : opportunity.path?.steps || []).forEach((step, i) => {
+      addLog(
+        `Hop ${i + 1}: ${step.tokenIn.symbol}→${step.tokenOut.symbol} on ${step.dex}`,
+        'info'
+      );
+    });
+
+    const payer = publicKey?.toBase58() || user?.walletAddress;
+    if (!payer) {
+      setArbStatus('Connect a wallet to compile the atomic transaction.');
+      setTransactionDraft({
+        instructions: (await import('../lib/arbitrage/atomic-build')).opportunityToBuiltInstructions(opportunity),
+      });
+      return;
+    }
+
+    try {
+      setIsBuilding(true);
+      const built = await buildAtomicArbTransaction({
+        opportunity,
+        userPublicKey: payer,
+        connection,
+        jitoTipLamports,
+      });
+      setTransactionDraft({ instructions: built.instructions, memo: 'atomic-arb' });
+      setBuiltTransaction(built.transaction);
+      setArbWarnings(built.warnings);
+      const profitHint = built.profitableAfterQuotes
+        ? `Live quotes profitable (raw Δ ${built.expectedProfitRaw.toString()})`
+        : 'Live quotes NOT profitable';
+      const simHint = built.simulationOk ? 'simulation OK' : 'simulation FAILED';
+      setArbStatus(`Atomic TX ready — ${profitHint}; ${simHint}${built.unitsConsumed ? `; ${built.unitsConsumed} CU` : ''}`);
+      addLog(profitHint, built.profitableAfterQuotes ? 'success' : 'error');
+      addLog(simHint, built.simulationOk ? 'success' : 'error');
+      onTransactionBuilt?.(built.transaction, {
+        sol: (built.unitsConsumed || 0) / 1e9,
+        platformFee: { sol: 0 },
+        total: { sol: (built.unitsConsumed || 0) / 1e9 },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBuildError(msg);
+      setArbStatus(`Failed to compile atomic arb: ${msg}`);
+      addLog(msg, 'error');
+      const { opportunityToBuiltInstructions } = await import('../lib/arbitrage/atomic-build');
+      setTransactionDraft({ instructions: opportunityToBuiltInstructions(opportunity) });
+    } finally {
+      setIsBuilding(false);
+    }
+  };
 
   const handleImport = async () => {
     if (!importSignature || !connection) return;
@@ -1025,20 +1120,58 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       return;
     }
 
+    const isVersioned =
+      builtTransaction instanceof VersionedTransaction ||
+      (builtTransaction && typeof builtTransaction === 'object' && 'message' in builtTransaction && !('instructions' in builtTransaction));
+    if (isVersioned && useCustodial) {
+      addLog('Atomic arb uses a versioned transaction — connect Phantom/Solflare to Execute.', 'error');
+      return;
+    }
+
     setIsExecuting(true);
     addLog('Sending transaction to network...', 'info');
 
+    let txToSend = builtTransaction;
+
+    if (arbOpportunity && (publicKey || user?.walletAddress)) {
+      try {
+        addLog('Recompiling atomic arb with fresh blockhash…', 'info');
+        const rebuilt = await buildAtomicArbTransaction({
+          opportunity: arbOpportunity,
+          userPublicKey: (publicKey?.toBase58() || user!.walletAddress) as string,
+          connection,
+          jitoTipLamports,
+        });
+        if (!rebuilt.profitableAfterQuotes) {
+          throw new Error('Live quotes are no longer profitable');
+        }
+        if (!rebuilt.simulationOk) {
+          throw new Error(rebuilt.warnings.find((w) => /sim/i.test(w)) || 'Simulation failed');
+        }
+        txToSend = rebuilt.transaction;
+        setBuiltTransaction(rebuilt.transaction);
+        setArbWarnings(rebuilt.warnings);
+        setArbStatus('Fresh atomic TX simulated OK — sending');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addLog(msg, 'error');
+        setBuildError(msg);
+        setIsExecuting(false);
+        return;
+      }
+    }
+
     try {
       // Check for additional signers (like mint keypairs from create_token_and_mint)
-      const additionalSigners = (builtTransaction as any)._additionalSigners || [];
+      const additionalSigners = (txToSend as any)._additionalSigners || [];
       
-      let signedTransaction = builtTransaction;
+      let signedTransaction = txToSend;
       
       if (useCustodial && user?.walletAddress) {
         // Sign with custodial wallet (and additional signers if any)
         addLog('Signing with custodial wallet...', 'info');
         signedTransaction = await signTransactionWithCustodialAndSigners(
-          builtTransaction,
+          txToSend,
           additionalSigners,
           {
             userWalletAddress: user.walletAddress,
@@ -1079,7 +1212,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       addLog(`View on Solscan: https://solscan.io/tx/${signature}`, 'info');
       
       // Update transaction log with signature
-      const transactionLogId = (builtTransaction as any)._transactionLogId;
+      const transactionLogId = (txToSend as any)._transactionLogId;
       if (transactionLogId) {
         await updateStatus(transactionLogId, 'pending', signature);
       }
@@ -1244,9 +1377,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
               {builtTransaction && (
                 <button 
                   onClick={executeTransaction}
-                  disabled={isExecuting || !publicKey}
+                  disabled={isExecuting || (!publicKey && !user?.walletAddress)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                    isExecuting || !publicKey
+                    isExecuting || (!publicKey && !user?.walletAddress)
                     ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
                     : 'bg-green-500 hover:bg-green-400 text-slate-900 hover:scale-105 active:scale-95'
                   }`}
@@ -1285,6 +1418,30 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           </div>
 
           <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0 relative z-10">
+            {arbOpportunity && (
+              <div className="w-full max-w-md bg-slate-900/90 border border-teal-700/50 rounded-xl p-3 text-left space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-teal-200">Atomic arb path</p>
+                  <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    {arbOpportunity.accuracy || 'heuristic'}
+                  </span>
+                </div>
+                {arbStatus && <p className="text-xs text-slate-300">{arbStatus}</p>}
+                <label className="flex items-center justify-between text-xs text-slate-400">
+                  Jito tip
+                  <select
+                    value={jitoTipLamports}
+                    onChange={(e) => setJitoTipLamports(Number(e.target.value))}
+                    className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                  >
+                    <option value={0}>Off</option>
+                    <option value={10000}>0.00001 SOL</option>
+                    <option value={100000}>0.0001 SOL</option>
+                    <option value={1000000}>0.001 SOL</option>
+                  </select>
+                </label>
+              </div>
+            )}
             {simpleWorkflow.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50 relative w-full z-2">
                 <div className="relative z-10 flex flex-col items-center gap-4">
@@ -1316,7 +1473,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                         <div>
                           <h3 className="text-sm font-bold text-slate-200">{block.name}</h3>
                           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
-                            {block.verified ? <span className="text-teal-500 flex items-center gap-1"><ShieldCheck size={10}/> Verified</span> : 'External'}
+                            {block.params?.dex ? (
+                              <span className="text-teal-400">{block.params.dex}</span>
+                            ) : block.verified ? (
+                              <span className="text-teal-500 flex items-center gap-1"><ShieldCheck size={10}/> Verified</span>
+                            ) : (
+                              'External'
+                            )}
                           </p>
                         </div>
                       </div>
@@ -1723,6 +1886,30 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             <span className="text-red-400">{buildError}</span>
           </div>
         )}
+
+        {(arbOpportunity || arbStatus) && (
+          <div className="mb-4 p-4 bg-teal-900/20 border border-teal-700/60 rounded-lg space-y-2">
+            <div className="flex items-center gap-2 text-teal-200 font-semibold">
+              <Zap size={16} />
+              Atomic arbitrage loaded
+              {arbOpportunity?.accuracy && (
+                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                  {arbOpportunity.accuracy}
+                </span>
+              )}
+            </div>
+            {arbStatus && <p className="text-sm text-slate-300">{arbStatus}</p>}
+            {arbOpportunity && (
+              <p className="text-xs text-slate-400">
+                Est. {arbOpportunity.netProfit.toFixed(6)} {arbOpportunity.profitTokenSymbol || 'units'} ·{' '}
+                {(arbOpportunity.confidence * 100).toFixed(0)}% confidence · Execute sends one atomic versioned transaction
+              </p>
+            )}
+            {arbWarnings.slice(0, 3).map((w, i) => (
+              <p key={i} className="text-xs text-amber-300">• {w}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Scrollable Content */}
@@ -1778,7 +1965,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
 
   // Main Transaction Builder layout
   return (
-    <div className="flex flex-col h-full bg-gray-900">
+    <div className="h-full w-full flex flex-col bg-gray-900 overflow-hidden">
       {/* Mode Toggle Header */}
       <div className="border-b border-gray-700 bg-gray-800/50 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">

@@ -22,24 +22,29 @@ export function DisclaimerAgreement({ onAgree }: DisclaimerAgreementProps) {
 
   // Auto-detect if content is already fully visible (no scrolling needed)
   React.useEffect(() => {
-    const scrollContainer = document.querySelector('.disclaimer-scroll-container') as HTMLElement;
-    if (scrollContainer) {
-      // Check if content fits without scrolling
-      if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) {
+    const check = () => {
+      const scrollContainer = document.querySelector('.disclaimer-scroll-container') as HTMLElement | null;
+      if (!scrollContainer) return;
+      if (scrollContainer.scrollHeight <= scrollContainer.clientHeight + 20) {
         setHasScrolled(true);
       }
-    }
+    };
+    check();
+    const t = window.setTimeout(check, 300);
+    const t2 = window.setTimeout(() => setHasScrolled(true), 2500);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(t2);
+    };
   }, []);
 
   const handleAgree = () => {
-    if (hasScrolled && agreed) {
-      // Store agreement in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('sealevel-disclaimer-agreed', 'true');
-        localStorage.setItem('sealevel-disclaimer-agreed-date', new Date().toISOString());
-      }
-      onAgree();
+    if (!agreed) return;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sealevel-disclaimer-agreed', 'true');
+      localStorage.setItem('sealevel-disclaimer-agreed-date', new Date().toISOString());
     }
+    onAgree();
   };
 
   return (
@@ -145,11 +150,12 @@ export function DisclaimerAgreement({ onAgree }: DisclaimerAgreementProps) {
             </label>
           </div>
           <button
+            type="button"
             onClick={handleAgree}
-            disabled={!hasScrolled || !agreed}
+            disabled={!agreed}
             className="w-full px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-white font-semibold transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
           >
-            {hasScrolled && agreed ? (
+            {agreed ? (
               <>
                 <CheckCircle size={20} />
                 I Agree - Continue to Sealevel Studio
@@ -157,7 +163,7 @@ export function DisclaimerAgreement({ onAgree }: DisclaimerAgreementProps) {
             ) : (
               <>
                 <X size={20} />
-                Please read and agree to continue
+                Check the box to continue
               </>
             )}
           </button>

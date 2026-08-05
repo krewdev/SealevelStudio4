@@ -5,7 +5,7 @@
 /* Ensure background is always loaded */
 html, body {
   background-color: #111827; /* bg-gray-900 */
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 body {

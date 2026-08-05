@@ -108,7 +108,11 @@ export class PoolScanner {
           if (this.rpcUrl) {
             if (typeof (fetcher as any).setRpcUrl === 'function') {
               (fetcher as any).setRpcUrl(this.rpcUrl);
-              console.log(`[Scanner] Set RPC URL for ${dex}: ${this.rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')}`);
+              console.log(
+                `[Scanner] Set RPC URL for ${dex}: ${this.rpcUrl
+                  .replace(/api-key=[^&]+/gi, 'api-key=***')
+                  .replace(/(quiknode\.pro\/)[^/?#]+/gi, '$1***')}`
+              );
             } else {
               console.warn(`[Scanner] Fetcher ${dex} does not have setRpcUrl method`);
             }

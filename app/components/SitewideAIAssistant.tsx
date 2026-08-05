@@ -41,13 +41,13 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
     {
       id: 'welcome',
       role: 'assistant',
-      content: "👋 Hi! I'm your Sealevel AI Assistant. I can execute Solana operations through natural language!\n\n**Try commands like:**\n• \"stake 200 sol\"\n• \"send 5 sol to jimmy\"\n• \"airdrop 10 sol on devnet\"\n• \"show contacts\"\n\nWhat would you like to build today?",
+      content: "Hi — I'm Grok for Sealevel. Ask about the scanner, atomic builder, paper bots, sniper, charts, or KOL mapper.\n\nNot financial advice. Live mainnet trades can lose money.",
       timestamp: new Date(),
       suggestions: [
-        "stake 200 sol",
-        "send 5 sol to alice",
-        "airdrop 10 sol on devnet",
-        "show contacts"
+        "How do I use the arb scanner?",
+        "Explain inventory market maker",
+        "How do I open the KOL mapper?",
+        "What's quote_verified vs heuristic?"
       ]
     }
   ]);
@@ -92,10 +92,63 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
     setIsTyping(true);
 
     try {
-      // Try to use LM Studio with MCP enhancement for better understanding if available
+      // Prefer Grok (xAI) site-wide, then local LM Studio, then rule-based intents.
       let aiResponse: string | null = null;
       let mcpResourcesUsed = false;
-      if (lmStudioAvailable) {
+      try {
+        const { runClientGrokTool } = await import('../lib/ai/grok-client-tools');
+        const history = messages
+          .filter((m) => m.id !== 'welcome')
+          .slice(-12)
+          .map((m) => ({ role: m.role, content: m.content }));
+        const view =
+          typeof window !== 'undefined' ? localStorage.getItem('sealevel-active-view') || 'home' : 'home';
+        let payload: Record<string, unknown> = { prompt: textToSend, messages: history, view };
+        for (let hop = 0; hop < 6; hop++) {
+          const grokRes = await fetch('/api/ai/grok', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const grokJson = await grokRes.json();
+          if (Array.isArray(grokJson.clientActions)) {
+            for (const action of grokJson.clientActions) {
+              if (action?.type === 'navigate' && action.view) {
+                window.dispatchEvent(new CustomEvent('sealevel-navigate', { detail: action.view }));
+              }
+            }
+          }
+          if (!grokRes.ok) {
+            // Missing key → fall through to LM Studio / rule-based intents.
+            if (grokJson.requiresConfiguration) {
+              break;
+            }
+            aiResponse = String(grokJson.error || 'Grok request failed');
+            break;
+          }
+          if (Array.isArray(grokJson.pendingClientTools) && grokJson.pendingClientTools.length) {
+            const clientToolResults = [];
+            for (const t of grokJson.pendingClientTools) {
+              const result = await runClientGrokTool(t.name, t.args || {});
+              clientToolResults.push({ tool_call_id: t.id, content: result });
+            }
+            payload = {
+              resumeMessages: grokJson.resumeMessages,
+              clientToolResults,
+              view,
+            };
+            continue;
+          }
+          if (grokJson.content) {
+            aiResponse = String(grokJson.content);
+          }
+          break;
+        }
+      } catch (grokErr) {
+        console.warn('Grok assistant failed', grokErr);
+      }
+
+      if (lmStudioAvailable && !aiResponse) {
         try {
           // Try MCP-enhanced first (enriched with dataset and transaction examples)
           const mcpResult = await getAIResponseWithMCPContext(textToSend, {
@@ -142,8 +195,8 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
         return;
       }
 
-      // If it's a help query or unknown intent, use AI response if available
-      if ((intent.type === 'help' || intent.type === 'unknown') && aiResponse) {
+      // Grok (or local AI) answers general questions; intents still handle wallet actions.
+      if (aiResponse && (intent.type === 'help' || intent.type === 'unknown')) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -337,7 +390,8 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 left-6 z-50 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200"
+          className="fixed bottom-6 left-6 z-[60] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200"
+          title="Ask Grok"
           title="AI Assistant"
         >
           <Brain className="w-6 h-6" />
@@ -346,7 +400,7 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 left-6 z-50 w-96 max-w-[calc(100vw-3rem)] bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="fixed bottom-6 left-6 z-[60] w-96 max-w-[calc(100vw-3rem)] bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -354,9 +408,9 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
                 <Brain className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-white font-semibold">AI Assistant</h3>
+                <h3 className="text-white font-semibold">Grok</h3>
                 <p className="text-white/80 text-sm">
-                  {lmStudioAvailable === true ? '🤖 Powered by LM Studio' : 'Sealevel Studio Helper'}
+                  Site-wide Sealevel assistant
                 </p>
               </div>
             </div>

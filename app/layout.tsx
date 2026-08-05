@@ -4,8 +4,9 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ClientOnly } from './components/ClientOnly'
+import { SitewideAIAssistant } from './components/SitewideAIAssistant'
 import { WalletProvider } from './components/WalletProvider'
-import { PresaleCountdown } from './components/PresaleCountdown'
+
 import { NetworkProvider } from './contexts/NetworkContext'
 import { TutorialProvider } from './contexts/TutorialContext'
 import { MultiversXWalletProvider } from './contexts/MultiversXWalletContext'
@@ -73,7 +74,7 @@ export default function RootLayout({
           </NetworkProvider>
         </ErrorBoundary>
         <ClientOnly>
-          <PresaleCountdown />
+          <SitewideAIAssistant />
         </ClientOnly>
         <Analytics />
         <SpeedInsights />

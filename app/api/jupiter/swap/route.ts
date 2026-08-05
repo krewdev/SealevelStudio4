@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
-const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/v6`;
+const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/swap/v1`;
 
 export const dynamic = 'force-dynamic';
 

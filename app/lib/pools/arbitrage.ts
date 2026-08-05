@@ -309,91 +309,105 @@ export class ArbitrageDetector {
     poolA: PoolData,
     poolB: PoolData
   ): ArbitrageOpportunity | null {
-    // Determine profitable direction
-    const buyFromA = poolA.price < poolB.price;
-    const sourcePool = buyFromA ? poolA : poolB;
-    const destPool = buyFromA ? poolB : poolA;
+    const pairA = new Set([poolA.tokenA.mint, poolA.tokenB.mint]);
+    const pairB = new Set([poolB.tokenA.mint, poolB.tokenB.mint]);
+    if (![...pairA].every((m) => pairB.has(m))) return null;
 
-    // Calculate optimal input amount with slippage modeling
-    const optimalAmount = this.calculateOptimalInputAmount(sourcePool, destPool);
-    const inputAmount = optimalAmount;
-    
-    // Calculate swap output with slippage consideration
-    const outputAmount = this.calculateSwapOutputWithSlippage(
-      inputAmount,
-      sourcePool.reserves.tokenA,
-      sourcePool.reserves.tokenB,
-      sourcePool.tokenA.decimals,
-      sourcePool.tokenB.decimals,
-      sourcePool.fee
-    );
+    const baseMint =
+      pairA.has(WSOL_MINT) ? WSOL_MINT : poolA.tokenA.mint;
+    const quoteMint =
+      poolA.tokenA.mint === baseMint ? poolA.tokenB.mint : poolA.tokenA.mint;
 
-    // Swap back on second pool with slippage
-    const finalAmount = this.calculateSwapOutputWithSlippage(
-      outputAmount,
-      destPool.reserves.tokenB,
-      destPool.reserves.tokenA,
-      destPool.tokenB.decimals,
-      destPool.tokenA.decimals,
-      destPool.fee
-    );
+    const priceA = this.priceOf(poolA, baseMint, quoteMint);
+    const priceB = this.priceOf(poolB, baseMint, quoteMint);
+    if (priceA <= 0 || priceB <= 0) return null;
 
-    const profit = Number(finalAmount - inputAmount) / 1e9; // Convert to SOL
-    const profitPercent = (profit / Number(inputAmount) * 1e9) * 100;
-    // Enhanced gas estimation with priority fees for MEV protection
-    const baseGas = BASE_TRANSACTION_FEE + (SWAP_INSTRUCTION_FEE * 2);
-    const priorityFee = Math.floor(baseGas * PRIORITY_FEE_MULTIPLIER);
+    const buyPool = priceA < priceB ? poolA : poolB;
+    const sellPool = priceA < priceB ? poolB : poolA;
+
+    const quoteInfo = this.tokenOnPool(buyPool, quoteMint);
+    const baseInfo = this.tokenOnPool(buyPool, baseMint);
+    if (!quoteInfo || !baseInfo) return null;
+
+    const inputAmount = this.optimalQuoteInput(buyPool, sellPool, quoteMint, baseMint);
+    const baseOut = this.swapPool(buyPool, quoteMint, baseMint, inputAmount);
+    const quoteOut = this.swapPool(sellPool, baseMint, quoteMint, baseOut);
+    if (baseOut <= BigInt(0) || quoteOut <= BigInt(0)) return null;
+
+    const profitRaw = quoteOut - inputAmount;
+    const scale = Math.pow(10, quoteInfo.decimals);
+    const profit = Number(profitRaw) / scale;
+    const profitPercent = Number(inputAmount) > 0 ? (Number(profitRaw) / Number(inputAmount)) * 100 : 0;
+
+    const baseGas = 15_000 + 200_000; // 2 swaps + ATAs (lamports-ish CU proxy)
+    const priorityFee = 50_000;
     const gasEstimate = baseGas + priorityFee;
-    const netProfit = profit - gasEstimate / 1e9;
+    const gasSol = quoteMint === WSOL_MINT ? gasEstimate / 1e9 : 0;
+    const netProfit = profit - gasSol;
 
     if (!this.config.showUnprofitable && netProfit <= 0) {
       return null;
     }
 
+    const warnings: string[] = [];
+    let confidence = this.calculateConfidence(profitPercent, 2);
+    if (this.isSyntheticClmm(buyPool) || this.isSyntheticClmm(sellPool)) {
+      confidence = Math.min(confidence, 0.35);
+      warnings.push('Orca Whirlpool reserves are synthetic (TVL/price), not tick liquidity — treat as a lead only.');
+    }
+    if (buyPool.dex === sellPool.dex) {
+      confidence = Math.min(confidence, 0.55);
+      warnings.push('Same-DEX pair; cross-venue edge may be an artifact.');
+    }
+    warnings.push('PnL is a constant-product heuristic on snapshot data, not a simulated fill.');
+
     const steps: ArbitrageStep[] = [
       {
-        pool: sourcePool,
-        dex: sourcePool.dex,
-        tokenIn: sourcePool.tokenA,
-        tokenOut: sourcePool.tokenB,
+        pool: buyPool,
+        dex: buyPool.dex,
+        tokenIn: quoteInfo,
+        tokenOut: baseInfo,
         amountIn: inputAmount,
-        amountOut: outputAmount,
-        price: sourcePool.price,
-        fee: sourcePool.fee,
+        amountOut: baseOut,
+        price: this.priceOf(buyPool, baseMint, quoteMint),
+        fee: buyPool.fee,
       },
       {
-        pool: destPool,
-        dex: destPool.dex,
-        tokenIn: destPool.tokenB,
-        tokenOut: destPool.tokenA,
-        amountIn: outputAmount,
-        amountOut: finalAmount,
-        price: 1 / destPool.price,
-        fee: destPool.fee,
+        pool: sellPool,
+        dex: sellPool.dex,
+        tokenIn: baseInfo,
+        tokenOut: this.tokenOnPool(sellPool, quoteMint) || quoteInfo,
+        amountIn: baseOut,
+        amountOut: quoteOut,
+        price: this.priceOf(sellPool, baseMint, quoteMint),
+        fee: sellPool.fee,
       },
     ];
 
     const path: ArbitragePath = {
       type: 'simple',
       steps,
-      startToken: sourcePool.tokenA,
-      endToken: sourcePool.tokenA,
+      startToken: quoteInfo,
+      endToken: quoteInfo,
       totalHops: 2,
     };
 
     return {
-      id: `arb-${Date.now()}-${Math.random()}`,
+      id: `arb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       path,
       type: 'simple',
       profit,
       profitPercent,
       inputAmount,
-      outputAmount: finalAmount,
+      outputAmount: quoteOut,
       gasEstimate,
       netProfit,
-      confidence: this.calculateConfidence(profitPercent, 2),
+      confidence,
       steps,
       timestamp: new Date(),
+      accuracy: 'heuristic',
+      profitTokenSymbol: quoteInfo.symbol,
+      warnings,
     };
   }
 
@@ -477,6 +491,9 @@ export class ArbitrageDetector {
       confidence: this.calculateConfidence(profitPercent, path.length),
       steps,
       timestamp: new Date(),
+      accuracy: 'heuristic',
+      profitTokenSymbol: startToken.symbol,
+      warnings: ['Multi-hop PnL is a constant-product heuristic on snapshot reserves.'],
     };
   }
 
@@ -676,6 +693,79 @@ export class ArbitrageDetector {
 
   private getPairKey(mintA: string, mintB: string): string {
     return [mintA, mintB].sort().join('-');
+  }
+
+  private isSyntheticClmm(pool: PoolData): boolean {
+    return (
+      pool.dex === 'orca' ||
+      pool.programId === 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc'
+    );
+  }
+
+  private tokenOnPool(pool: PoolData, mint: string): TokenInfo | null {
+    if (pool.tokenA.mint === mint) return pool.tokenA;
+    if (pool.tokenB.mint === mint) return pool.tokenB;
+    return null;
+  }
+
+  private priceOf(pool: PoolData, baseMint: string, quoteMint: string): number {
+    const base = this.tokenOnPool(pool, baseMint);
+    const quote = this.tokenOnPool(pool, quoteMint);
+    if (!base || !quote) return 0;
+    const baseRes = Number(pool.tokenA.mint === baseMint ? pool.reserves.tokenA : pool.reserves.tokenB);
+    const quoteRes = Number(pool.tokenA.mint === quoteMint ? pool.reserves.tokenA : pool.reserves.tokenB);
+    const baseUi = baseRes / Math.pow(10, base.decimals);
+    const quoteUi = quoteRes / Math.pow(10, quote.decimals);
+    if (baseUi <= 0) return 0;
+    return quoteUi / baseUi;
+  }
+
+  private swapPool(pool: PoolData, tokenInMint: string, tokenOutMint: string, amountIn: bigint): bigint {
+    const tokenIn = this.tokenOnPool(pool, tokenInMint);
+    const tokenOut = this.tokenOnPool(pool, tokenOutMint);
+    if (!tokenIn || !tokenOut || amountIn <= BigInt(0)) return BigInt(0);
+    const reserveIn = pool.tokenA.mint === tokenInMint ? pool.reserves.tokenA : pool.reserves.tokenB;
+    const reserveOut = pool.tokenA.mint === tokenOutMint ? pool.reserves.tokenA : pool.reserves.tokenB;
+    return this.calculateSwapOutputWithSlippage(
+      amountIn,
+      reserveIn,
+      reserveOut,
+      tokenIn.decimals,
+      tokenOut.decimals,
+      pool.fee
+    );
+  }
+
+  private optimalQuoteInput(
+    buyPool: PoolData,
+    sellPool: PoolData,
+    quoteMint: string,
+    baseMint: string
+  ): bigint {
+    const quoteInfo = this.tokenOnPool(buyPool, quoteMint);
+    const decimals = quoteInfo?.decimals ?? 9;
+    const unit = BigInt(Math.pow(10, Math.min(decimals, 9)));
+    const testAmounts = [
+      unit / BigInt(100),
+      unit / BigInt(10),
+      unit / BigInt(2),
+      unit,
+      unit * BigInt(2),
+      unit * BigInt(5),
+    ].filter((a) => a > BigInt(0));
+
+    let best = unit;
+    let bestProfit = BigInt(Number.MIN_SAFE_INTEGER);
+    for (const amount of testAmounts) {
+      const mid = this.swapPool(buyPool, quoteMint, baseMint, amount);
+      const out = this.swapPool(sellPool, baseMint, quoteMint, mid);
+      const profit = out - amount;
+      if (profit > bestProfit) {
+        bestProfit = profit;
+        best = amount;
+      }
+    }
+    return best;
   }
 
   private getTokenInfo(mint: string): TokenInfo | null {
