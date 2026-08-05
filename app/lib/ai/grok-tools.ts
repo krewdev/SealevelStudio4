@@ -296,7 +296,6 @@ export const GROK_TOOLS = [
 
 const SOL = 'So11111111111111111111111111111111111111112';
 const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const KOL = process.env.KOL_RADAR_URL || 'http://127.0.0.1:8088';
 
 export async function runGrokTool(
   name: string,
@@ -459,15 +458,15 @@ export async function runGrokTool(
     }
     case 'kol_hot_board': {
       try {
-        const res = await fetch(`${KOL}/api/hot`, { signal: AbortSignal.timeout(4000) });
+        const res = await fetch(`${origin}/api/kol/hot`);
         const data = await res.json();
         const tokens = (data.tokens || data || []).slice(0, Number(args.limit) || 12);
-        return { result: { ok: true, tokens, ts: data.ts } };
+        return { result: { ok: !!data.ok, tokens, ts: data.ts, error: data.error } };
       } catch (e) {
         return {
           result: {
             ok: false,
-            error: 'KOL radar not reachable. Start ~/solana-kol-radar ./start.sh all-local',
+            error: 'KOL radar not reachable. Start ~/solana-kol-radar ./start.sh all-local or set KOL_RADAR_URL.',
             detail: e instanceof Error ? e.message : String(e),
           },
         };
@@ -475,9 +474,7 @@ export async function runGrokTool(
     }
     case 'kol_mint': {
       try {
-        const res = await fetch(`${KOL}/api/mint/${encodeURIComponent(String(args.mint))}`, {
-          signal: AbortSignal.timeout(5000),
-        });
+        const res = await fetch(`${origin}/api/kol/mint/${encodeURIComponent(String(args.mint))}`);
         return { result: await res.json() };
       } catch (e) {
         return { result: { ok: false, error: e instanceof Error ? e.message : String(e) } };
@@ -486,14 +483,12 @@ export async function runGrokTool(
     case 'kol_wallet_map': {
       try {
         const wallet = String(args.wallet);
-        const res = await fetch(`${KOL}/api/mapper?seed=${encodeURIComponent(wallet)}`, {
-          signal: AbortSignal.timeout(8000),
-        });
+        const res = await fetch(`${origin}/api/kol/mapper?seed=${encodeURIComponent(wallet)}&hops=2&live=0`);
         const data = await res.json().catch(() => ({}));
         return {
           result: {
             ...data,
-            mapperUrl: `${KOL}/mapper?seed=${wallet}`,
+            mapperView: 'kol-mapper',
           },
         };
       } catch (e) {
@@ -501,7 +496,6 @@ export async function runGrokTool(
           result: {
             ok: false,
             error: e instanceof Error ? e.message : String(e),
-            mapperUrl: `${KOL}/mapper?seed=${args.wallet}`,
           },
         };
       }

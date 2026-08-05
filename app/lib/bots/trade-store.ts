@@ -8,6 +8,9 @@ export type PaperTrade = {
   price: number;
   bot: 'volume' | 'mm' | 'sniper';
   pattern: string;
+  live?: boolean;
+  signature?: string;
+  error?: string;
 };
 
 type Listener = () => void;
@@ -27,6 +30,9 @@ export function pushPaperTrade(trade: Omit<PaperTrade, 'id' | 'ts'> & { ts?: num
     price: trade.price,
     bot: trade.bot,
     pattern: trade.pattern,
+    live: trade.live,
+    signature: trade.signature,
+    error: trade.error,
   };
   trades.push(full);
   if (trades.length > MAX) trades.splice(0, trades.length - MAX);

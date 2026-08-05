@@ -3,8 +3,9 @@
 
 import {
   Connection,
+  PublicKey,
+  SystemProgram,
   Transaction,
-  VersionedTransaction,
 } from '@solana/web3.js';
 import { ArbitrageOpportunity } from './types';
 import { WalletContextState } from '@solana/wallet-adapter-react';

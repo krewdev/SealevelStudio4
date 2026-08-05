@@ -6,6 +6,7 @@ import {
 } from '../../app/lib/arbitrage/quote-verify';
 import type { ArbitrageOpportunity } from '../../app/lib/pools/types';
 import { CLIENT_TOOL_NAMES } from '../../app/lib/ai/grok-tools';
+import { isLivePatternAllowed } from '../../app/lib/bots/live-engine';
 
 function opp(partial: Partial<ArbitrageOpportunity>): ArbitrageOpportunity {
   return {
@@ -64,6 +65,16 @@ describe('desk loop unit tests', () => {
     const sorted = sortOpportunitiesByQuoteQuality([stale, heuristic, verified]);
     expect(sorted.map((o) => o.id)).toEqual(['v', 'h', 's']);
     expect(rankOpportunity(verified)).toBeGreaterThan(rankOpportunity(heuristic));
+  });
+
+  it('blocks wash/volume patterns from live mode', () => {
+    expect(isLivePatternAllowed('inventory-mm')).toBe(true);
+    expect(isLivePatternAllowed('buy-drip')).toBe(true);
+    expect(isLivePatternAllowed('sell-drip')).toBe(true);
+    expect(isLivePatternAllowed('volume-tight')).toBe(false);
+    expect(isLivePatternAllowed('wash-chop')).toBe(false);
+    expect(isLivePatternAllowed('buy-pump')).toBe(false);
+    expect(isLivePatternAllowed('shake-out')).toBe(false);
   });
 
   it('never treats execute_built_arb or arm_sniper as server-side tools', () => {

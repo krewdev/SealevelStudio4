@@ -262,7 +262,12 @@ export async function buildAtomicArbTransaction(params: {
   }
 
   const lookupTables: AddressLookupTableAccount[] = [];
-  for (const addr of altAddresses) {
+  const altList: string[] = [];
+  altAddresses.forEach((addr) => {
+    altList.push(addr);
+  });
+  for (let i = 0; i < altList.length; i++) {
+    const addr = altList[i]!;
     const res = await connection.getAddressLookupTable(new PublicKey(addr));
     if (res.value) lookupTables.push(res.value);
   }

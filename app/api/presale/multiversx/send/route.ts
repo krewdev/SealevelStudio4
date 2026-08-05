@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       txHash?: string;
       code?: string;
       error?: string;
+      message?: string;
       data?: { txHash?: string };
     };
 

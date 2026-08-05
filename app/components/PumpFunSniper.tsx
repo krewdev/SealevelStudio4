@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { executeJupiterSwap, WSOL_MINT } from '../lib/bots/live-swap';
 import { PumpFunStream, PumpFunStreamEvent, PumpFunToken } from '../lib/pumpfun/stream';
 import { PumpFunQuickNodeStream } from '../lib/pumpfun/quicknode-stream';
 import { SnipingAnalysis } from '../lib/pumpfun/ai-analysis';
@@ -73,6 +73,20 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
     totalInvested: 0,
     totalProfit: 0,
   });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('sealevel-sniper-arm');
+      if (!raw) return;
+      const armed = JSON.parse(raw) as { mint?: string; maxSol?: number };
+      setConfig((prev) => ({
+        ...prev,
+        maxInvestment: Number(armed.maxSol) > 0 ? Number(armed.maxSol) : prev.maxInvestment,
+      }));
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Initialize stream
   useEffect(() => {
@@ -181,50 +195,31 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
     }
 
     try {
-      const investmentAmount = Math.min(
+      const investmentSol = Math.min(
         analysis.maxInvestment || config.maxInvestment,
         config.maxInvestment
-      ) * LAMPORTS_PER_SOL;
+      );
+      new PublicKey(token.mint);
 
-      // Build buy transaction for pump.fun
-      // Note: This is a simplified example - actual pump.fun buy requires their program interaction
-      const transaction = new Transaction();
-      
-      // Get associated token account
-      const mintPubkey = new PublicKey(token.mint);
-      const userAta = await getAssociatedTokenAddress(mintPubkey, publicKey);
-      
-      // Check if ATA exists, create if not
-      try {
-        await connection.getAccountInfo(userAta);
-      } catch {
-        transaction.add(
-          createAssociatedTokenAccountInstruction(
-            publicKey,
-            userAta,
-            publicKey,
-            mintPubkey,
-            TOKEN_PROGRAM_ID
-          )
-        );
-      }
-
-      // TODO: Add actual pump.fun buy instruction
-      // This requires the pump.fun program ID and buy instruction builder
-      // For now, this is a placeholder structure
-
-      const signature = await sendTransaction(transaction, connection);
-      await connection.confirmTransaction(signature, 'confirmed');
+      const result = await executeJupiterSwap({
+        connection,
+        publicKey,
+        sendTransaction: sendTransaction as any,
+        inputMint: WSOL_MINT,
+        outputMint: token.mint,
+        amountRaw: String(Math.floor(investmentSol * LAMPORTS_PER_SOL)),
+        slippageBps: 150,
+      });
 
       setSnipedTokens(prev => new Set(prev).add(token.mint));
       setStats(prev => ({
         ...prev,
         snipesExecuted: prev.snipesExecuted + 1,
         snipesSuccessful: prev.snipesSuccessful + 1,
-        totalInvested: prev.totalInvested + investmentAmount / LAMPORTS_PER_SOL,
+        totalInvested: prev.totalInvested + investmentSol,
       }));
 
-      console.log('[PumpFun Sniper] Sniped token:', token.symbol, signature);
+      console.log('[PumpFun Sniper] Sniped token:', token.symbol, result.signature);
     } catch (error) {
       console.error('[PumpFun Sniper] Snipe execution error:', error);
       setStats(prev => ({

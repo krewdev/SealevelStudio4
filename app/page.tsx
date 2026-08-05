@@ -794,7 +794,7 @@ function Sidebar({
   setActiveView: (view: string) => void;
   onViewChange?: () => void;
 }) {
-  const navItems = [
+  const navItems: { id: string; label: string; icon: React.ReactNode; section: string; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <Layers className="h-4 w-4" />, section: 'core' },
     { id: 'scanner', label: 'Arb Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
     { id: 'builder', label: 'TX Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },

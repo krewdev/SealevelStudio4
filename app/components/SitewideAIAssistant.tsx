@@ -392,7 +392,6 @@ export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: A
           onClick={() => setIsOpen(true)}
           className="fixed bottom-6 left-6 z-[60] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200"
           title="Ask Grok"
-          title="AI Assistant"
         >
           <Brain className="w-6 h-6" />
         </button>

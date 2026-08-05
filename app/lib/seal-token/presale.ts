@@ -419,7 +419,7 @@ export function calculateVestedTokens(
         date: new Date(presaleEndDate.getTime() + firstUnlock.unlockAt * 24 * 60 * 60 * 1000),
         amount: totalTokens * (firstUnlock.percent / 100),
       } : null,
-      unlockSchedule: vestingConfig?.unlockSchedule.map(schedule => ({
+      unlockSchedule: vestingConfig?.unlockSchedule.map((schedule: { unlockAt: number; percent: number }) => ({
         date: new Date(presaleEndDate.getTime() + schedule.unlockAt * 24 * 60 * 60 * 1000),
         amount: totalTokens * (schedule.percent / 100),
         percent: schedule.percent,
@@ -432,7 +432,7 @@ export function calculateVestedTokens(
   
   let vested = 0;
   let nextUnlock: { date: Date; amount: number } | null = null;
-  const unlockSchedule = vestingConfig.unlockSchedule.map(schedule => {
+  const unlockSchedule = vestingConfig.unlockSchedule.map((schedule: { unlockAt: number; percent: number }) => {
     const unlockDate = new Date(presaleEndDate.getTime() + schedule.unlockAt * 24 * 60 * 60 * 1000);
     const amount = totalTokens * (schedule.percent / 100);
     const isUnlocked = daysSinceEnd >= schedule.unlockAt;

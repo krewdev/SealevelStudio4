@@ -43,7 +43,7 @@ const CARDS = [
   {
     id: 'kol-mapper',
     title: 'KOL Mapper',
-    body: 'Wallet / flow mapper via local solana-kol-radar.',
+    body: 'Native hot board + hop graph (proxies solana-kol-radar).',
     icon: Map,
     accent: 'from-purple-400 to-pink-500',
   },
