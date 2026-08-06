@@ -6,6 +6,7 @@ import {
 } from '../../app/lib/arbitrage/quote-verify';
 import type { ArbitrageOpportunity } from '../../app/lib/pools/types';
 import { CLIENT_TOOL_NAMES } from '../../app/lib/ai/grok-tools';
+import { HIGHLIGHT_ONLY_TARGETS, SAFE_CLICK_TARGETS } from '../../app/lib/ai/page-actions';
 import { isLivePatternAllowed } from '../../app/lib/bots/live-engine';
 import { formatLamportsDelta } from '../../app/lib/tx/state-diff';
 import { pnlFromTrades } from '../../app/lib/bots/position';
@@ -109,5 +110,11 @@ describe('desk loop unit tests', () => {
     expect(CLIENT_TOOL_NAMES.has('highlight_ui')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('start_quote_replay')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('jupiter_quote')).toBe(false);
+  });
+
+  it('treats confirm-live as highlight-only, not a safe click', () => {
+    expect(HIGHLIGHT_ONLY_TARGETS.has('desk-confirm-live')).toBe(true);
+    expect(SAFE_CLICK_TARGETS.has('desk-confirm-live')).toBe(false);
+    expect(HIGHLIGHT_ONLY_TARGETS.has('desk-start-live')).toBe(true);
   });
 });

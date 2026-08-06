@@ -9,7 +9,21 @@ export type DeskSession = {
   intentTab?: 'volume' | 'mm' | 'sniper';
   opportunityId?: string;
   lastSim?: { ok: boolean; units?: number; profitHint?: string; at: number };
-  replay?: { mint: string; completedAt: number; pnlSol: number; trades: number; seconds: number };
+  replay?: {
+    mint: string;
+    completedAt: number;
+    pnlSol: number;
+    trades: number;
+    seconds: number;
+    buys?: number;
+    sells?: number;
+  };
+  lastPreflight?: {
+    at: number;
+    venue: string;
+    worstCaseSol: number;
+    blockers: number;
+  };
   dailyLossSol?: number;
   dailyLossDay?: string; // YYYY-MM-DD UTC
   updatedAt: number;

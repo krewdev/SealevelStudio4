@@ -115,7 +115,7 @@ export async function runQuoteReplay(params: {
   patchDeskSession({
     mint,
     source: 'replay',
-    replay: { mint, completedAt: Date.now(), pnlSol, trades, seconds },
+    replay: { mint, completedAt: Date.now(), pnlSol, trades, seconds, buys, sells },
   });
   params.onStatus?.(
     `Replay done: ${trades} prints, est. PnL ${pnlSol >= 0 ? '+' : ''}${pnlSol.toFixed(4)} SOL (fees not included). Live unlocked for this mint.`
@@ -123,7 +123,9 @@ export async function runQuoteReplay(params: {
   return { mint, seconds, trades, buys, sells, pnlSol, lastSpot };
 }
 
-export function replayUnlocksLive(mint: string, maxAgeMs = 30 * 60 * 1000): boolean {
+export const REPLAY_MAX_AGE_MS = 30 * 60 * 1000;
+
+export function replayUnlocksLive(mint: string, maxAgeMs = REPLAY_MAX_AGE_MS): boolean {
   const s = getDeskSession();
   if (!s.replay || s.replay.mint !== mint) return false;
   return Date.now() - s.replay.completedAt < maxAgeMs;

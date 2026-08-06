@@ -385,7 +385,7 @@ export const GROK_TOOLS = [
     function: {
       name: 'click_ui',
       description:
-        'Click a SAFE control (nav, paper start/stop, replay, disarm, switch active signer: wallet-use-phantom / wallet-use-studio). Will NOT click Execute or Start live — those are highlighted only.',
+        'Click a SAFE control (nav, paper start/stop, replay, disarm, switch active signer: wallet-use-phantom / wallet-use-studio). Will NOT click Execute, Start live, or Confirm live — those are highlighted only.',
       parameters: {
         type: 'object',
         properties: { target: { type: 'string' } },

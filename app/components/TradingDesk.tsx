@@ -18,7 +18,13 @@ import { BotCandleChart } from './BotCandleChart';
 import { replayUnlocksLive, runQuoteReplay } from '../lib/bots/replay-engine';
 import { clearDisarm, disarmAll, isDisarmed, subscribeDisarm } from '../lib/bots/kill-switch';
 import { fetchOnchainPosition, pnlFromTrades } from '../lib/bots/position';
-import { getDailyLoss, patchDeskSession, subscribeDeskSession } from '../lib/session/desk-session';
+import {
+  getDailyLoss,
+  getDeskSession,
+  patchDeskSession,
+  subscribeDeskSession,
+} from '../lib/session/desk-session';
+import { buildLivePreflightPlan, resolveLiveVenue, type LiveVenueKind } from '../lib/bots/live-preflight';
 
 type Tab = 'volume' | 'mm' | 'sniper';
 type Mode = 'paper' | 'live';
@@ -54,6 +60,13 @@ export function TradingDesk({
   const [disarmWhy, setDisarmWhy] = useState('');
   const [position, setPosition] = useState<{ sol: number; tokenUi: number } | null>(null);
   const [sessionNote, setSessionNote] = useState('');
+  const [replaySnap, setReplaySnap] = useState(() => getDeskSession().replay ?? null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewAck, setReviewAck] = useState(false);
+  const [venue, setVenue] = useState<{ kind: LiveVenueKind | 'pending'; label: string; error?: string }>({
+    kind: 'pending',
+    label: 'Probing venue…',
+  });
   const deskStartedRef = useRef(false);
   const stopLiveRef = useRef<(() => void) | null>(null);
   const replayStopRef = useRef({ stopped: false });
@@ -72,6 +85,7 @@ export function TradingDesk({
       if (s.intentTab && s.intentTab !== tab) setTab(s.intentTab);
       if (s.reason) setSessionNote(`${s.source || 'session'}: ${s.reason}`);
       if (s.mint) setReplayOk(replayUnlocksLive(s.mint));
+      setReplaySnap(s.replay ?? null);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -180,31 +194,47 @@ export function TradingDesk({
     };
   }, []);
 
-  const startLive = () => {
-    if (disarmed) {
-      setStatus(`Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`);
-      return;
-    }
+  const liveGateMessage = (): string | null => {
+    if (disarmed) return `Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`;
     if (!liveSignerReady || !publicKey || !sendTransaction) {
-      setStatus(
-        active.source === 'studio'
-          ? 'Studio wallet cannot sign live swaps. Switch to Phantom in the header.'
-          : 'Connect Phantom/Solflare for live swaps.'
-      );
+      return active.source === 'studio'
+        ? 'Studio wallet cannot sign live swaps. Switch to Phantom in the header.'
+        : 'Connect Phantom/Solflare for live swaps.';
+    }
+    if (!liveOkPattern) return 'This pattern is paper-only.';
+    if (!ackLive) return 'Check the live-risk box first.';
+    if (!replayUnlocksLive(mint.trim())) return 'Run 60s quote replay before live.';
+    return null;
+  };
+
+  const openLiveReview = async () => {
+    const gate = liveGateMessage();
+    if (gate) {
+      setStatus(gate);
       return;
     }
-    if (!liveOkPattern) {
-      setStatus('This pattern is paper-only.');
+    setReviewAck(false);
+    setReviewOpen(true);
+    setVenue({ kind: 'pending', label: 'Probing Jupiter / pump curve…' });
+    try {
+      const v = await resolveLiveVenue(connection, mint.trim(), maxSol);
+      setVenue({ kind: v.kind, label: v.label, error: v.error });
+    } catch (err) {
+      setVenue({
+        kind: 'none',
+        label: 'No route',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  const armLiveBot = () => {
+    const gate = liveGateMessage();
+    if (gate) {
+      setStatus(gate);
       return;
     }
-    if (!ackLive) {
-      setStatus('Check the live-risk box first.');
-      return;
-    }
-    if (!replayUnlocksLive(mint.trim())) {
-      setStatus('Run 60s quote replay before live.');
-      return;
-    }
+    if (!publicKey || !sendTransaction) return;
     stopControlledPaperBot();
     deskStartedRef.current = false;
     try {
@@ -226,6 +256,8 @@ export function TradingDesk({
         (msg) => setStatus(msg)
       );
       setLiveRunning(true);
+      setReviewOpen(false);
+      setStatus('Live armed — first Jupiter/curve tick shortly. Approve each wallet popup.');
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err));
     }
@@ -242,6 +274,53 @@ export function TradingDesk({
   const patterns = BOT_PATTERNS.filter((p) => (tab === 'mm' ? p.kind === 'mm' || p.id === 'inventory-mm' : p.kind !== 'mm'));
   const busy = running || liveRunning || replaying;
   const liveUnlocked = replayOk || replayUnlocksLive(mint.trim());
+  const preflight = useMemo(
+    () =>
+      buildLivePreflightPlan({
+        mint: mint.trim(),
+        pattern: effectivePattern,
+        livePatternAllowed: liveOkPattern,
+        maxSolPerTrade: maxSol,
+        intervalMs,
+        maxTrades,
+        signerSource: active.source,
+        signerAddress: active.address,
+        canSignVersioned: active.canSignVersioned,
+        disarmed,
+        dailyLossSol: getDailyLoss(),
+        walletSol: position?.sol ?? null,
+        replay: replaySnap && replaySnap.mint === mint.trim() ? replaySnap : null,
+        venue,
+      }),
+    [
+      mint,
+      effectivePattern,
+      liveOkPattern,
+      maxSol,
+      intervalMs,
+      maxTrades,
+      active.source,
+      active.address,
+      active.canSignVersioned,
+      disarmed,
+      position?.sol,
+      replaySnap,
+      venue,
+      tick,
+    ]
+  );
+
+  useEffect(() => {
+    if (!reviewOpen) return;
+    patchDeskSession({
+      lastPreflight: {
+        at: Date.now(),
+        venue: preflight.venueLabel,
+        worstCaseSol: preflight.worstCaseSol,
+        blockers: preflight.blockers.length,
+      },
+    });
+  }, [reviewOpen, preflight.venueLabel, preflight.worstCaseSol, preflight.blockers.length]);
 
   useEffect(() => {
     const posKey = active.payerPublicKey;
@@ -263,7 +342,7 @@ export function TradingDesk({
   }, [active.payerPublicKey, mint, connection, tick, liveRunning]);
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden relative">
       <header className="shrink-0 border-b border-slate-800 px-4 py-3 flex items-center gap-3">
         {onBack && (
           <button onClick={onBack} className="text-slate-400 hover:text-white flex items-center gap-1 text-sm">
@@ -309,6 +388,99 @@ export function TradingDesk({
       {sessionNote && (
         <div className="px-4 py-1.5 text-[11px] text-cyan-200/90 bg-cyan-950/30 border-b border-cyan-900/40">
           Session · {sessionNote}
+        </div>
+      )}
+
+      {reviewOpen && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-amber-700/50 bg-slate-950 shadow-2xl">
+            <div className="border-b border-amber-900/40 px-4 py-3">
+              <h2 className="text-sm font-semibold text-amber-100">Live preflight — review before first fill</h2>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Nothing broadcasts until you confirm. Grok cannot click this.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-4 py-3 text-xs">
+              <dt className="text-slate-500">Mint</dt>
+              <dd className="font-mono text-slate-200 break-all">{preflight.mint || '—'}</dd>
+              <dt className="text-slate-500">Pattern</dt>
+              <dd className="text-slate-200">{preflight.pattern}</dd>
+              <dt className="text-slate-500">Signer</dt>
+              <dd className="text-slate-200">{preflight.signer}</dd>
+              <dt className="text-slate-500">Venue</dt>
+              <dd className="text-slate-200">
+                {preflight.venueKind === 'pending' ? 'Probing…' : preflight.venueLabel}
+              </dd>
+              <dt className="text-slate-500">Size</dt>
+              <dd className="text-slate-200">
+                ≤ {preflight.maxSolPerTrade} SOL / fill · {preflight.intervalMs} ms · ≤ {preflight.maxTrades} swaps
+              </dd>
+              <dt className="text-slate-500">Worst-case spend</dt>
+              <dd className="text-amber-200 font-medium">{preflight.worstCaseSol.toFixed(4)} SOL</dd>
+              <dt className="text-slate-500">Kill switch</dt>
+              <dd className="text-slate-200">
+                session {preflight.sessionLossCap} SOL · daily {preflight.dailyLossUsed.toFixed(4)} / {preflight.dailyLossCap}{' '}
+                used
+              </dd>
+              <dt className="text-slate-500">Replay</dt>
+              <dd className="text-slate-200">
+                {preflight.replay
+                  ? `${preflight.replay.trades} prints (${preflight.replay.buys ?? '?'}b/${preflight.replay.sells ?? '?'}s) · PnL ${
+                      preflight.replay.pnlSol >= 0 ? '+' : ''
+                    }${preflight.replay.pnlSol.toFixed(4)} SOL · ${preflight.replay.ageLabel}`
+                  : 'none'}
+              </dd>
+              {position && (
+                <>
+                  <dt className="text-slate-500">Wallet now</dt>
+                  <dd className="text-slate-200">
+                    {position.sol.toFixed(4)} SOL · token {position.tokenUi.toPrecision(4)}
+                  </dd>
+                </>
+              )}
+            </dl>
+            {preflight.blockers.length > 0 && (
+              <ul className="mx-4 mb-2 list-disc space-y-1 rounded-lg border border-red-900/50 bg-red-950/40 px-5 py-2 text-[11px] text-red-200">
+                {preflight.blockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            )}
+            {preflight.warnings.length > 0 && (
+              <ul className="mx-4 mb-2 list-disc space-y-1 rounded-lg border border-amber-900/40 bg-amber-950/30 px-5 py-2 text-[11px] text-amber-100">
+                {preflight.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
+            <label className="mx-4 mb-3 flex items-start gap-2 text-[11px] text-amber-100">
+              <input
+                type="checkbox"
+                checked={reviewAck}
+                onChange={(e) => setReviewAck(e.target.checked)}
+                className="mt-0.5"
+              />
+              I reviewed mint, size, venue, replay, and loss caps. This will spend real SOL. Not financial advice.
+            </label>
+            <div className="flex gap-2 border-t border-slate-800 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setReviewOpen(false)}
+                className="flex-1 rounded-lg bg-slate-800 py-2 text-sm text-slate-200 hover:bg-slate-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={armLiveBot}
+                disabled={!preflight.canArm || !reviewAck || busy}
+                data-sealevel-target="desk-confirm-live"
+                className="flex-1 rounded-lg bg-amber-600 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500"
+              >
+                Confirm & start live
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -477,12 +649,12 @@ export function TradingDesk({
                 </button>
               ) : (
                 <button
-                  onClick={startLive}
+                  onClick={() => void openLiveReview()}
                   disabled={busy || disarmed || !ackLive || !liveSignerReady || !liveOkPattern || !liveUnlocked}
                   data-sealevel-target="desk-start-live"
                   className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >
-                  <Play size={14} /> Start live
+                  <Play size={14} /> Review live
                 </button>
               )}
               <button
@@ -492,6 +664,7 @@ export function TradingDesk({
                   replayStopRef.current.stopped = true;
                   stopControlledPaperBot();
                   stopLive();
+                  setReviewOpen(false);
                   setStatus('Idle');
                 }}
                 disabled={!busy}

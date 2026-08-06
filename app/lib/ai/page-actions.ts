@@ -24,6 +24,7 @@ export const HIGHLIGHT_ONLY_TARGETS = new Set([
   'builder-execute',
   'builder-build',
   'desk-start-live',
+  'desk-confirm-live',
   'connect-wallet',
 ]);
 

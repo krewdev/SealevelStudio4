@@ -29,9 +29,11 @@ export type LiveBotConfig = {
   sendTransaction: WalletSender;
 };
 
-const MAX_SOL = 0.05;
-const MIN_INTERVAL_MS = 8000;
-const MAX_TRADES = 20;
+export const LIVE_MAX_SOL_PER_TRADE = 0.05;
+export const LIVE_MIN_INTERVAL_MS = 8000;
+export const LIVE_MAX_TRADES = 20;
+export const LIVE_SESSION_LOSS_CAP = 0.05;
+export const LIVE_DAILY_LOSS_CAP = 0.08;
 
 function rand(min: number, max: number) {
   return min + Math.random() * (max - min);
@@ -40,9 +42,9 @@ function rand(min: number, max: number) {
 function clampLive(cfg: LiveBotConfig): LiveBotConfig {
   return {
     ...cfg,
-    maxSolPerTrade: Math.min(MAX_SOL, Math.max(0.001, cfg.maxSolPerTrade)),
-    intervalMs: Math.max(MIN_INTERVAL_MS, cfg.intervalMs),
-    maxTrades: Math.min(MAX_TRADES, Math.max(1, Math.floor(cfg.maxTrades))),
+    maxSolPerTrade: Math.min(LIVE_MAX_SOL_PER_TRADE, Math.max(0.001, cfg.maxSolPerTrade)),
+    intervalMs: Math.max(LIVE_MIN_INTERVAL_MS, cfg.intervalMs),
+    maxTrades: Math.min(LIVE_MAX_TRADES, Math.max(1, Math.floor(cfg.maxTrades))),
   };
 }
 
@@ -68,8 +70,8 @@ export function startLiveBot(
   let inventoryTokens = 0;
   let solSpent = 0;
   let solGot = 0;
-  const maxDd = cfg.maxDrawdownSol ?? 0.05;
-  const dailyCap = cfg.dailyLossCapSol ?? 0.08;
+  const maxDd = cfg.maxDrawdownSol ?? LIVE_SESSION_LOSS_CAP;
+  const dailyCap = cfg.dailyLossCapSol ?? LIVE_DAILY_LOSS_CAP;
 
   const mintStr = mint.toBase58();
 
