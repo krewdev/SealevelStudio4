@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
-import { Wallet, Loader2, Sparkles, ArrowRight } from 'lucide-react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { Wallet, Loader2, Sparkles, ArrowRight, Shield } from 'lucide-react';
 
 interface LoginGateProps {
   children: React.ReactNode;
@@ -11,6 +13,8 @@ interface LoginGateProps {
 
 export function LoginGate({ children, onSkip }: LoginGateProps) {
   const { user, isLoading, createWallet } = useUser();
+  const { publicKey, connecting } = useWallet();
+  const { setVisible } = useWalletModal();
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
@@ -36,8 +40,8 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
     );
   }
 
-  // If user is logged in, show children
-  if (user) {
+  // Studio session or Phantom is enough to enter.
+  if (user || publicKey) {
     return <>{children}</>;
   }
 
@@ -113,9 +117,23 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
               Welcome to Sea Level Studio
             </h1>
             <p className="text-gray-400 text-sm sm:text-base">
-              Create a wallet or login to get started
+              One signer. Phantom for live trading, studio wallet for demo.
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setVisible(true)}
+            disabled={connecting}
+            className="w-full py-3 sm:py-3.5 mb-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-60"
+          >
+            {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+            <span>Connect Phantom / Solflare</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          <p className="text-[11px] text-emerald-300/90 text-center mb-4">
+            Recommended for builder Execute, live MM, sniper, and atomic arb.
+          </p>
 
           {/* Email Input (Optional) */}
           {showEmailInput && (
@@ -160,18 +178,17 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
           <button
             onClick={handleCreateWallet}
             disabled={isCreating}
-            className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl hover:shadow-purple-500/50 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base"
+            className="w-full py-3 sm:py-3.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all border border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-3 sm:mb-4 text-sm sm:text-base"
           >
             {isCreating ? (
               <>
                 <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
-                <span>Creating Wallet...</span>
+                <span>Creating studio wallet...</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span>Create New Wallet</span>
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Create studio wallet (demo)</span>
               </>
             )}
           </button>
@@ -196,10 +213,10 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
 
           {/* Info */}
           <div className="mt-4 sm:mt-6 space-y-3">
-            <div className="p-3 sm:p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-              <p className="text-xs sm:text-sm text-blue-300">
-                <strong className="text-blue-200">🔒 Secure:</strong> Your wallet is created securely and stored server-side. 
-                You can access it anytime by logging in.
+            <div className="p-3 sm:p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-xs sm:text-sm text-amber-200">
+                <strong className="text-amber-100">Studio wallet:</strong> Sealevel holds an encrypted key in an httpOnly cookie
+                and signs via API. Fine for demo and faucet. Do not put mainnet size here — use Phantom for live trades.
               </p>
             </div>
             <div className="p-3 sm:p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">

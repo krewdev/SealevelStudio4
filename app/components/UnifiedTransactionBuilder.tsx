@@ -44,8 +44,7 @@ import { AdvancedInstructionCard } from './AdvancedInstructionCard';
 import { TemplateSelectorModal } from './TemplateSelectorModal';
 import { useTransactionLogger } from '../hooks/useTransactionLogger';
 import { RecentTransactions } from './RecentTransactions';
-import { useUser } from '../contexts/UserContext';
-import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
 import { buildAtomicArbTransaction } from '../lib/arbitrage/atomic-build';
@@ -508,15 +507,11 @@ interface UnifiedTransactionBuilderProps {
 
 export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
-  const { publicKey, sendTransaction, connecting } = useWallet();
+  const { connecting } = useWallet();
   const { connection } = useConnection();
-  const { user } = useUser();
-  const payerAddress = publicKey?.toBase58() || user?.walletAddress || null;
-  const walletLabel = publicKey
-    ? `Phantom ${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
-    : user?.walletAddress
-      ? `Studio ${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)}`
-      : null;
+  const active = useActiveWallet();
+  const payerAddress = active.address;
+  const walletLabel = active.connected ? active.label : null;
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   
   // Shared transaction state
@@ -1025,11 +1020,10 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       return;
     }
 
-    // Prefer adapter wallet (Phantom) when connected; fall back to studio custodial wallet.
-    const payerPublicKey = publicKey || (user?.walletAddress ? new PublicKey(user.walletAddress) : null);
+    const payerPublicKey = active.payerPublicKey;
 
     if (!payerPublicKey) {
-      setBuildError('Please connect your wallet or create a custodial wallet to build transactions');
+      setBuildError('Connect Phantom or create a studio wallet to build transactions');
       return;
     }
 
@@ -1135,10 +1129,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       return;
     }
 
-    // Check if we should use custodial wallet
-    const useCustodial = shouldUseCustodialWallet(user?.walletAddress, publicKey?.toBase58());
-    
-    if (!useCustodial && (!sendTransaction || !publicKey)) {
+    if (!active.connected || !active.payerPublicKey) {
       addLog('Error: Transaction not built or wallet not connected', 'error');
       return;
     }
@@ -1146,8 +1137,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     const isVersioned =
       builtTransaction instanceof VersionedTransaction ||
       (builtTransaction && typeof builtTransaction === 'object' && 'message' in builtTransaction && !('instructions' in builtTransaction));
-    if (isVersioned && useCustodial) {
-      addLog('Atomic arb uses a versioned transaction — connect Phantom/Solflare to Execute.', 'error');
+    if (isVersioned && !active.canSignVersioned) {
+      addLog('Atomic arb uses a versioned transaction — switch to Phantom in the header to Execute.', 'error');
       return;
     }
 
@@ -1156,12 +1147,12 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
 
     let txToSend = builtTransaction;
 
-    if (arbOpportunity && (publicKey || user?.walletAddress)) {
+    if (arbOpportunity && active.address) {
       try {
         addLog('Recompiling atomic arb with fresh blockhash…', 'info');
         const rebuilt = await buildAtomicArbTransaction({
           opportunity: arbOpportunity,
-          userPublicKey: (publicKey?.toBase58() || user!.walletAddress) as string,
+          userPublicKey: active.address,
           connection,
           jitoTipLamports,
         });
@@ -1188,49 +1179,11 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       // Check for additional signers (like mint keypairs from create_token_and_mint)
       const additionalSigners = (txToSend as any)._additionalSigners || [];
       
-      let signedTransaction = txToSend;
-      
-      if (useCustodial && user?.walletAddress) {
-        // Sign with custodial wallet (and additional signers if any)
-        addLog('Signing with custodial wallet...', 'info');
-        signedTransaction = await signTransactionWithCustodialAndSigners(
-          txToSend,
-          additionalSigners,
-          {
-            userWalletAddress: user.walletAddress,
-            connection,
-          }
-        );
-        addLog('Transaction signed with custodial wallet', 'success');
-      } else {
-        // Use external wallet (Phantom, etc.)
-        if (additionalSigners.length > 0) {
-          addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
-          // Sign transaction with additional signers
-          additionalSigners.forEach((signer: any) => {
-            signedTransaction.partialSign(signer);
-          });
-        }
-        
-        // External wallet will sign when sendTransaction is called
-        if (!sendTransaction) {
-          throw new Error('No wallet available for signing');
-        }
+      if (additionalSigners.length > 0) {
+        addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
       }
-      
-      // Send transaction
-      let signature: string;
-      if (useCustodial) {
-        // For custodial wallet, we need to send the already-signed transaction
-        const serialized = signedTransaction.serialize({ requireAllSignatures: false });
-        signature = await connection.sendRawTransaction(serialized, {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else {
-        // For external wallet, use sendTransaction which will prompt for signature
-        signature = await sendTransaction(signedTransaction, connection);
-      }
+      addLog(`Signing with ${active.label}...`, 'info');
+      const signature = await active.sendWithActive(txToSend, connection, additionalSigners);
       addLog(`Transaction sent! Signature: ${signature}`, 'success');
       addLog(`View on Solscan: https://solscan.io/tx/${signature}`, 'info');
       
@@ -1400,9 +1353,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               {builtTransaction && (
                 <button 
                   onClick={executeTransaction}
-                  disabled={isExecuting || (!publicKey && !user?.walletAddress)}
+                  disabled={isExecuting || !payerAddress}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                    isExecuting || (!publicKey && !user?.walletAddress)
+                    isExecuting || !payerAddress
                     ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
                     : 'bg-green-500 hover:bg-green-400 text-slate-900 hover:scale-105 active:scale-95'
                   }`}
@@ -2098,8 +2051,17 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
                   </>
                 )}
               </button>
-              {!publicKey && (
+              {!active.phantomConnected && (
                 <WalletMultiButton className="!h-8 !text-xs !px-3 !rounded-lg !bg-purple-600 hover:!bg-purple-500" />
+              )}
+              {active.source === 'studio' && active.phantomConnected && (
+                <button
+                  type="button"
+                  onClick={() => active.setPreferred('phantom')}
+                  className="text-[11px] px-2 py-1 rounded bg-emerald-900/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/70"
+                >
+                  Use Phantom
+                </button>
               )}
             </div>
           ) : connecting ? (

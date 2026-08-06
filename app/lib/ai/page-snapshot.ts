@@ -12,6 +12,9 @@ export type PageSnapshot = {
   wallet: {
     phantom?: string | null;
     studio?: string | null;
+    active?: string | null;
+    source?: 'phantom' | 'studio' | null;
+    canSignVersioned?: boolean;
     connected: boolean;
   };
   session: ReturnType<typeof getDeskSession>;
@@ -28,6 +31,9 @@ export type PageSnapshot = {
 export function collectPageSnapshot(extra?: {
   phantom?: string | null;
   studio?: string | null;
+  source?: 'phantom' | 'studio' | null;
+  active?: string | null;
+  canSignVersioned?: boolean;
   network?: string;
 }): PageSnapshot {
   const view =
@@ -48,6 +54,9 @@ export function collectPageSnapshot(extra?: {
     wallet: {
       phantom: extra?.phantom || null,
       studio: extra?.studio || null,
+      source: extra?.source ?? null,
+      active: extra?.active || extra?.phantom || extra?.studio || null,
+      canSignVersioned: extra?.canSignVersioned ?? Boolean(extra?.phantom),
       connected: !!(extra?.phantom || extra?.studio),
     },
     session,
@@ -68,6 +77,9 @@ export function snapshotToPrompt(snap: PageSnapshot): string {
     `NETWORK=${snap.network || 'unknown'}`,
     `PHANTOM=${snap.wallet.phantom || 'none'}`,
     `STUDIO_WALLET=${snap.wallet.studio || 'none'}`,
+    `ACTIVE_SIGNER=${snap.wallet.source || 'none'}`,
+    `ACTIVE_ADDRESS=${snap.wallet.active || 'none'}`,
+    `CAN_SIGN_VERSIONED=${snap.wallet.canSignVersioned ? 'yes' : 'no'}`,
     `SESSION_MINT=${snap.session.mint || 'none'}`,
     `SESSION_SOURCE=${snap.session.source || 'none'}`,
     `SESSION_REASON=${snap.session.reason || 'none'}`,

@@ -5,7 +5,7 @@ import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
 import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket, Network } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import WalletButton from './components/WalletButton';
+import { UnifiedWalletControl } from './components/UnifiedWalletControl';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
 import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
@@ -704,7 +704,6 @@ function Header({
   network,
   setNetwork,
   networks,
-  wallet,
   onBackToLanding,
   activeView,
   setActiveView,
@@ -712,7 +711,6 @@ function Header({
   network: keyof typeof NETWORKS;
   setNetwork: (network: keyof typeof NETWORKS) => void;
   networks: typeof NETWORKS;
-  wallet: React.ReactNode;
   onBackToLanding?: () => void;
   activeView: string;
   setActiveView: (view: string) => void;
@@ -794,12 +792,7 @@ function Header({
           </select>
         </button>
         
-        {/* Wallet Button */}
-        <div className="flex items-center">
-          {wallet}
-        </div>
-        
-        {/* User Profile - Compact Dropdown */}
+        <UnifiedWalletControl />
         <UserProfileWidget />
       </div>
     </header>
@@ -1675,12 +1668,12 @@ function AppContent() {
   // Check if user has wallet (for wallet-connect screen)
   const { user } = useUser();
 
-  // Effect to handle wallet connection completion
+  // Effect to handle wallet connection completion (Phantom or studio)
   useEffect(() => {
-    if (currentScreen === 'wallet-connect' && user) {
+    if (currentScreen === 'wallet-connect' && (user || publicKey)) {
       enterAfterAuth();
     }
-  }, [currentScreen, user, enterAfterAuth]);
+  }, [currentScreen, user, publicKey, enterAfterAuth]);
 
   let content: React.ReactNode;
 
@@ -2182,7 +2175,6 @@ function AppContent() {
           network={network} 
           setNetwork={setNetwork} 
           networks={NETWORKS} 
-          wallet={<WalletButton />}
           onBackToLanding={handleBackToLanding}
           activeView={activeView}
           setActiveView={setActiveView}

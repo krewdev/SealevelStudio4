@@ -82,15 +82,5 @@ export async function signTransactionWithCustodialAndSigners(
   return signedTx;
 }
 
-/**
- * Check if user has custodial wallet and should use it for signing
- */
-export function shouldUseCustodialWallet(
-  userWalletAddress: string | null | undefined,
-  adapterPublicKey?: string | null
-): boolean {
-  // Prefer Phantom/Solflare when both exist (needed for versioned txs / atomic arb).
-  if (adapterPublicKey) return false;
-  return !!userWalletAddress;
-}
+export { shouldUseCustodialWallet } from '../wallet/active-signer';
 

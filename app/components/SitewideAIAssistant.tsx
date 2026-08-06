@@ -4,9 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Brain, Loader2, Send, Sparkles, Square, X } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { useUser } from '../contexts/UserContext';
+import { useConnection } from '@solana/wallet-adapter-react';
 import { useNetwork } from '../contexts/NetworkContext';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { collectPageSnapshot, snapshotToPrompt, type GrokMode } from '../lib/ai/page-snapshot';
 import { MUTATING_GROK_TOOLS } from '../lib/ai/grok-tools';
 
@@ -42,9 +42,8 @@ const SUGGEST: Record<GrokMode, string[]> = {
 };
 
 export function SitewideAIAssistant() {
-  const { publicKey } = useWallet();
   const { connection } = useConnection();
-  const { user } = useUser();
+  const active = useActiveWallet();
   const { network } = useNetwork();
   const [open, setOpen] = useState(false);
   const [wide, setWide] = useState(false);
@@ -86,11 +85,11 @@ export function SitewideAIAssistant() {
   }, [open]);
 
   const pageChip = useMemo(() => {
-    const phantom = publicKey?.toBase58();
-    const studio = user?.walletAddress;
-    const pay = phantom ? `P ${phantom.slice(0, 4)}…` : studio ? `S ${studio.slice(0, 4)}…` : 'no wallet';
+    const pay = active.connected
+      ? `${active.source === 'phantom' ? 'P' : 'S'} ${active.shortLabel}`
+      : 'no wallet';
     return `${view} · ${network} · ${pay}`;
-  }, [view, network, publicKey, user?.walletAddress]);
+  }, [view, network, active.connected, active.source, active.shortLabel]);
 
   const stop = () => {
     abortRef.current = true;
@@ -115,8 +114,11 @@ export function SitewideAIAssistant() {
     try {
       const { runClientGrokTool } = await import('../lib/ai/grok-client-tools');
       const snap = collectPageSnapshot({
-        phantom: publicKey?.toBase58() || null,
-        studio: user?.walletAddress || null,
+        phantom: active.phantom,
+        studio: active.studio,
+        source: active.source,
+        active: active.address,
+        canSignVersioned: active.canSignVersioned,
         network,
       });
       const history = [...messages, userMsg]
@@ -194,8 +196,11 @@ export function SitewideAIAssistant() {
             mode,
             pageContext: snapshotToPrompt(
               collectPageSnapshot({
-                phantom: publicKey?.toBase58() || null,
-                studio: user?.walletAddress || null,
+                phantom: active.phantom,
+                studio: active.studio,
+                source: active.source,
+                active: active.address,
+                canSignVersioned: active.canSignVersioned,
                 network,
               })
             ),

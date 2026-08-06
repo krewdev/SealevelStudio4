@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Bot, Play, Square, Zap } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PumpFunSniper } from './PumpFunSniper';
 import { BOT_PATTERNS, type BotPatternId } from '../lib/bots/patterns';
 import {
@@ -30,7 +31,10 @@ export function TradingDesk({
   initialTab?: Tab;
 }) {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const active = useActiveWallet();
+  const publicKey = active.adapter.publicKey;
+  const sendTransaction = active.adapter.sendTransaction;
+  const liveSignerReady = active.canSignVersioned && !!publicKey && !!sendTransaction;
   const [tab, setTab] = useState<Tab>(initialTab || 'volume');
   const [mode, setMode] = useState<Mode>('paper');
   const [mint, setMint] = useState('DEMO');
@@ -181,8 +185,12 @@ export function TradingDesk({
       setStatus(`Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`);
       return;
     }
-    if (!publicKey || !sendTransaction) {
-      setStatus('Connect Phantom/Solflare for live swaps.');
+    if (!liveSignerReady || !publicKey || !sendTransaction) {
+      setStatus(
+        active.source === 'studio'
+          ? 'Studio wallet cannot sign live swaps. Switch to Phantom in the header.'
+          : 'Connect Phantom/Solflare for live swaps.'
+      );
       return;
     }
     if (!liveOkPattern) {
@@ -236,12 +244,13 @@ export function TradingDesk({
   const liveUnlocked = replayOk || replayUnlocksLive(mint.trim());
 
   useEffect(() => {
-    if (!publicKey || !mint || mint.toUpperCase() === 'DEMO') {
+    const posKey = active.payerPublicKey;
+    if (!posKey || !mint || mint.toUpperCase() === 'DEMO') {
       setPosition(null);
       return;
     }
     let cancelled = false;
-    fetchOnchainPosition(connection, publicKey, mint.trim())
+    fetchOnchainPosition(connection, posKey, mint.trim())
       .then((p) => {
         if (!cancelled) setPosition({ sol: p.sol, tokenUi: p.tokenUi });
       })
@@ -251,7 +260,7 @@ export function TradingDesk({
     return () => {
       cancelled = true;
     };
-  }, [publicKey, mint, connection, tick, liveRunning]);
+  }, [active.payerPublicKey, mint, connection, tick, liveRunning]);
 
   return (
     <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden">
@@ -437,7 +446,19 @@ export function TradingDesk({
                     ? `Replay OK for this mint. Daily loss ${getDailyLoss().toFixed(4)} SOL.`
                     : 'Live stays locked until a quote replay finishes on this mint.'}
                 </p>
-                {!connected && <p className="text-[11px] text-red-300">Connect a wallet to sign live swaps.</p>}
+                {!liveSignerReady && (
+                  <p className="text-[11px] text-red-300">
+                    {active.source === 'studio'
+                      ? 'Live needs Phantom. Switch signer in the header.'
+                      : 'Connect Phantom to sign live swaps.'}
+                  </p>
+                )}
+                {active.connected && (
+                  <p className="text-[11px] text-slate-400">
+                    Active signer: {active.label}
+                    {active.source === 'studio' ? ' · hosted key, paper/demo only' : ''}
+                  </p>
+                )}
                 {!liveOkPattern && (
                   <p className="text-[11px] text-red-300">Switch to Market maker or buy/sell drip for live.</p>
                 )}
@@ -457,7 +478,7 @@ export function TradingDesk({
               ) : (
                 <button
                   onClick={startLive}
-                  disabled={busy || disarmed || !ackLive || !connected || !liveOkPattern || !liveUnlocked}
+                  disabled={busy || disarmed || !ackLive || !liveSignerReady || !liveOkPattern || !liveUnlocked}
                   data-sealevel-target="desk-start-live"
                   className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >

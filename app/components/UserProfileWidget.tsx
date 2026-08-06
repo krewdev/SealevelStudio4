@@ -1,19 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '../contexts/UserContext';
-import { Twitter, Send, LogOut, User as UserIcon, Wallet, Coins, Loader2, ChevronDown, Mail, Sparkles, Settings } from 'lucide-react';
+import { LogOut, User as UserIcon, Wallet, Coins, ChevronDown, Settings } from 'lucide-react';
 import { DepositWallet } from './DepositWallet';
 import { Settings as SettingsComponent } from './Settings';
 
 export function UserProfileWidget() {
-  const { user, isLoading, linkTwitter, linkTelegram, logout, refreshBalance, createWallet } = useUser();
-  const [isLinkingTwitter, setIsLinkingTwitter] = useState(false);
-  const [isLinkingTelegram, setIsLinkingTelegram] = useState(false);
+  const { user, logout, refreshBalance } = useUser();
   const [showDeposit, setShowDeposit] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [email, setEmail] = useState('');
-  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
-  // Compact header version - social connect is handled by SocialConnectButton in header
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -32,117 +26,9 @@ export function UserProfileWidget() {
     };
   }, [showDropdown]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center px-2 py-2 text-gray-400" title="Loading studio wallet">
-        <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
-      </div>
-    );
-  }
-
-  const handleGenerateWallet = async () => {
-    if (!email || !email.includes('@')) {
-      alert('Please enter a valid email address');
-      return;
-    }
-
-    setIsCreatingWallet(true);
-    try {
-      await createWallet(email);
-      setShowEmailModal(false);
-      setEmail('');
-    } catch (error) {
-      console.error('Failed to create wallet:', error);
-      alert('Failed to create wallet. Please try again.');
-    } finally {
-      setIsCreatingWallet(false);
-    }
-  };
-
+  // Wallet connect / create lives in UnifiedWalletControl. This chip is account settings only.
   if (!user) {
-    return (
-      <>
-        <button
-          onClick={() => setShowEmailModal(true)}
-          className="flex items-center space-x-1 sm:space-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 px-2 sm:px-4 py-2 text-sm font-medium text-white transition-all shadow-lg hover:shadow-purple-500/20"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span className="hidden sm:inline">Generate Wallet</span>
-        </button>
-
-        {/* Email Collection Modal */}
-        {showEmailModal && (
-          <>
-            <div 
-              className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-              onClick={() => setShowEmailModal(false)}
-            >
-              <div 
-                className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
-                    <Wallet className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">Create Your Wallet</h3>
-                    <p className="text-xs text-gray-400">Link your wallet to your email</p>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      onKeyPress={(e) => e.key === 'Enter' && handleGenerateWallet()}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Your wallet will be securely linked to this email address
-                  </p>
-                </div>
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setShowEmailModal(false)}
-                    className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                    disabled={isCreatingWallet}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleGenerateWallet}
-                    disabled={isCreatingWallet || !email || !email.includes('@')}
-                    className="flex-1 py-2 px-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isCreatingWallet ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Creating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>Generate Wallet</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </>
-    );
+    return null;
   }
 
   return (

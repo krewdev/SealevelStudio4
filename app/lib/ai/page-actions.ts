@@ -14,6 +14,10 @@ export const SAFE_CLICK_TARGETS = new Set([
   'desk-rearm',
   'header-disarm',
   'header-rearm',
+  'wallet-connect-phantom',
+  'wallet-use-phantom',
+  'wallet-use-studio',
+  'wallet-create-studio',
 ]);
 
 export const HIGHLIGHT_ONLY_TARGETS = new Set([
