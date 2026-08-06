@@ -31,6 +31,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
@@ -507,9 +508,15 @@ interface UnifiedTransactionBuilderProps {
 
 export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, connected, connecting } = useWallet();
   const { connection } = useConnection();
   const { user } = useUser();
+  const payerAddress = publicKey?.toBase58() || user?.walletAddress || null;
+  const walletLabel = publicKey
+    ? `Phantom ${publicKey.toBase58().slice(0, 4)}…${publicKey.toBase58().slice(-4)}`
+    : user?.walletAddress
+      ? `Studio ${user.walletAddress.slice(0, 4)}…${user.walletAddress.slice(-4)}`
+      : null;
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   
   // Shared transaction state
@@ -602,7 +609,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       );
     });
 
-    const payer = publicKey?.toBase58() || user?.walletAddress;
+    const payer = payerAddress;
     if (!payer) {
       setArbStatus('Connect a wallet to compile the atomic transaction.');
       setTransactionDraft({
@@ -813,30 +820,30 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       };
 
       if (block.id === 'system_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['from'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['from'] = payerAddress;
         accounts['to'] = block.params.to || '';
         args['amount'] = convertSolToLamports(block.params.amount || '0');
       } else if (block.id === 'token_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['authority'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['authority'] = payerAddress;
         accounts['source'] = '';
         accounts['destination'] = block.params.destination || '';
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'create_token_and_mint') {
         // Combined operation: Create mint + Create token account + Mint tokens with ALL features
-        if (!publicKey) throw new Error('Wallet not connected');
+        if (!payerAddress) throw new Error('Wallet not connected');
         
         // Core SPL Mint Attributes
         const decimals = parseInt(block.params.decimals || '9');
         const initialSupply = convertSolToLamports(block.params.initialSupply || '0');
-        const mintAuthority = block.params.mintAuthority || publicKey.toString();
-        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? publicKey.toString() : '');
+        const mintAuthority = block.params.mintAuthority || payerAddress;
+        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? payerAddress : '');
         const enableFreeze = block.params.enableFreeze === 'true';
         const revokeMintAuthority = block.params.revokeMintAuthority === 'true';
         
         // Token Account Attributes
-        const tokenAccountOwner = block.params.tokenAccountOwner || publicKey.toString();
+        const tokenAccountOwner = block.params.tokenAccountOwner || payerAddress;
         const delegate = block.params.delegate || '';
         const delegatedAmount = BigInt(block.params.delegatedAmount || '0');
         const freezeInitialAccount = block.params.freezeInitialAccount === 'true';
@@ -904,7 +911,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
         args['metadataPointer'] = metadataPointer;
         args['supplyCap'] = supplyCap;
         
-        accounts['payer'] = publicKey.toString();
+        accounts['payer'] = payerAddress;
         accounts['tokenAccountOwner'] = tokenAccountOwner;
         if (freezeAuthority) {
           accounts['freezeAuthority'] = freezeAuthority;
@@ -921,14 +928,14 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
         instructions.push({ template: placeholderTemplate, accounts, args });
         continue; // Skip normal processing
       } else if (block.id === 'token_mint') {
-        if (!publicKey) throw new Error('Wallet not connected');
+        if (!payerAddress) throw new Error('Wallet not connected');
         accounts['mint'] = block.params.mint || '';
         accounts['destination'] = block.params.destination || '';
-        accounts['authority'] = publicKey.toString();
+        accounts['authority'] = payerAddress;
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'jup_swap') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['userTransferAuthority'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['userTransferAuthority'] = payerAddress;
         args['amount'] = BigInt(block.params.amount || '0');
         args['minAmountOut'] = BigInt(block.params.minAmountOut || '0');
       } else {
@@ -1018,10 +1025,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       return;
     }
 
-    // Use custodial wallet as payer if available, otherwise external wallet
-    const payerPublicKey = user?.walletAddress 
-      ? new PublicKey(user.walletAddress)
-      : publicKey;
+    // Prefer adapter wallet (Phantom) when connected; fall back to studio custodial wallet.
+    const payerPublicKey = publicKey || (user?.walletAddress ? new PublicKey(user.walletAddress) : null);
 
     if (!payerPublicKey) {
       setBuildError('Please connect your wallet or create a custodial wallet to build transactions');
@@ -1131,7 +1136,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     }
 
     // Check if we should use custodial wallet
-    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
+    const useCustodial = shouldUseCustodialWallet(user?.walletAddress, publicKey?.toBase58());
     
     if (!useCustodial && (!sendTransaction || !publicKey)) {
       addLog('Error: Transaction not built or wallet not connected', 'error');
@@ -1879,7 +1884,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             {builtTransaction && (
               <button
                 onClick={executeTransaction}
-                disabled={isExecuting || !publicKey}
+                disabled={isExecuting || !payerAddress}
                 className="flex items-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
               >
                 {isExecuting ? (
@@ -2072,13 +2077,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             <TrendingUp size={16} />
             Arbitrage
           </button>
-          {publicKey ? (
+          {walletLabel && payerAddress ? (
             <button
-              onClick={() => copyAddress(publicKey.toString())}
+              onClick={() => copyAddress(payerAddress)}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
               title="Click to copy wallet address"
             >
-              {justCopied === publicKey.toString() ? (
+              {justCopied === payerAddress ? (
                 <>
                   <ClipboardCheck size={14} />
                   <span>Copied!</span>
@@ -2086,14 +2091,21 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               ) : (
                 <>
                   <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span>{publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}</span>
+                  <span>{walletLabel}</span>
                 </>
               )}
             </button>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
-              Wallet Not Connected
+          ) : connecting ? (
+            <span className="text-xs px-2 py-1 rounded bg-amber-900/30 text-amber-300 border border-amber-700/50">
+              Connecting…
             </span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
+                Wallet not connected
+              </span>
+              <WalletMultiButton className="!h-8 !text-xs !px-3 !rounded-lg !bg-purple-600 hover:!bg-purple-500" />
+            </div>
           )}
           <button
             onClick={() => setShowClipboard(!showClipboard)}

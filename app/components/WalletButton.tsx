@@ -5,13 +5,11 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Wallet, LogOut, Loader2 } from 'lucide-react';
 import { useNetwork } from '../contexts/NetworkContext';
-import { useUser } from '../contexts/UserContext';
 import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 
 export const WalletButton = () => {
   const { publicKey, disconnect, wallet } = useWallet();
   const { network } = useNetwork();
-  const { user, isLoading } = useUser();
   
   // Get selected blockchain from localStorage and listen for changes
   const [selectedBlockchain, setSelectedBlockchain] = useState<string | null>('solana');
@@ -57,11 +55,8 @@ export const WalletButton = () => {
     }
   };
 
-  // If user has custodial wallet OR is being created, don't show external wallet button
-  // (UserProfileWidget in header handles custodial wallet display)
-  if (user?.walletAddress || isLoading) {
-    return null;
-  }
+  // Always keep Phantom/Solflare available. Custodial studio wallets are shown in
+  // UserProfileWidget; hiding this button made the TX builder look disconnected.
 
   // MultiversX wallet connection UI
   if (selectedBlockchain === 'multiverx') {

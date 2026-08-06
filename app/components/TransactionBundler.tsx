@@ -122,7 +122,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
 
   const handleSend = useCallback(async () => {
     // Check if we should use custodial wallet
-    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
+    const useCustodial = shouldUseCustodialWallet(user?.walletAddress, publicKey?.toBase58());
     const payerPublicKey = useCustodial && user?.walletAddress 
       ? new PublicKey(user.walletAddress)
       : publicKey;
