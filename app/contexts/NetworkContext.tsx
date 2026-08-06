@@ -7,6 +7,8 @@ type NetworkType = 'mainnet' | 'devnet' | 'testnet';
 interface NetworkContextType {
   network: NetworkType;
   setNetwork: (network: NetworkType) => void;
+  /** False until localStorage network is read — wait before mounting wallet adapter. */
+  ready: boolean;
 }
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
@@ -20,21 +22,22 @@ function envDefault(): NetworkType {
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
   const [network, setNetwork] = useState<NetworkType>(envDefault());
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     try {
       const saved = localStorage.getItem('sealevel-network');
       if (saved === 'mainnet' || saved === 'devnet' || saved === 'testnet') {
         setNetwork(saved);
-        return;
+      } else {
+        const fallback = envDefault();
+        setNetwork(fallback);
+        localStorage.setItem('sealevel-network', fallback);
       }
-      const fallback = envDefault();
-      setNetwork(fallback);
-      localStorage.setItem('sealevel-network', fallback);
     } catch (error) {
       console.warn('Failed to load network preference:', error);
     }
+    setReady(true);
   }, []);
 
   const handleSetNetwork = (newNetwork: NetworkType) => {
@@ -50,7 +53,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NetworkContext.Provider value={{ network, setNetwork: handleSetNetwork }}>
+    <NetworkContext.Provider value={{ network, setNetwork: handleSetNetwork, ready }}>
       {children}
     </NetworkContext.Provider>
   );

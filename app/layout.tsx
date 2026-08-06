@@ -8,6 +8,7 @@ import { SitewideAIAssistant } from './components/SitewideAIAssistant'
 import { WalletProvider } from './components/WalletProvider'
 
 import { NetworkProvider } from './contexts/NetworkContext'
+import { UserProvider } from './contexts/UserContext'
 import { TutorialProvider } from './contexts/TutorialContext'
 import { MultiversXWalletProvider } from './contexts/MultiversXWalletContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -64,18 +65,20 @@ export default function RootLayout({
           <NetworkProvider>
             <DevnetOnlyGuard>
               <WalletProvider>
-                <MultiversXWalletProvider>
-                  <TutorialProvider>
-                    {children}
-                  </TutorialProvider>
-                </MultiversXWalletProvider>
+                <UserProvider>
+                  <MultiversXWalletProvider>
+                    <TutorialProvider>
+                      {children}
+                      <ClientOnly>
+                        <SitewideAIAssistant />
+                      </ClientOnly>
+                    </TutorialProvider>
+                  </MultiversXWalletProvider>
+                </UserProvider>
               </WalletProvider>
             </DevnetOnlyGuard>
           </NetworkProvider>
         </ErrorBoundary>
-        <ClientOnly>
-          <SitewideAIAssistant />
-        </ClientOnly>
         <Analytics />
         <SpeedInsights />
       </body>

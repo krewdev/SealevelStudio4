@@ -1491,11 +1491,7 @@ interface LoaderContextInfo {
 
 // Main App Component
 export default function App() {
-  return (
-    <UserProvider>
-      <AppContent />
-    </UserProvider>
-  );
+  return <AppContent />;
 }
 
 function AppContent() {

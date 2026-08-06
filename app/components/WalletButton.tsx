@@ -8,7 +8,7 @@ import { useNetwork } from '../contexts/NetworkContext';
 import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 
 export const WalletButton = () => {
-  const { publicKey, disconnect, wallet } = useWallet();
+  const { publicKey, disconnect } = useWallet();
   const { network } = useNetwork();
   
   // Get selected blockchain from localStorage and listen for changes
@@ -40,23 +40,6 @@ export const WalletButton = () => {
   
   // MultiversX wallet connection
   const multiversXWallet = useMultiversXWallet();
-
-  // Force wallet to reconnect when network changes
-  const handleNetworkSwitch = async () => {
-    if (wallet) {
-      try {
-        // Disconnect current wallet
-        await disconnect();
-        // The wallet should reconnect to the new network
-        console.log(`Wallet should now connect to ${network}`);
-      } catch (error) {
-        console.error('Error switching wallet network:', error);
-      }
-    }
-  };
-
-  // Always keep Phantom/Solflare available. Custodial studio wallets are shown in
-  // UserProfileWidget; hiding this button made the TX builder look disconnected.
 
   // MultiversX wallet connection UI
   if (selectedBlockchain === 'multiverx') {

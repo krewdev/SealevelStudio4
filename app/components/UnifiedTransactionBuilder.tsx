@@ -508,7 +508,7 @@ interface UnifiedTransactionBuilderProps {
 
 export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
-  const { publicKey, sendTransaction, connected, connecting } = useWallet();
+  const { publicKey, sendTransaction, connecting } = useWallet();
   const { connection } = useConnection();
   const { user } = useUser();
   const payerAddress = publicKey?.toBase58() || user?.walletAddress || null;
@@ -2078,23 +2078,28 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             Arbitrage
           </button>
           {walletLabel && payerAddress ? (
-            <button
-              onClick={() => copyAddress(payerAddress)}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
-              title="Click to copy wallet address"
-            >
-              {justCopied === payerAddress ? (
-                <>
-                  <ClipboardCheck size={14} />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span>{walletLabel}</span>
-                </>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => copyAddress(payerAddress)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
+                title="Click to copy wallet address"
+              >
+                {justCopied === payerAddress ? (
+                  <>
+                    <ClipboardCheck size={14} />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span>{walletLabel}</span>
+                  </>
+                )}
+              </button>
+              {!publicKey && (
+                <WalletMultiButton className="!h-8 !text-xs !px-3 !rounded-lg !bg-purple-600 hover:!bg-purple-500" />
               )}
-            </button>
+            </div>
           ) : connecting ? (
             <span className="text-xs px-2 py-1 rounded bg-amber-900/30 text-amber-300 border border-amber-700/50">
               Connecting…

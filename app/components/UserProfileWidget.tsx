@@ -34,11 +34,8 @@ export function UserProfileWidget() {
 
   if (isLoading) {
     return (
-      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-        <div className="flex items-center justify-center space-x-3">
-          <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
-          <span className="text-sm text-gray-400">Loading wallet...</span>
-        </div>
+      <div className="flex items-center px-2 py-2 text-gray-400" title="Loading studio wallet">
+        <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
       </div>
     );
   }
