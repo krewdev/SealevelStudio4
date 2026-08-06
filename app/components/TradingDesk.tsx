@@ -14,6 +14,10 @@ import {
 import { isLivePatternAllowed, startLiveBot } from '../lib/bots/live-engine';
 import { clearPaperTrades, listPaperTrades, subscribePaperTrades } from '../lib/bots/trade-store';
 import { BotCandleChart } from './BotCandleChart';
+import { replayUnlocksLive, runQuoteReplay } from '../lib/bots/replay-engine';
+import { clearDisarm, disarmAll, isDisarmed, subscribeDisarm } from '../lib/bots/kill-switch';
+import { fetchOnchainPosition, pnlFromTrades } from '../lib/bots/position';
+import { getDailyLoss, patchDeskSession, subscribeDeskSession } from '../lib/session/desk-session';
 
 type Tab = 'volume' | 'mm' | 'sniper';
 type Mode = 'paper' | 'live';
@@ -40,8 +44,15 @@ export function TradingDesk({
   const [maxSol, setMaxSol] = useState(0.01);
   const [intervalMs, setIntervalMs] = useState(12000);
   const [maxTrades, setMaxTrades] = useState(8);
+  const [replaying, setReplaying] = useState(false);
+  const [replayOk, setReplayOk] = useState(false);
+  const [disarmed, setDisarmed] = useState(() => isDisarmed());
+  const [disarmWhy, setDisarmWhy] = useState('');
+  const [position, setPosition] = useState<{ sol: number; tokenUi: number } | null>(null);
+  const [sessionNote, setSessionNote] = useState('');
   const deskStartedRef = useRef(false);
   const stopLiveRef = useRef<(() => void) | null>(null);
+  const replayStopRef = useRef({ stopped: false });
 
   const effectivePattern: BotPatternId = tab === 'mm' ? 'inventory-mm' : pattern;
   const liveOkPattern = isLivePatternAllowed(effectivePattern);
@@ -49,6 +60,29 @@ export function TradingDesk({
   useEffect(() => {
     if (initialTab) setTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    return subscribeDeskSession((s) => {
+      if (s.mint && s.mint !== mint) setMint(s.mint);
+      if (s.maxSol) setMaxSol(s.maxSol);
+      if (s.intentTab && s.intentTab !== tab) setTab(s.intentTab);
+      if (s.reason) setSessionNote(`${s.source || 'session'}: ${s.reason}`);
+      if (s.mint) setReplayOk(replayUnlocksLive(s.mint));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => subscribeDisarm((s) => {
+    setDisarmed(s.disarmed);
+    setDisarmWhy(s.reason);
+    if (s.disarmed) {
+      stopControlledPaperBot();
+      stopLiveRef.current?.();
+      stopLiveRef.current = null;
+      setLiveRunning(false);
+      deskStartedRef.current = false;
+    }
+  }), []);
 
   useEffect(() => subscribePaperTrades(() => setTick((t) => t + 1)), []);
 
@@ -106,7 +140,31 @@ export function TradingDesk({
     });
   };
 
+  const startReplay = async () => {
+    replayStopRef.current.stopped = false;
+    setReplaying(true);
+    try {
+      const result = await runQuoteReplay({
+        mint: mint.trim(),
+        pattern: effectivePattern,
+        maxSolPerTrade: maxSol,
+        seconds: 60,
+        signal: replayStopRef.current,
+        onStatus: (msg) => setStatus(msg),
+      });
+      setReplayOk(result.trades >= 0 && replayUnlocksLive(mint.trim()));
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReplaying(false);
+    }
+  };
+
   const startLive = () => {
+    if (disarmed) {
+      setStatus(`Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`);
+      return;
+    }
     if (!publicKey || !sendTransaction) {
       setStatus('Connect Phantom/Solflare for live swaps.');
       return;
@@ -117,6 +175,10 @@ export function TradingDesk({
     }
     if (!ackLive) {
       setStatus('Check the live-risk box first.');
+      return;
+    }
+    if (!replayUnlocksLive(mint.trim())) {
+      setStatus('Run 60s quote replay before live.');
       return;
     }
     stopControlledPaperBot();
@@ -152,8 +214,28 @@ export function TradingDesk({
   }, [mint, pattern, tab]);
 
   const trades = useMemo(() => listPaperTrades(mint.trim() || 'DEMO'), [mint, tick]);
+  const pnl = useMemo(() => pnlFromTrades(trades), [trades]);
   const patterns = BOT_PATTERNS.filter((p) => (tab === 'mm' ? p.kind === 'mm' || p.id === 'inventory-mm' : p.kind !== 'mm'));
-  const busy = running || liveRunning;
+  const busy = running || liveRunning || replaying;
+  const liveUnlocked = replayOk || replayUnlocksLive(mint.trim());
+
+  useEffect(() => {
+    if (!publicKey || !mint || mint.toUpperCase() === 'DEMO') {
+      setPosition(null);
+      return;
+    }
+    let cancelled = false;
+    fetchOnchainPosition(connection, publicKey, mint.trim())
+      .then((p) => {
+        if (!cancelled) setPosition({ sol: p.sol, tokenUi: p.tokenUi });
+      })
+      .catch(() => {
+        if (!cancelled) setPosition(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey, mint, connection, tick, liveRunning]);
 
   return (
     <div className="h-full w-full flex flex-col bg-slate-950 text-white overflow-hidden">
@@ -184,8 +266,25 @@ export function TradingDesk({
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => (disarmed ? clearDisarm() : disarmAll('manual desk'))}
+          className={`ml-2 text-xs px-2 py-1 rounded ${disarmed ? 'bg-slate-700 text-slate-200' : 'bg-red-900/70 text-red-100 hover:bg-red-800'}`}
+        >
+          {disarmed ? 'Re-arm' : 'Disarm all'}
+        </button>
         <span className="ml-auto text-xs text-slate-500 max-w-md truncate" title={status}>{status}</span>
       </header>
+      {disarmed && (
+        <div className="px-4 py-2 text-xs bg-red-950/70 text-red-100 border-b border-red-900/50">
+          Kill switch ON{disarmWhy ? `: ${disarmWhy}` : ''}. Paper/live/sniper arm halted.
+        </div>
+      )}
+      {sessionNote && (
+        <div className="px-4 py-1.5 text-[11px] text-cyan-200/90 bg-cyan-950/30 border-b border-cyan-900/40">
+          Session · {sessionNote}
+        </div>
+      )}
 
       {tab === 'sniper' ? (
         <div className="flex-1 min-h-0 overflow-auto">
@@ -234,7 +333,14 @@ export function TradingDesk({
               Mint {mode === 'live' ? '(required live mint)' : '(paper uses DEMO curve if empty)'}
               <input
                 value={mint}
-                onChange={(e) => setMint(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setMint(v);
+                  if (v.trim() && v.toUpperCase() !== 'DEMO') {
+                    patchDeskSession({ mint: v.trim(), source: 'manual' });
+                    setReplayOk(replayUnlocksLive(v.trim()));
+                  }
+                }}
                 className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm"
                 placeholder="Token mint or DEMO"
               />
@@ -300,6 +406,19 @@ export function TradingDesk({
                   <input type="checkbox" checked={ackLive} onChange={(e) => setAckLive(e.target.checked)} className="mt-0.5" />
                   I understand this spends real SOL / tokens. Not financial advice. Grok cannot start live bots.
                 </label>
+                <button
+                  type="button"
+                  onClick={() => void startReplay()}
+                  disabled={busy || !liveOkPattern || !mint || mint.toUpperCase() === 'DEMO'}
+                  className="w-full bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 rounded py-2 text-sm"
+                >
+                  {replaying ? 'Replaying live quotes…' : liveUnlocked ? 'Re-run 60s quote replay' : 'Run 60s quote replay (unlocks live)'}
+                </button>
+                <p className="text-[11px] text-slate-400">
+                  {liveUnlocked
+                    ? `Replay OK for this mint. Daily loss ${getDailyLoss().toFixed(4)} SOL.`
+                    : 'Live stays locked until a quote replay finishes on this mint.'}
+                </p>
                 {!connected && <p className="text-[11px] text-red-300">Connect a wallet to sign live swaps.</p>}
                 {!liveOkPattern && (
                   <p className="text-[11px] text-red-300">Switch to Market maker or buy/sell drip for live.</p>
@@ -311,7 +430,7 @@ export function TradingDesk({
               {mode === 'paper' ? (
                 <button
                   onClick={startDeskBot}
-                  disabled={busy}
+                  disabled={busy || disarmed}
                   className="flex-1 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >
                   <Play size={14} /> Start paper
@@ -319,7 +438,7 @@ export function TradingDesk({
               ) : (
                 <button
                   onClick={startLive}
-                  disabled={busy || !ackLive || !connected || !liveOkPattern}
+                  disabled={busy || disarmed || !ackLive || !connected || !liveOkPattern || !liveUnlocked}
                   className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >
                   <Play size={14} /> Start live
@@ -328,6 +447,7 @@ export function TradingDesk({
               <button
                 onClick={() => {
                   deskStartedRef.current = false;
+                  replayStopRef.current.stopped = true;
                   stopControlledPaperBot();
                   stopLive();
                   setStatus('Idle');
@@ -345,10 +465,15 @@ export function TradingDesk({
               Clear trades
             </button>
             <div className="text-xs text-slate-500 space-y-1">
-              <div>Trades: {trades.length}</div>
+              <div>Trades: {trades.length} · session tape PnL {pnl.realizedSol >= 0 ? '+' : ''}{pnl.realizedSol.toFixed(4)} SOL</div>
+              {position && (
+                <div>
+                  Wallet {position.sol.toFixed(3)} SOL · token {position.tokenUi.toPrecision(4)}
+                </div>
+              )}
               <div className={`flex items-center gap-1 ${liveRunning ? 'text-amber-300' : 'text-teal-300'}`}>
                 <Zap size={12} />
-                {liveRunning ? 'LIVE Jupiter swaps — wallet must approve each fill' : 'Paper simulation — no on-chain txs'}
+                {liveRunning ? 'LIVE Jupiter swaps — wallet must approve each fill' : 'Paper / replay — no on-chain txs'}
               </div>
             </div>
           </aside>

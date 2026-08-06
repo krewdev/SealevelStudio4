@@ -48,6 +48,8 @@ import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
 import { buildAtomicArbTransaction } from '../lib/arbitrage/atomic-build';
+import { formatLamportsDelta, type AccountDiffRow } from '../lib/tx/state-diff';
+import { patchDeskSession } from '../lib/session/desk-session';
 
 // --- Block to Instruction Template Mapping ---
 const BLOCK_TO_TEMPLATE: Record<string, string> = {
@@ -549,6 +551,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [arbStatus, setArbStatus] = useState<string | null>(null);
   const [arbWarnings, setArbWarnings] = useState<string[]>([]);
   const [jitoTipLamports, setJitoTipLamports] = useState(0);
+  const [arbDiff, setArbDiff] = useState<AccountDiffRow[]>([]);
   const arbLoadRef = useRef(false);
 
   // Import state
@@ -619,6 +622,21 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       setTransactionDraft({ instructions: built.instructions, memo: 'atomic-arb' });
       setBuiltTransaction(built.transaction);
       setArbWarnings(built.warnings);
+      setArbDiff(built.stateDiff || []);
+      const hop0 = opportunity.steps?.[0] || opportunity.path?.steps?.[0];
+      if (hop0?.tokenIn?.mint) {
+        patchDeskSession({
+          mint: hop0.tokenOut?.mint || hop0.tokenIn.mint,
+          source: 'scanner',
+          lastSim: {
+            ok: built.simulationOk,
+            units: built.unitsConsumed,
+            profitHint: built.profitableAfterQuotes ? 'quote profitable' : 'unprofitable',
+            at: Date.now(),
+          },
+          opportunityId: opportunity.id,
+        });
+      }
       const profitHint = built.profitableAfterQuotes
         ? `Live quotes profitable (raw Δ ${built.expectedProfitRaw.toString()})`
         : 'Live quotes NOT profitable';
@@ -1908,6 +1926,21 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             {arbWarnings.slice(0, 3).map((w, i) => (
               <p key={i} className="text-xs text-amber-300">• {w}</p>
             ))}
+            {arbDiff.length > 0 && (
+              <div className="mt-2 border-t border-teal-900/50 pt-2">
+                <div className="text-[11px] uppercase tracking-wide text-teal-300/80 mb-1">Simulated account diff</div>
+                <div className="space-y-1 max-h-36 overflow-auto">
+                  {arbDiff.slice(0, 8).map((d) => (
+                    <div key={d.address} className="flex justify-between gap-2 text-[11px] font-mono text-slate-300">
+                      <span className="truncate" title={d.address}>{d.address.slice(0, 4)}…{d.address.slice(-4)}</span>
+                      <span className={d.deltaLamports >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                        {formatLamportsDelta(d.deltaLamports)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

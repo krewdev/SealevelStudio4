@@ -1,5 +1,6 @@
 import { startPaperBot, type PaperBotConfig } from './paper-engine';
 import type { BotPatternId } from './patterns';
+import { isDisarmed } from './kill-switch';
 
 export type PaperBotStatus = {
   mint: string;
@@ -35,6 +36,9 @@ export function subscribePaperBotStatus(fn: (status: PaperBotStatus | null) => v
 }
 
 export function startControlledPaperBot(cfg: Partial<PaperBotConfig> & { pattern?: BotPatternId }) {
+  if (isDisarmed()) {
+    throw new Error('Desk is disarmed. Re-arm before starting paper bots.');
+  }
   stopControlledPaperBot();
   const full: PaperBotConfig = {
     mint: cfg.mint || 'DEMO',

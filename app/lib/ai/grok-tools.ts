@@ -9,6 +9,10 @@ export const CLIENT_TOOL_NAMES = new Set([
   'list_session_wallets',
   'arm_sniper',
   'execute_built_arb',
+  'get_desk_session',
+  'attach_mint_to_desk',
+  'disarm_all',
+  'clear_disarm',
 ]);
 
 export type ClientAction = { type: 'navigate'; view: string };
@@ -290,6 +294,46 @@ export const GROK_TOOLS = [
         properties: { confirm: { type: 'boolean' } },
         required: ['confirm'],
       },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_desk_session',
+      description: 'Read the shared desk session (mint, source, replay unlock, last sim). Does not trade.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'attach_mint_to_desk',
+      description: 'Put a mint into the shared desk session and open bots/sniper. Does not buy.',
+      parameters: {
+        type: 'object',
+        properties: {
+          mint: { type: 'string' },
+          tab: { type: 'string', enum: ['sniper', 'mm', 'volume'] },
+          reason: { type: 'string' },
+        },
+        required: ['mint'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'disarm_all',
+      description: 'Kill switch: stop paper/live bots and clear sniper arm. Does not send txs.',
+      parameters: { type: 'object', properties: { reason: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'clear_disarm',
+      description: 'Re-arm the desk after a kill switch. Does not start bots.',
+      parameters: { type: 'object', properties: {} },
     },
   },
 ];

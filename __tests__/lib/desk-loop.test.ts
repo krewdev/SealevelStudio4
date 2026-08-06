@@ -7,6 +7,10 @@ import {
 import type { ArbitrageOpportunity } from '../../app/lib/pools/types';
 import { CLIENT_TOOL_NAMES } from '../../app/lib/ai/grok-tools';
 import { isLivePatternAllowed } from '../../app/lib/bots/live-engine';
+import { formatLamportsDelta } from '../../app/lib/tx/state-diff';
+import { pnlFromTrades } from '../../app/lib/bots/position';
+import { bondingCurvePda, PUMP_PROGRAM_ID } from '../../app/lib/pumpfun/curve-buy';
+import { PublicKey } from '@solana/web3.js';
 
 function opp(partial: Partial<ArbitrageOpportunity>): ArbitrageOpportunity {
   return {
@@ -77,10 +81,30 @@ describe('desk loop unit tests', () => {
     expect(isLivePatternAllowed('shake-out')).toBe(false);
   });
 
+  it('formats lamport deltas and tape PnL', () => {
+    expect(formatLamportsDelta(1_000_000_000)).toBe('+1.000000 SOL');
+    expect(formatLamportsDelta(-500_000_000)).toBe('-0.500000 SOL');
+    const pnl = pnlFromTrades([
+      { id: '1', ts: 1, mint: 'm', side: 'buy', sol: 0.02, tokens: 1, price: 1, bot: 'mm', pattern: 'x', live: true },
+      { id: '2', ts: 2, mint: 'm', side: 'sell', sol: 0.025, tokens: 1, price: 1, bot: 'mm', pattern: 'x', live: true },
+    ]);
+    expect(pnl.realizedSol).toBeCloseTo(0.005);
+    expect(pnl.liveTrades).toBe(2);
+  });
+
+  it('derives pump bonding-curve PDA on the known program', () => {
+    const mint = new PublicKey('11111111111111111111111111111111');
+    const pda = bondingCurvePda(mint);
+    expect(pda.toBase58()).not.toBe(mint.toBase58());
+    expect(PUMP_PROGRAM_ID.toBase58().startsWith('6EF8')).toBe(true);
+  });
+
   it('never treats execute_built_arb or arm_sniper as server-side tools', () => {
     expect(CLIENT_TOOL_NAMES.has('execute_built_arb')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('arm_sniper')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('start_paper_bot')).toBe(true);
+    expect(CLIENT_TOOL_NAMES.has('disarm_all')).toBe(true);
+    expect(CLIENT_TOOL_NAMES.has('get_desk_session')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('jupiter_quote')).toBe(false);
   });
 });

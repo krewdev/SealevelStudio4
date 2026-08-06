@@ -4,6 +4,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { executeJupiterSwap, WSOL_MINT } from '../lib/bots/live-swap';
+import { executePumpCurveBuy, isOnPumpBondingCurve } from '../lib/pumpfun/curve-buy';
+import { isDisarmed } from '../lib/bots/kill-switch';
+import { patchDeskSession } from '../lib/session/desk-session';
+import { pushPaperTrade } from '../lib/bots/trade-store';
 import { PumpFunStream, PumpFunStreamEvent, PumpFunToken } from '../lib/pumpfun/stream';
 import { PumpFunQuickNodeStream } from '../lib/pumpfun/quicknode-stream';
 import { SnipingAnalysis } from '../lib/pumpfun/ai-analysis';
@@ -193,22 +197,57 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
       console.error('[PumpFun Sniper] Wallet not connected');
       return;
     }
+    if (isDisarmed()) {
+      console.warn('[PumpFun Sniper] Desk disarmed — skip buy');
+      return;
+    }
 
     try {
       const investmentSol = Math.min(
         analysis.maxInvestment || config.maxInvestment,
         config.maxInvestment
       );
-      new PublicKey(token.mint);
+      const mintKey = new PublicKey(token.mint);
+      patchDeskSession({ mint: token.mint, source: 'sniper', reason: token.symbol || 'snipe' });
 
-      const result = await executeJupiterSwap({
-        connection,
-        publicKey,
-        sendTransaction: sendTransaction as any,
-        inputMint: WSOL_MINT,
-        outputMint: token.mint,
-        amountRaw: String(Math.floor(investmentSol * LAMPORTS_PER_SOL)),
-        slippageBps: 150,
+      let signature = '';
+      let venue: 'jupiter' | 'pump-curve' = 'jupiter';
+      try {
+        const result = await executeJupiterSwap({
+          connection,
+          publicKey,
+          sendTransaction: sendTransaction as any,
+          inputMint: WSOL_MINT,
+          outputMint: token.mint,
+          amountRaw: String(Math.floor(investmentSol * LAMPORTS_PER_SOL)),
+          slippageBps: 150,
+        });
+        signature = result.signature;
+      } catch (jupErr) {
+        const onCurve = await isOnPumpBondingCurve(connection, mintKey);
+        if (!onCurve) throw jupErr;
+        const curve = await executePumpCurveBuy({
+          connection,
+          publicKey,
+          sendTransaction: sendTransaction as any,
+          mint: token.mint,
+          solAmount: investmentSol,
+          slippagePercent: 15,
+        });
+        signature = curve.signature;
+        venue = 'pump-curve';
+      }
+
+      pushPaperTrade({
+        mint: token.mint,
+        side: 'buy',
+        sol: investmentSol,
+        tokens: 0,
+        price: 0,
+        bot: 'sniper',
+        pattern: venue,
+        live: true,
+        signature,
       });
 
       setSnipedTokens(prev => new Set(prev).add(token.mint));
@@ -219,7 +258,7 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
         totalInvested: prev.totalInvested + investmentSol,
       }));
 
-      console.log('[PumpFun Sniper] Sniped token:', token.symbol, result.signature);
+      console.log('[PumpFun Sniper] Sniped token:', token.symbol, venue, signature);
     } catch (error) {
       console.error('[PumpFun Sniper] Snipe execution error:', error);
       setStats(prev => ({

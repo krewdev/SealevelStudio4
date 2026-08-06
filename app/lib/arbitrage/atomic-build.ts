@@ -9,6 +9,7 @@ import {
 } from '@solana/web3.js';
 import type { ArbitrageOpportunity, ArbitrageStep } from '../pools/types';
 import type { BuiltInstruction } from '../instructions/types';
+import { diffVersionedTransaction, type AccountDiffRow } from '../tx/state-diff';
 
 export interface VisualArbStep {
   index: number;
@@ -34,6 +35,7 @@ export interface AtomicArbBuildResult {
   unitsConsumed?: number;
   warnings: string[];
   hops: { inMint: string; outMint: string; inAmount: string; outAmount: string }[];
+  stateDiff?: AccountDiffRow[];
 }
 
 interface JupiterIx {
@@ -285,13 +287,17 @@ export async function buildAtomicArbTransaction(params: {
   let simulationOk = false;
   let simulationLogs: string[] = [];
   let unitsConsumed: number | undefined;
+  let stateDiff: AccountDiffRow[] = [];
   try {
-    const sim = await connection.simulateTransaction(transaction, { sigVerify: false, replaceRecentBlockhash: true });
-    simulationLogs = sim.value.logs || [];
-    unitsConsumed = sim.value.unitsConsumed;
-    simulationOk = !sim.value.err;
+    const diff = await diffVersionedTransaction(connection, transaction);
+    simulationLogs = diff.logs;
+    unitsConsumed = diff.unitsConsumed;
+    simulationOk = !diff.err;
+    stateDiff = diff.diffs;
     if (!simulationOk) {
-      warnings.push(`Simulation failed: ${JSON.stringify(sim.value.err)}`);
+      warnings.push(`Simulation failed: ${diff.err}`);
+    } else if (stateDiff.length) {
+      warnings.push(`State diff: ${stateDiff.length} accounts change (largest ${stateDiff[0]!.deltaLamports} lamports).`);
     }
   } catch (err) {
     warnings.push(`Simulation error: ${err instanceof Error ? err.message : String(err)}`);
@@ -310,5 +316,6 @@ export async function buildAtomicArbTransaction(params: {
     unitsConsumed,
     warnings,
     hops: hopSummaries,
+    stateDiff,
   };
 }

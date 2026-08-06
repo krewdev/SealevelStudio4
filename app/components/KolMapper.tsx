@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ExternalLink, Map as MapIcon, Radio, RefreshCw } from 'lucide-react';
+import { attachMintToDesk } from '../lib/session/desk-session';
 
 type KolTab = 'hot' | 'mapper' | 'mint';
 
@@ -224,6 +225,7 @@ export function KolMapper({ onBack }: { onBack?: () => void }) {
                 <th className="text-left p-2">KOLs</th>
                 <th className="text-left p-2">Source</th>
                 <th className="text-left p-2">Mint</th>
+                <th className="text-left p-2">Desk</th>
               </tr>
             </thead>
             <tbody>
@@ -243,6 +245,24 @@ export function KolMapper({ onBack }: { onBack?: () => void }) {
                   <td className="p-2">{t.kol_buyers ?? 0}/{t.buyers ?? 0}</td>
                   <td className="p-2 text-slate-500">{t.source}</td>
                   <td className="p-2 font-mono text-slate-500">{t.mint?.slice(0, 6)}…{t.mint?.slice(-4)}</td>
+                  <td className="p-2">
+                    {t.mint && (
+                      <button
+                        type="button"
+                        className="text-[11px] px-2 py-1 rounded bg-teal-800 hover:bg-teal-700 text-teal-50"
+                        onClick={() =>
+                          attachMintToDesk({
+                            mint: t.mint!,
+                            source: 'kol',
+                            reason: `${t.symbol || 'token'} heat ${t.heat ?? '?'} · ${t.source || 'board'}`,
+                            intentTab: 'sniper',
+                          })
+                        }
+                      >
+                        To desk
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {hot.length === 0 && (
@@ -268,6 +288,22 @@ export function KolMapper({ onBack }: { onBack?: () => void }) {
               <button type="button" onClick={() => loadMint(mint)} className="px-3 py-2 bg-cyan-700 rounded text-sm">
                 Load mint
               </button>
+              {mint.trim() && (
+                <button
+                  type="button"
+                  className="px-3 py-2 bg-teal-800 rounded text-sm"
+                  onClick={() =>
+                    attachMintToDesk({
+                      mint: mint.trim(),
+                      source: 'kol',
+                      reason: 'mint drill-down',
+                      intentTab: 'mm',
+                    })
+                  }
+                >
+                  Send to MM desk
+                </button>
+              )}
             </div>
             {mintData && (
               <pre className="text-[11px] bg-slate-900 border border-slate-800 rounded p-3 overflow-auto max-h-[70vh]">

@@ -11,6 +11,8 @@ import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
 import { ArbitrageScanner } from './components/ArbitrageScanner';
 import { setPendingArbOpportunity } from './lib/arbitrage/pending-build';
+import { patchDeskSession } from './lib/session/desk-session';
+import { clearDisarm, disarmAll, subscribeDisarm } from './lib/bots/kill-switch';
 import { FreeTrialBanner } from './components/FreeTrialBanner';
 import { UnifiedAIAgents } from './components/UnifiedAIAgents';
 import { useNetwork } from './contexts/NetworkContext';
@@ -679,6 +681,23 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
   );
 }
 
+function DisarmHeaderButton() {
+  const [on, setOn] = React.useState(false);
+  React.useEffect(() => subscribeDisarm((s) => setOn(s.disarmed)), []);
+  return (
+    <button
+      type="button"
+      onClick={() => (on ? clearDisarm() : disarmAll('header'))}
+      className={`hidden sm:inline text-[11px] px-2 py-1 rounded border ${
+        on ? 'border-slate-500 text-slate-200' : 'border-red-700/80 text-red-200 hover:bg-red-950/60'
+      }`}
+      title="Stop paper bots, live MM, and sniper arm"
+    >
+      {on ? 'Re-arm' : 'Disarm'}
+    </button>
+  );
+}
+
 // 1. Header Component
 function Header({ 
   network,
@@ -748,6 +767,7 @@ function Header({
         )}
       </div>
       <div className="flex items-center space-x-1.5 sm:space-x-3">
+        <DisarmHeaderButton />
         {/* Social Connect - Compact */}
         <SocialConnectButton />
         
@@ -1117,6 +1137,17 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   const handleArbitrageBuild = (opportunity: any) => {
     setPendingArbOpportunity(opportunity);
+    const step = opportunity?.steps?.[0] || opportunity?.path?.steps?.[0];
+    const mint = step?.tokenOut?.mint || step?.tokenIn?.mint || '';
+    if (mint) {
+      patchDeskSession({
+        mint,
+        source: 'scanner',
+        reason: `arb ${opportunity.accuracy || 'heuristic'} net ${opportunity.netProfit}`,
+        opportunityId: opportunity.id,
+        intentTab: 'mm',
+      });
+    }
     setActiveView('builder');
   };
 

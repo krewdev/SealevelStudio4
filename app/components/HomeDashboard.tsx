@@ -29,7 +29,7 @@ const CARDS = [
   {
     id: 'bots',
     title: 'Bots',
-    body: 'Paper volume / inventory MM (no chain). Sniper tab is the live Pump.fun UI.',
+    body: 'Paper → 60s quote replay → gated live MM/DCA. Sniper tries Jupiter then pump curve.',
     icon: Bot,
     accent: 'from-fuchsia-500 to-purple-600',
   },
@@ -43,7 +43,7 @@ const CARDS = [
   {
     id: 'kol-mapper',
     title: 'KOL Mapper',
-    body: 'Native hot board + hop graph (proxies solana-kol-radar).',
+    body: 'Hot board (radar or Dexscreener fallback). Send a mint to the desk in one click.',
     icon: Map,
     accent: 'from-purple-400 to-pink-500',
   },

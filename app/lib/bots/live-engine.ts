@@ -2,6 +2,9 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import type { BotPatternId } from './patterns';
 import { pushPaperTrade } from './trade-store';
 import { executeJupiterSwap, fetchJupiterQuote, WSOL_MINT, type WalletSender } from './live-swap';
+import { isDisarmed, disarmAll } from './kill-switch';
+import { addDailyLoss, getDailyLoss } from '../session/desk-session';
+import { fetchOnchainPosition } from './position';
 
 /** Patterns that are not two-sided wash/volume tape. */
 export const LIVE_ALLOWED_PATTERNS: BotPatternId[] = ['inventory-mm', 'buy-drip', 'sell-drip'];
@@ -19,6 +22,8 @@ export type LiveBotConfig = {
   slippageBps: number;
   buyBelowMidPct: number;
   sellAboveMidPct: number;
+  maxDrawdownSol?: number;
+  dailyLossCapSol?: number;
   publicKey: PublicKey;
   connection: Connection;
   sendTransaction: WalletSender;
@@ -61,8 +66,19 @@ export function startLiveBot(
   let timer: ReturnType<typeof setTimeout> | null = null;
   let mid = 0;
   let inventoryTokens = 0;
+  let solSpent = 0;
+  let solGot = 0;
+  const maxDd = cfg.maxDrawdownSol ?? 0.05;
+  const dailyCap = cfg.dailyLossCapSol ?? 0.08;
 
   const mintStr = mint.toBase58();
+
+  const tripKill = (why: string) => {
+    stopped = true;
+    addDailyLoss(Math.max(0, solSpent - solGot));
+    disarmAll(why);
+    onStatus?.(why);
+  };
 
   const schedule = (delay?: number) => {
     if (stopped) return;
@@ -71,9 +87,23 @@ export function startLiveBot(
 
   const runOnce = async () => {
     if (stopped) return;
+    if (isDisarmed()) {
+      stopped = true;
+      onStatus?.(`Disarmed: ${'kill switch'}`);
+      return;
+    }
     if (trades >= cfg.maxTrades) {
       onStatus?.(`Live bot hit max ${cfg.maxTrades} signed swaps — stopped.`);
       stopped = true;
+      return;
+    }
+    const openLoss = solSpent - solGot;
+    if (openLoss >= maxDd) {
+      tripKill(`Kill switch: session loss ${openLoss.toFixed(4)} SOL ≥ ${maxDd} cap`);
+      return;
+    }
+    if (getDailyLoss() >= dailyCap) {
+      tripKill(`Kill switch: daily loss ${getDailyLoss().toFixed(4)} SOL ≥ ${dailyCap} cap`);
       return;
     }
 
@@ -118,6 +148,7 @@ export function startLiveBot(
         const tokens = Number(result.outAmount);
         inventoryTokens += tokens;
         trades += 1;
+        solSpent += sol;
         pushPaperTrade({
           mint: mintStr,
           side: 'buy',
@@ -131,6 +162,12 @@ export function startLiveBot(
         });
         onStatus?.(`LIVE BUY ${sol.toFixed(4)} SOL · ${result.signature.slice(0, 8)}…`);
       } else {
+        try {
+          const pos = await fetchOnchainPosition(cfg.connection, cfg.publicKey, mintStr);
+          if (pos.tokenRaw > BigInt(0)) inventoryTokens = Number(pos.tokenRaw);
+        } catch {
+          /* keep local inventory */
+        }
         const tokenRaw = Math.max(1, Math.floor(inventoryTokens * 0.35));
         const result = await executeJupiterSwap({
           connection: cfg.connection,
@@ -144,6 +181,7 @@ export function startLiveBot(
         inventoryTokens = Math.max(0, inventoryTokens - tokenRaw);
         trades += 1;
         const solOut = Number(result.outAmount) / 1e9;
+        solGot += solOut;
         pushPaperTrade({
           mint: mintStr,
           side: 'sell',

@@ -4,11 +4,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { listPaperTrades, subscribePaperTrades } from '../lib/bots/trade-store';
 import { BotCandleChart } from './BotCandleChart';
+import { getDeskSession, subscribeDeskSession } from '../lib/session/desk-session';
 
 export function BotChartsView({ onBack, onOpenBots }: { onBack?: () => void; onOpenBots?: () => void }) {
-  const [mint, setMint] = useState('DEMO');
+  const [mint, setMint] = useState(() => getDeskSession().mint || 'DEMO');
   const [tick, setTick] = useState(0);
   useEffect(() => subscribePaperTrades(() => setTick((t) => t + 1)), []);
+  useEffect(() => subscribeDeskSession((s) => {
+    if (s.mint) setMint(s.mint);
+  }), []);
   const trades = useMemo(() => listPaperTrades(mint.trim() || undefined), [mint, tick]);
 
   return (
