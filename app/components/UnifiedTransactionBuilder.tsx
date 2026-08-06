@@ -1865,6 +1865,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               <button
                 onClick={buildTransaction}
                 disabled={isBuilding || isExecuting}
+                data-sealevel-target="builder-build"
                 className="flex items-center space-x-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
               >
                 {isBuilding ? (
@@ -1885,6 +1886,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               <button
                 onClick={executeTransaction}
                 disabled={isExecuting || !payerAddress}
+                data-sealevel-target="builder-execute"
                 className="flex items-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
               >
                 {isExecuting ? (

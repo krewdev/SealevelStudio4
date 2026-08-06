@@ -160,6 +160,22 @@ export function TradingDesk({
     }
   };
 
+  const startReplayRef = useRef(startReplay);
+  startReplayRef.current = startReplay;
+  const startDeskBotRef = useRef(startDeskBot);
+  startDeskBotRef.current = startDeskBot;
+
+  useEffect(() => {
+    const onReplay = () => void startReplayRef.current();
+    const onPaper = () => startDeskBotRef.current();
+    window.addEventListener('sealevel-start-replay', onReplay);
+    window.addEventListener('sealevel-start-paper', onPaper);
+    return () => {
+      window.removeEventListener('sealevel-start-replay', onReplay);
+      window.removeEventListener('sealevel-start-paper', onPaper);
+    };
+  }, []);
+
   const startLive = () => {
     if (disarmed) {
       setStatus(`Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`);
@@ -269,6 +285,7 @@ export function TradingDesk({
         <button
           type="button"
           onClick={() => (disarmed ? clearDisarm() : disarmAll('manual desk'))}
+          data-sealevel-target={disarmed ? 'desk-rearm' : 'desk-disarm'}
           className={`ml-2 text-xs px-2 py-1 rounded ${disarmed ? 'bg-slate-700 text-slate-200' : 'bg-red-900/70 text-red-100 hover:bg-red-800'}`}
         >
           {disarmed ? 'Re-arm' : 'Disarm all'}
@@ -410,6 +427,7 @@ export function TradingDesk({
                   type="button"
                   onClick={() => void startReplay()}
                   disabled={busy || !liveOkPattern || !mint || mint.toUpperCase() === 'DEMO'}
+                  data-sealevel-target="desk-replay"
                   className="w-full bg-indigo-700 hover:bg-indigo-600 disabled:bg-slate-800 rounded py-2 text-sm"
                 >
                   {replaying ? 'Replaying live quotes…' : liveUnlocked ? 'Re-run 60s quote replay' : 'Run 60s quote replay (unlocks live)'}
@@ -431,6 +449,7 @@ export function TradingDesk({
                 <button
                   onClick={startDeskBot}
                   disabled={busy || disarmed}
+                  data-sealevel-target="desk-start-paper"
                   className="flex-1 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >
                   <Play size={14} /> Start paper
@@ -439,12 +458,14 @@ export function TradingDesk({
                 <button
                   onClick={startLive}
                   disabled={busy || disarmed || !ackLive || !connected || !liveOkPattern || !liveUnlocked}
+                  data-sealevel-target="desk-start-live"
                   className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 rounded py-2 text-sm flex items-center justify-center gap-2"
                 >
                   <Play size={14} /> Start live
                 </button>
               )}
               <button
+                data-sealevel-target="desk-stop"
                 onClick={() => {
                   deskStartedRef.current = false;
                   replayStopRef.current.stopped = true;

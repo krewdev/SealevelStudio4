@@ -3,6 +3,7 @@ import {
   GROK_TOOLS,
   runGrokTool,
   CLIENT_TOOL_NAMES,
+  MUTATING_GROK_TOOLS,
   type ClientAction,
 } from '@/app/lib/ai/grok-tools';
 
@@ -11,17 +12,23 @@ export const dynamic = 'force-dynamic';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const DEFAULT_MODEL = process.env.XAI_MODEL || process.env.GROK_MODEL || 'grok-4-latest';
 
-const SYSTEM = `You are Grok for Sealevel Studio with tools.
+const SYSTEM = `You are Grok, the bleeding-edge copilot inside Sealevel Studio.
 
-Use tools instead of guessing live data.
-- Paper bots: start_paper_bot / stop_paper_bot / paper_candle_stats
-- Builder: load_top_opp_into_builder (never auto-executes)
-- Research: scan_opportunities, jupiter_quote, token_price, parse_transaction, simulate_arb_roundtrip
-- KOL: kol_hot_board, kol_mint, kol_wallet_map (needs local radar on :8088)
-- Wallets: list_session_wallets, wallet_info, create_session_wallet (no secrets)
-- Live risk: prepare_live_swap, arm_sniper, execute_built_arb require confirm=true and still do not auto-broadcast
+You can SEE the page (snapshot + read_page_state), POINT (highlight_ui), and AUTOMATE safe UI (click_ui, navigate, paper bots, replay, attach mint, disarm).
 
-Not financial advice. Prefer paper. Be concise.`;
+MODES
+- explain: teach. Read-only tools only. Do not navigate or start bots unless the user insists.
+- plan: numbered plan with why / risk / what you will click. Read tools OK. Do not mutate the page.
+- act: execute the plan with tools. Narrate each step briefly.
+
+HARD RULES
+- NEVER broadcast, sign, or click Execute / Start live. Highlight those and ask the human to click.
+- Prefer paper + quote replay. Not financial advice.
+- Use tools for live data; do not invent quotes, slots, or PnL.
+- When automating, call read_page_state first if snapshot looks stale.
+- After acting, summarize what changed on the page.
+
+Tools: navigate, highlight_ui, click_ui, start_quote_replay, start/stop_paper_bot, attach_mint_to_desk, load_top_opp_into_builder, scan_opportunities, jupiter_quote, kol_*, inspect_account, disarm_all.`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,6 +47,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const model = typeof body.model === 'string' && body.model.trim() ? body.model : DEFAULT_MODEL;
     const view = typeof body.view === 'string' ? body.view : '';
+    const mode =
+      body.mode === 'plan' || body.mode === 'act' || body.mode === 'explain' ? body.mode : 'explain';
+    const pageContext =
+      typeof body.pageContext === 'string'
+        ? body.pageContext
+        : body.pageContext
+          ? JSON.stringify(body.pageContext)
+          : '';
     const origin = new URL(request.url).origin;
     const clientActions: ClientAction[] = [];
 
@@ -50,7 +65,14 @@ export async function POST(request: NextRequest) {
       chatMessages = [
         {
           role: 'system',
-          content: view ? `${SYSTEM}\n\nUser is on "${view}".` : SYSTEM,
+          content: [
+            SYSTEM,
+            `MODE=${mode}`,
+            view ? `DECLARED_VIEW=${view}` : '',
+            pageContext ? `PAGE_SNAPSHOT\n${pageContext}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
         },
         ...messages
           .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
@@ -125,7 +147,29 @@ export async function POST(request: NextRequest) {
           args = {};
         }
         if (CLIENT_TOOL_NAMES.has(name)) {
+          if (mode !== 'act' && MUTATING_GROK_TOOLS.has(name)) {
+            chatMessages.push({
+              role: 'tool',
+              tool_call_id: call.id,
+              content: JSON.stringify({
+                refused: true,
+                reason: `MODE=${mode} blocks mutating tool ${name}. Switch to Act to automate.`,
+              }),
+            });
+            continue;
+          }
           pendingClient.push({ id: call.id, name, args });
+          continue;
+        }
+        if (mode !== 'act' && MUTATING_GROK_TOOLS.has(name)) {
+          chatMessages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: JSON.stringify({
+              refused: true,
+              reason: `MODE=${mode} blocks mutating tool ${name}. Switch to Act to automate.`,
+            }),
+          });
           continue;
         }
         const { result, clientAction } = await runGrokTool(name, args, origin);

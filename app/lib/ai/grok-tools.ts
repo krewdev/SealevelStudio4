@@ -13,6 +13,25 @@ export const CLIENT_TOOL_NAMES = new Set([
   'attach_mint_to_desk',
   'disarm_all',
   'clear_disarm',
+  'read_page_state',
+  'highlight_ui',
+  'click_ui',
+  'start_quote_replay',
+]);
+
+export const MUTATING_GROK_TOOLS = new Set([
+  'start_paper_bot',
+  'stop_paper_bot',
+  'load_top_opp_into_builder',
+  'attach_mint_to_desk',
+  'arm_sniper',
+  'disarm_all',
+  'clear_disarm',
+  'click_ui',
+  'start_quote_replay',
+  'create_session_wallet',
+  'execute_built_arb',
+  'prepare_live_swap',
 ]);
 
 export type ClientAction = { type: 'navigate'; view: string };
@@ -334,6 +353,52 @@ export const GROK_TOOLS = [
       name: 'clear_disarm',
       description: 'Re-arm the desk after a kill switch. Does not start bots.',
       parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'read_page_state',
+      description: 'Read live UI snapshot: view, wallets, session mint, paper bot, disarm, visible controls.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'highlight_ui',
+      description: 'Pulse-highlight a labeled control on the page and scroll it into view. Does not click.',
+      parameters: {
+        type: 'object',
+        properties: {
+          target: {
+            type: 'string',
+            description: 'data-sealevel-target id, e.g. builder-execute, desk-start-live, nav-scanner',
+          },
+        },
+        required: ['target'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'click_ui',
+      description:
+        'Click a SAFE control (nav, paper start/stop, replay, disarm). Will NOT click Execute or Start live — those are highlighted only.',
+      parameters: {
+        type: 'object',
+        properties: { target: { type: 'string' } },
+        required: ['target'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'start_quote_replay',
+      description: 'Open Trading Desk and start a 60s Jupiter quote replay (no broadcast). Unlocks live for the session mint.',
+      parameters: { type: 'object', properties: { mint: { type: 'string' } } },
     },
   },
 ];

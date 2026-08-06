@@ -688,6 +688,7 @@ function DisarmHeaderButton() {
     <button
       type="button"
       onClick={() => (on ? clearDisarm() : disarmAll('header'))}
+      data-sealevel-target={on ? 'header-rearm' : 'header-disarm'}
       className={`hidden sm:inline text-[11px] px-2 py-1 rounded border ${
         on ? 'border-slate-500 text-slate-200' : 'border-red-700/80 text-red-200 hover:bg-red-950/60'
       }`}
@@ -747,6 +748,7 @@ function Header({
               key={l.id}
               type="button"
               onClick={() => setActiveView(l.id)}
+              data-sealevel-target={`nav-${l.id}`}
               className={`px-2 sm:px-2.5 py-1 rounded-md text-xs sm:text-sm whitespace-nowrap transition-colors ${
                 activeView === l.id
                   ? 'bg-purple-600/30 text-purple-200'

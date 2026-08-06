@@ -138,3 +138,39 @@ body {
 .markdown-content table tr:nth-child(even) {
   background-color: #1f2937;
 }
+
+@keyframes sealevel-ai-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
+}
+
+.sealevel-ai-focus {
+  outline: 2px solid #c084fc !important;
+  outline-offset: 3px;
+  border-radius: 8px;
+  animation: sealevel-ai-pulse 1.2s ease-out 3;
+  z-index: 30;
+  position: relative;
+}
+
+.grok-md {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.grok-md p { margin: 0.35em 0; }
+.grok-md ul, .grok-md ol { margin: 0.4em 0 0.4em 1.1em; }
+.grok-md li { margin: 0.15em 0; }
+.grok-md code {
+  background: #111827;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.grok-md pre {
+  background: #030712;
+  padding: 0.6em;
+  border-radius: 8px;
+  overflow: auto;
+  font-size: 0.72rem;
+}
+.grok-md strong { color: #f5f3ff; }

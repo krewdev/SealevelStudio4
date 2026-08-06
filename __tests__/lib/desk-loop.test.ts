@@ -105,6 +105,9 @@ describe('desk loop unit tests', () => {
     expect(CLIENT_TOOL_NAMES.has('start_paper_bot')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('disarm_all')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('get_desk_session')).toBe(true);
+    expect(CLIENT_TOOL_NAMES.has('click_ui')).toBe(true);
+    expect(CLIENT_TOOL_NAMES.has('highlight_ui')).toBe(true);
+    expect(CLIENT_TOOL_NAMES.has('start_quote_replay')).toBe(true);
     expect(CLIENT_TOOL_NAMES.has('jupiter_quote')).toBe(false);
   });
 });

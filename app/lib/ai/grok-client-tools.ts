@@ -11,6 +11,8 @@ import { setPendingArbOpportunity } from '../arbitrage/pending-build';
 import type { BotPatternId } from '../bots/patterns';
 import { attachMintToDesk, getDeskSession, patchDeskSession } from '../session/desk-session';
 import { clearDisarm, disarmAll } from '../bots/kill-switch';
+import { collectPageSnapshot } from './page-snapshot';
+import { clickSafeTarget, highlightTarget } from './page-actions';
 
 export async function runClientGrokTool(
   name: string,
@@ -100,6 +102,23 @@ export async function runClientGrokTool(
     case 'clear_disarm': {
       clearDisarm();
       return { disarmed: false };
+    }
+    case 'read_page_state': {
+      return collectPageSnapshot();
+    }
+    case 'highlight_ui': {
+      return highlightTarget(String(args.target || ''));
+    }
+    case 'click_ui': {
+      return clickSafeTarget(String(args.target || ''));
+    }
+    case 'start_quote_replay': {
+      if (args.mint) {
+        patchDeskSession({ mint: String(args.mint), source: 'grok', reason: 'quote replay', intentTab: 'mm' });
+      }
+      window.dispatchEvent(new CustomEvent('sealevel-navigate', { detail: 'bots' }));
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent('sealevel-start-replay')), 250);
+      return { started: true, broadcast: false, note: '60s quote replay — no live sends.' };
     }
     case 'list_session_wallets': {
       const out: unknown[] = [];
