@@ -38,9 +38,17 @@ import { getTemplateById, getTemplatesByCategory, INSTRUCTION_TEMPLATES } from '
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
 import { importTransactionDetailed } from '../lib/transaction-importer';
 import { exportDraftToTypeScript } from '../lib/tx/export-typescript';
-import { evaluateFirewall, flattenToTimeTravelSteps, loadFirewallPolicy, type TimeTravelStep } from '../lib/studio';
+import {
+  evaluateFirewall,
+  flattenToTimeTravelSteps,
+  hydrateTimeTravelSnapshots,
+  loadFirewallPolicy,
+  worstPayerDelta,
+  type AdversarialFork,
+  type TimeTravelStep,
+} from '../lib/studio';
 import { StudioRail, isFirewallOverrideChecked } from './studio/StudioRail';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
 import { AdvancedInstructionCard } from './AdvancedInstructionCard';
@@ -567,6 +575,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [timeTravelSteps, setTimeTravelSteps] = useState<TimeTravelStep[]>([]);
+  const [adversaryForks, setAdversaryForks] = useState<AdversarialFork[]>([]);
 
   useEffect(() => {
     if (arbLoadRef.current) return;
@@ -716,9 +725,25 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       addLog(`Fetching transaction ${sig}...`, 'info');
       const { instructions, parsed } = await importTransactionDetailed(connection, sig);
       try {
-        setTimeTravelSteps(flattenToTimeTravelSteps(parsed as any, sig));
+        const flat = flattenToTimeTravelSteps(parsed as any, sig);
+        const hydrated = await hydrateTimeTravelSnapshots({
+          connection,
+          signature: sig,
+          steps: flat,
+          payer: active.address,
+          runLivePrefix: Boolean(active.address),
+        });
+        setTimeTravelSteps(hydrated);
+        addLog(
+          'Time-travel: historical pre/post from landed meta. Mid-CPI banks do not exist in RPC; live prefix sims are current-bank only.',
+          'info'
+        );
       } catch {
-        setTimeTravelSteps([]);
+        try {
+          setTimeTravelSteps(flattenToTimeTravelSteps(parsed as any, sig));
+        } catch {
+          setTimeTravelSteps([]);
+        }
       }
 
       setTransactionDraft({ instructions });
@@ -1238,6 +1263,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       policy: loadFirewallPolicy(),
       sim: simDiff,
       draft: fwDraft,
+      worstAdversaryDeltaSol: worstPayerDelta(adversaryForks.filter((f) => f.method === 'simulated')),
     });
     if (!fw.ok && !isFirewallOverrideChecked()) {
       addLog(`Firewall blocked Execute: ${fw.violations.map((v) => v.message).join(' ')}`, 'error');
@@ -1997,8 +2023,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               payer={payerAddress}
               connection={connection}
               timeTravelSteps={timeTravelSteps}
+              builtTx={builtTransaction instanceof Transaction ? builtTransaction : null}
+              adversaryForks={adversaryForks}
+              onAdversaryForks={setAdversaryForks}
+              signTransaction={active.signTransaction}
               onDraftChange={setTransactionDraft}
               onLog={addLog}
+              onTimeTravelSteps={setTimeTravelSteps}
             />
           </div>
           <div className="border-t border-slate-800 shrink-0">

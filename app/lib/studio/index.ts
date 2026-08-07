@@ -6,5 +6,8 @@ export * from './adversarial';
 export * from './counterfactual';
 export * from './time-travel';
 export * from './handshake';
+export * from './handshake-exec';
 export * from './live-capability';
 export * from './write-radar';
+export * from './tx-clone';
+export * from './jito-rpc';

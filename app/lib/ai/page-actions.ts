@@ -29,6 +29,8 @@ export const HIGHLIGHT_ONLY_TARGETS = new Set([
   'firewall-override',
   'handshake-create',
   'handshake-counter',
+  'handshake-submit',
+  'adversary-run',
 ]);
 
 const HIGHLIGHT_CLASS = 'sealevel-ai-focus';

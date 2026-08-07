@@ -5,17 +5,37 @@ export type HandshakeParty = {
   label?: string;
   address?: string;
   instructions: BuiltInstruction[];
+  signedTxBase64?: string;
 };
 
+export type HandshakeStatus =
+  | 'open'
+  | 'countered'
+  | 'ready'
+  | 'partially-signed'
+  | 'signed'
+  | 'submitted'
+  | 'landed'
+  | 'failed';
+
 export type HandshakeOffer = {
-  v: 1;
+  v: 1 | 2;
   id: string;
   note?: string;
   createdAt: number;
   tipLamports: number;
+  tipAccount?: string;
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  unsignedTxA?: string;
+  unsignedTxB?: string;
+  bundleId?: string;
+  landedSignatures?: string[];
+  landedSlot?: number;
+  submitError?: string;
   partyA: HandshakeParty;
   partyB?: HandshakeParty;
-  status: 'open' | 'countered' | 'ready';
+  status: HandshakeStatus;
 };
 
 function randomId(): string {
@@ -28,7 +48,7 @@ export function createHandshake(opts: {
   tipLamports?: number;
 }): HandshakeOffer {
   return {
-    v: 1,
+    v: 2,
     id: randomId(),
     note: opts.note,
     createdAt: Date.now(),
@@ -65,8 +85,33 @@ export function decodeHandshake(raw: string): HandshakeOffer {
     json = atob(pad);
   }
   const parsed = JSON.parse(json) as HandshakeOffer;
-  if (parsed?.v !== 1 || !parsed.partyA) throw new Error('Not a Sealevel handshake v1 blob');
+  if ((parsed?.v !== 1 && parsed?.v !== 2) || !parsed.partyA) {
+    throw new Error('Not a Sealevel handshake v1/v2 blob');
+  }
   return parsed;
+}
+
+export function handshakeSignProgress(offer: HandshakeOffer): {
+  aSigned: boolean;
+  bSigned: boolean;
+  bothSigned: boolean;
+} {
+  const aSigned = Boolean(offer.partyA.signedTxBase64);
+  const bSigned = Boolean(offer.partyB?.signedTxBase64);
+  return { aSigned, bSigned, bothSigned: aSigned && bSigned };
+}
+
+export function deriveHandshakeStatus(offer: HandshakeOffer): HandshakeStatus {
+  if (offer.status === 'landed' || offer.status === 'submitted' || offer.status === 'failed') {
+    return offer.status;
+  }
+  const { aSigned, bSigned, bothSigned } = handshakeSignProgress(offer);
+  if (bothSigned) return 'signed';
+  if (aSigned || bSigned) return 'partially-signed';
+  if (offer.unsignedTxA && offer.unsignedTxB && offer.partyB?.instructions?.length) return 'ready';
+  if (offer.partyB?.instructions?.length) return 'ready';
+  if (offer.partyB) return 'countered';
+  return 'open';
 }
 
 export function handshakeSummary(offer: HandshakeOffer): string {
@@ -77,8 +122,12 @@ export function handshakeSummary(offer: HandshakeOffer): string {
   return [
     `A ${offer.partyA.address?.slice(0, 4) || 'anon'}… ${a.roleSketch}`,
     b ? `B ${offer.partyB?.address?.slice(0, 4) || 'anon'}… ${b.roleSketch}` : 'B waiting',
-    `tip ${offer.tipLamports} · ${offer.status}`,
-  ].join(' · ');
+    `tip ${offer.tipLamports}${offer.tipAccount ? `@${offer.tipAccount.slice(0, 4)}…` : ''} · ${offer.status}`,
+    offer.bundleId ? `bundle ${offer.bundleId.slice(0, 8)}…` : '',
+    offer.landedSignatures?.length ? `sigs ${offer.landedSignatures.map((s) => s.slice(0, 8)).join(',')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function combinedDraft(offer: HandshakeOffer): TransactionDraft {

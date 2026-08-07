@@ -8,11 +8,13 @@ import {
   counterHandshake,
   createHandshake,
   decodeHandshake,
+  deriveHandshakeStatus,
   encodeHandshake,
   evaluateFirewall,
   evaluateLiveCapability,
   flattenToTimeTravelSteps,
   forkDraftFromStep,
+  headerBits,
   jaccard,
   matchKnownShapes,
   projectAdversarialForks,
@@ -75,6 +77,15 @@ describe('signing firewall', () => {
       extraPrograms: ['Evil111111111111111111111111111111111111111'],
     });
     expect(unknown.violations.some((v) => v.code === 'unknown-program')).toBe(true);
+
+    const adv = evaluateFirewall({
+      policy: { ...DEFAULT_FIREWALL_POLICY, maxPayerSolSpend: 0.05 },
+      sim: simOk,
+      draft,
+      worstAdversaryDeltaSol: -0.09,
+    });
+    expect(adv.ok).toBe(false);
+    expect(adv.violations.some((v) => v.code === 'adversary-spend')).toBe(true);
 
     const failed = evaluateFirewall({
       policy: DEFAULT_FIREWALL_POLICY,
@@ -185,19 +196,21 @@ describe('adversarial + counterfactual + radar', () => {
     expect(cf.waitSol).toBeGreaterThan(cf.chainSol);
   });
 
-  it('counts recent write-set collisions', () => {
+  it('counts processed + near-head as collisions', () => {
     const report = summarizeWriteRadar(
       [PAYER],
       {
         [PAYER]: [
-          { signature: 'aa', blockTime: 1_000_000 },
-          { signature: 'bb', blockTime: 1_000_000 },
+          { signature: 'aa', slot: 100, confirmationStatus: 'processed', blockTime: 1_000_000 },
+          { signature: 'bb', slot: 99, confirmationStatus: 'confirmed', blockTime: 1_000_000 },
         ],
       },
-      1_000_008 * 1000
+      1_000_008 * 1000,
+      100
     );
-    expect(report.collisions).toBe(2);
-    expect(report.hits).toHaveLength(2);
+    expect(report.pending).toBe(1);
+    expect(report.collisions).toBeGreaterThanOrEqual(2);
+    expect(report.caveat.toLowerCase()).toMatch(/mempool/);
   });
 });
 
@@ -260,8 +273,20 @@ describe('time-travel + handshake + capability', () => {
       instructions: transferDraft(5).instructions,
     });
     const again = decodeHandshake(encodeHandshake(countered));
-    expect(again.status).toBe('ready');
+    expect(deriveHandshakeStatus(again)).toBe('ready');
     expect(combinedDraft(again).instructions).toHaveLength(2);
+  });
+
+  it('classifies message header signer/writable bits like Solana runtime', () => {
+    const header = {
+      numRequiredSignatures: 1,
+      numReadonlySignedAccounts: 0,
+      numReadonlyUnsignedAccounts: 2,
+    };
+    expect(headerBits(0, 4, header)).toEqual({ isSigner: true, isWritable: true });
+    expect(headerBits(1, 4, header)).toEqual({ isSigner: false, isWritable: true });
+    expect(headerBits(2, 4, header)).toEqual({ isSigner: false, isWritable: false });
+    expect(headerBits(3, 4, header)).toEqual({ isSigner: false, isWritable: false });
   });
 
   it('binds live to phantom + ack + replay + firewall', () => {

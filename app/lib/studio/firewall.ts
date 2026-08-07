@@ -17,6 +17,7 @@ export type FirewallViolation = {
     | 'no-sim'
     | 'sim-failed'
     | 'payer-spend'
+    | 'adversary-spend'
     | 'unknown-program'
     | 'writable-cap'
     | 'owner-change';
@@ -95,6 +96,8 @@ export function evaluateFirewall(opts: {
   sim?: StateDiffResult | null;
   draft?: TransactionDraft | null;
   extraPrograms?: string[];
+  /** Worst successful-sim payer Δ (SOL) from live adversarial forks. */
+  worstAdversaryDeltaSol?: number | null;
 }): FirewallReport {
   const { policy } = opts;
   const surface = opts.draft
@@ -131,6 +134,17 @@ export function evaluateFirewall(opts: {
         message: `Payer would spend ${spend.toFixed(6)} SOL > cap ${policy.maxPayerSolSpend} SOL.`,
       });
     }
+  }
+
+  if (
+    opts.worstAdversaryDeltaSol != null &&
+    opts.worstAdversaryDeltaSol < 0 &&
+    Math.abs(opts.worstAdversaryDeltaSol) > policy.maxPayerSolSpend + 1e-12
+  ) {
+    violations.push({
+      code: 'adversary-spend',
+      message: `Worst live adversarial fork spends ${Math.abs(opts.worstAdversaryDeltaSol).toFixed(6)} SOL > cap ${policy.maxPayerSolSpend} SOL.`,
+    });
   }
 
   if (!policy.allowUnknownPrograms) {

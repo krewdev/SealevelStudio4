@@ -129,5 +129,6 @@ describe('desk loop unit tests', () => {
     expect(HIGHLIGHT_ONLY_TARGETS.has('desk-start-live')).toBe(true);
     expect(HIGHLIGHT_ONLY_TARGETS.has('firewall-override')).toBe(true);
     expect(HIGHLIGHT_ONLY_TARGETS.has('handshake-create')).toBe(true);
+    expect(HIGHLIGHT_ONLY_TARGETS.has('handshake-submit')).toBe(true);
   });
 });

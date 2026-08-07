@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import {
   ShieldAlert,
   Fingerprint,
@@ -19,17 +19,25 @@ import {
   counterHandshake,
   createHandshake,
   decodeHandshake,
+  deriveHandshakeStatus,
   encodeHandshake,
   evaluateFirewall,
   forkDraftFromStep,
   handshakeSummary,
   loadFirewallPolicy,
   matchKnownShapes,
+  prepareHandshakeBundle,
   projectAdversarialForks,
+  resimTailDraft,
+  runAdversarialSims,
   saveFirewallPolicy,
+  signHandshakeLeg,
+  snapshotAtStep,
+  submitHandshakeBundle,
   suggestFailurePatches,
   summarizeWriteRadar,
   worstPayerDelta,
+  type AdversarialFork,
   type FirewallPolicy,
   type HandshakeOffer,
   type TimeTravelStep,
@@ -44,37 +52,59 @@ export function StudioRail({
   payer,
   connection,
   timeTravelSteps,
+  builtTx,
+  adversaryForks,
+  onAdversaryForks,
+  signTransaction,
   onDraftChange,
   onLog,
+  onTimeTravelSteps,
 }: {
   draft: TransactionDraft;
   sim: StateDiffResult | null;
   payer: string | null;
   connection: Connection | null;
   timeTravelSteps: TimeTravelStep[];
+  builtTx: Transaction | null;
+  adversaryForks: AdversarialFork[];
+  onAdversaryForks: (forks: AdversarialFork[]) => void;
+  signTransaction: (tx: Transaction) => Promise<Transaction>;
   onDraftChange: (next: TransactionDraft) => void;
   onLog: (msg: string, type?: 'info' | 'error' | 'success' | 'warning') => void;
+  onTimeTravelSteps?: (steps: TimeTravelStep[]) => void;
 }) {
   const [tab, setTab] = useState<Tab>('firewall');
   const [policy, setPolicy] = useState<FirewallPolicy>(() => loadFirewallPolicy());
   const [override, setOverride] = useState(false);
   const [radar, setRadar] = useState<WriteRadarReport | null>(null);
+  const [radarBusy, setRadarBusy] = useState(false);
+  const [advBusy, setAdvBusy] = useState(false);
   const [hsBlob, setHsBlob] = useState('');
   const [hsNote, setHsNote] = useState('');
   const [offer, setOffer] = useState<HandshakeOffer | null>(null);
+  const [hsBusy, setHsBusy] = useState(false);
+  const [forkLiveSim, setForkLiveSim] = useState<StateDiffResult | null>(null);
+
+  const projected = useMemo(() => projectAdversarialForks(sim), [sim]);
+  const forks = adversaryForks.length ? adversaryForks : projected;
+  const worst = worstPayerDelta(forks.filter((f) => f.method === 'simulated' || !adversaryForks.length));
 
   const fw = useMemo(
-    () => evaluateFirewall({ policy, sim, draft }),
-    [policy, sim, draft]
+    () =>
+      evaluateFirewall({
+        policy,
+        sim,
+        draft,
+        worstAdversaryDeltaSol: worstPayerDelta(adversaryForks.filter((f) => f.method === 'simulated')),
+      }),
+    [policy, sim, draft, adversaryForks]
   );
   const dna = useMemo(() => computeTxDna(draft), [draft]);
   const shapes = useMemo(() => matchKnownShapes(dna), [dna]);
-  const forks = useMemo(() => projectAdversarialForks(sim), [sim]);
   const patches = useMemo(
     () => suggestFailurePatches(sim?.err, sim?.logs, draft),
     [sim, draft]
   );
-  const worst = worstPayerDelta(forks);
 
   useEffect(() => {
     try {
@@ -109,31 +139,85 @@ export function StudioRail({
     saveFirewallPolicy(next);
   };
 
-  const scanRadar = async () => {
-    if (!connection || !fw.writable.length) {
-      setRadar(summarizeWriteRadar(fw.writable, {}));
+  const runAdversary = async (waitExtraSlots = 0) => {
+    if (!connection || !builtTx || !payer) {
+      onLog('Build a legacy tx first (Advanced → Build). Versioned/arb txs cannot be forked this way.', 'warning');
       return;
     }
-    const sigsByAddress: Record<
-      string,
-      Array<{ signature: string; slot?: number; err?: unknown; blockTime?: number | null }>
-    > = {};
-    await Promise.all(
-      fw.writable.slice(0, 4).map(async (addr) => {
-        try {
-          const sigs = await connection.getSignaturesForAddress(new PublicKey(addr), { limit: 6 });
-          sigsByAddress[addr] = sigs.map((s) => ({
-            signature: s.signature,
-            slot: s.slot,
-            err: s.err,
-            blockTime: s.blockTime,
-          }));
-        } catch {
-          sigsByAddress[addr] = [];
-        }
-      })
-    );
-    setRadar(summarizeWriteRadar(fw.writable, sigsByAddress));
+    setAdvBusy(true);
+    try {
+      const live = await runAdversarialSims(connection, builtTx, payer, { waitExtraSlots });
+      onAdversaryForks(live);
+      const w = worstPayerDelta(live.filter((f) => f.method === 'simulated'));
+      onLog(
+        `Live adversarial sims done. Worst payer Δ ${w == null ? '—' : w.toFixed(6)} SOL. Sandwich is same-payer write contention, not a funded searcher.`,
+        live.some((f) => f.err) ? 'warning' : 'success'
+      );
+    } catch (e) {
+      onLog(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setAdvBusy(false);
+    }
+  };
+
+  const scanRadar = async () => {
+    if (!fw.writable.length) {
+      setRadar(summarizeWriteRadar([], {}));
+      return;
+    }
+    setRadarBusy(true);
+    try {
+      const res = await fetch('/api/studio/write-radar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses: fw.writable.slice(0, 4) }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setRadar(summarizeWriteRadar(fw.writable, json.sigsByAddress || {}, Date.now(), json.slot));
+        return;
+      }
+      throw new Error(json.error || 'radar api failed');
+    } catch {
+      if (!connection) {
+        setRadar(summarizeWriteRadar(fw.writable, {}));
+        setRadarBusy(false);
+        return;
+      }
+      const sigsByAddress: Record<string, any[]> = {};
+      const slot = await connection.getSlot('processed').catch(() => undefined);
+      await Promise.all(
+        fw.writable.slice(0, 4).map(async (addr) => {
+          try {
+            const sigs = await connection.getSignaturesForAddress(new PublicKey(addr), { limit: 8 });
+            sigsByAddress[addr] = sigs.map((s) => ({
+              signature: s.signature,
+              slot: s.slot,
+              err: s.err,
+              blockTime: s.blockTime,
+              confirmationStatus: s.confirmationStatus,
+            }));
+          } catch {
+            sigsByAddress[addr] = [];
+          }
+        })
+      );
+      setRadar(summarizeWriteRadar(fw.writable, sigsByAddress, Date.now(), slot));
+    } finally {
+      setRadarBusy(false);
+    }
+  };
+
+  const copyOffer = async (next: HandshakeOffer) => {
+    const blob = encodeHandshake(next);
+    setHsBlob(blob);
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}#handshake=${blob}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      onLog('Handshake URL copied.', 'success');
+    } catch {
+      onLog('Copy failed — blob is in the textarea.', 'warning');
+    }
   };
 
   return (
@@ -190,7 +274,7 @@ export function StudioRail({
               {policy.enabled ? (fw.ok ? 'Firewall green' : 'Firewall blocked') : 'Firewall off'}
             </p>
             {fw.payerDeltaSol != null && (
-              <p className="text-slate-400">Payer Δ {fw.payerDeltaSol.toFixed(6)} SOL</p>
+              <p className="text-slate-400">Clean payer Δ {fw.payerDeltaSol.toFixed(6)} SOL</p>
             )}
             {fw.violations.map((v) => (
               <p key={v.code + v.message} className="text-amber-200 mt-1">
@@ -235,7 +319,7 @@ export function StudioRail({
             Override firewall for the next Execute (highlight-only for Grok)
           </label>
           <p className="text-[10px] text-slate-500" data-firewall-override={override ? '1' : '0'}>
-            Grok cannot click Execute or this override.
+            Grok cannot click Execute or this override. Adversary spend uses live forks only, never arithmetic projections.
           </p>
         </div>
       )}
@@ -243,34 +327,62 @@ export function StudioRail({
       {tab === 'adversary' && (
         <div className="space-y-2">
           <p className="text-slate-400">
-            Worst payer Δ across forks:{' '}
-            <span className="text-amber-200 font-mono">
-              {worst == null ? '—' : `${worst.toFixed(6)} SOL`}
+            Worst payer Δ:{' '}
+            <span className="text-amber-200 font-mono">{worst == null ? '—' : `${worst.toFixed(6)} SOL`}</span>
+            <span className="ml-1 text-[10px] text-slate-500">
+              {adversaryForks.length ? '(live simulateTransaction)' : '(projection — run live forks)'}
             </span>
           </p>
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              data-sealevel-target="adversary-run"
+              disabled={advBusy || !builtTx}
+              onClick={() => void runAdversary(0)}
+              className="rounded bg-teal-800 px-2 py-1 text-white disabled:opacity-40"
+            >
+              {advBusy ? 'Simulating…' : 'Run live forks'}
+            </button>
+            <button
+              type="button"
+              disabled={advBusy || !builtTx}
+              onClick={() => void runAdversary(2)}
+              className="rounded bg-slate-800 px-2 py-1 text-slate-200 disabled:opacity-40"
+            >
+              Wait 2 slots & re-sim
+            </button>
+          </div>
           {forks.map((f) => (
             <div key={f.id} className="rounded border border-slate-800 p-2">
               <div className="flex justify-between text-slate-200">
-                <span>{f.label}</span>
+                <span>
+                  {f.label}{' '}
+                  <span className="text-[10px] text-slate-500">{f.method}</span>
+                </span>
                 <span className="font-mono">
                   {f.err ? 'revert' : f.payerDeltaSol == null ? '—' : `${f.payerDeltaSol.toFixed(6)}`}
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 mt-1">{f.note}</p>
+              {f.slot != null && <p className="text-[10px] text-slate-600">slot {f.slot}</p>}
             </div>
           ))}
           <button
             type="button"
             onClick={() => void scanRadar()}
+            disabled={radarBusy}
             className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700"
             data-sealevel-target="write-radar"
           >
-            <Radar size={12} /> Scan write-set radar
+            <Radar size={12} /> {radarBusy ? 'Scanning…' : 'Scan write-set (processed)'}
           </button>
           {radar && (
-            <p className={radar.collisions ? 'text-amber-300' : 'text-slate-400'}>{radar.note}</p>
+            <>
+              <p className={radar.collisions ? 'text-amber-300' : 'text-slate-400'}>{radar.note}</p>
+              <p className="text-[10px] text-slate-600">{radar.caveat}</p>
+            </>
           )}
-          {radar?.hits.slice(0, 5).map((h) => (
+          {radar?.hits.slice(0, 6).map((h) => (
             <a
               key={h.signature + h.address}
               href={`https://solscan.io/tx/${h.signature}`}
@@ -278,7 +390,8 @@ export function StudioRail({
               rel="noreferrer"
               className="block font-mono text-[10px] text-cyan-400 truncate"
             >
-              {h.address.slice(0, 4)}… {h.signature.slice(0, 8)}…
+              {h.pending ? 'PEND' : h.confirmation || 'conf'} · {h.address.slice(0, 4)}… {h.signature.slice(0, 8)}…
+              {h.slot != null ? ` · slot ${h.slot}` : ''}
             </a>
           ))}
         </div>
@@ -311,14 +424,32 @@ export function StudioRail({
           {timeTravelSteps.length > 0 && (
             <div className="space-y-1">
               <p className="text-slate-300">Time-travel ({timeTravelSteps.length} steps)</p>
-              <div className="max-h-48 overflow-y-auto space-y-1">
+              <p className="text-[10px] text-slate-500">
+                Historical banks exist only as meta pre (start) and meta post (end). Inner CPIs share the enclosing outer. Live prefix = current bank reconstruction.
+              </p>
+              <div className="max-h-56 overflow-y-auto space-y-1">
                 {timeTravelSteps.map((s) => (
                   <button
                     key={s.index}
                     type="button"
-                    onClick={() => {
-                      onDraftChange({ instructions: forkDraftFromStep(timeTravelSteps, s.index) });
-                      onLog(`Forked draft from step ${s.index} (${s.name})`, 'info');
+                    onClick={async () => {
+                      const remaining = forkDraftFromStep(timeTravelSteps, s.index);
+                      onDraftChange({ instructions: remaining });
+                      const snap = snapshotAtStep(timeTravelSteps, s.index);
+                      onLog(
+                        `Forked from step ${s.index} (${s.name}). Historical: ${snap?.source || 'none'}. ${snap?.note || ''}`,
+                        'info'
+                      );
+                      if (connection && payer && remaining.length) {
+                        const live = await resimTailDraft(connection, remaining, payer);
+                        setForkLiveSim(live);
+                        onLog(
+                          live.err
+                            ? `Live tail re-sim reverted: ${live.err}`
+                            : `Live tail re-sim OK · ${live.diffs.length} deltas on CURRENT bank (not historical slot).`,
+                          live.err ? 'warning' : 'success'
+                        );
+                      }
                     }}
                     className={`w-full text-left rounded px-2 py-1 border border-slate-800 hover:border-teal-700 ${
                       s.inner ? 'text-slate-500 pl-4' : 'text-slate-200'
@@ -328,9 +459,22 @@ export function StudioRail({
                     <span className="block font-mono text-[10px] text-slate-600 truncate">
                       {s.programId}
                     </span>
+                    {s.historical && (
+                      <span className="block text-[10px] text-teal-600/80">hist {s.historical.source}</span>
+                    )}
+                    {s.livePrefix && (
+                      <span className="block text-[10px] text-amber-600/80">
+                        live-prefix {s.livePrefix.err ? 'err' : `${s.livePrefix.accounts.length} Δ`}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
+              {forkLiveSim && (
+                <p className="text-[10px] text-slate-400">
+                  Last fork live re-sim: {forkLiveSim.err || `${forkLiveSim.diffs.length} account deltas`}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -339,7 +483,7 @@ export function StudioRail({
       {tab === 'handshake' && (
         <div className="space-y-2">
           <p className="text-slate-400">
-            Two-human atomic: your cards + theirs, one Jito bundle. No escrow program.
+            Two signed legs, one Jito bundle (A then B, tip on B). Same blockhash required. Not an escrow program.
           </p>
           <input
             value={hsNote}
@@ -356,14 +500,7 @@ export function StudioRail({
                 note: hsNote,
               });
               setOffer(created);
-              const blob = encodeHandshake(created);
-              const url = `${typeof window !== 'undefined' ? window.location.origin : ''}#handshake=${blob}`;
-              try {
-                await navigator.clipboard.writeText(url);
-                onLog('Handshake URL copied. Counterparty opens it to attach their ixs.', 'success');
-              } catch {
-                setHsBlob(blob);
-              }
+              await copyOffer(created);
             }}
             className="rounded bg-teal-800 px-2 py-1 text-white"
           >
@@ -381,7 +518,7 @@ export function StudioRail({
               try {
                 const raw = hsBlob.includes('handshake=') ? hsBlob.split('handshake=')[1]! : hsBlob;
                 const decoded = decodeHandshake(raw.trim());
-                setOffer(decoded);
+                setOffer({ ...decoded, status: deriveHandshakeStatus(decoded) });
                 onLog(handshakeSummary(decoded), 'info');
               } catch (e) {
                 onLog(e instanceof Error ? e.message : 'bad blob', 'error');
@@ -395,6 +532,23 @@ export function StudioRail({
             <div className="rounded border border-teal-900 p-2 space-y-1">
               <p className="text-teal-200">{handshakeSummary(offer)}</p>
               {offer.note && <p className="text-slate-500">{offer.note}</p>}
+              {offer.blockhash && (
+                <p className="font-mono text-[10px] text-slate-500">
+                  bh {offer.blockhash.slice(0, 8)}… valid≤{offer.lastValidBlockHeight}
+                </p>
+              )}
+              {offer.submitError && <p className="text-red-300">{offer.submitError}</p>}
+              {offer.landedSignatures?.map((s) => (
+                <a
+                  key={s}
+                  href={`https://solscan.io/tx/${s}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block text-cyan-400 font-mono"
+                >
+                  landed {s.slice(0, 12)}…
+                </a>
+              ))}
               <button
                 type="button"
                 data-sealevel-target="handshake-counter"
@@ -404,14 +558,82 @@ export function StudioRail({
                     instructions: draft.instructions,
                   });
                   setOffer(next);
-                  const blob = encodeHandshake(next);
-                  setHsBlob(blob);
-                  void navigator.clipboard.writeText(blob).catch(() => undefined);
-                  onLog('Counter attached. Both sides should Build + Execute in slot order or submit as Jito bundle.', 'success');
+                  void copyOffer(next);
                 }}
-                className="rounded bg-purple-800 px-2 py-1 text-white"
+                className="rounded bg-purple-800 px-2 py-1 text-white mr-1"
               >
                 Attach my cards as party B
+              </button>
+              <button
+                type="button"
+                disabled={hsBusy || !connection || !offer.partyB?.address}
+                onClick={async () => {
+                  if (!connection) return;
+                  setHsBusy(true);
+                  try {
+                    const next = await prepareHandshakeBundle(connection, offer);
+                    setOffer(next);
+                    await copyOffer(next);
+                    onLog('Shared blockhash frozen. Each party signs their own leg.', 'success');
+                  } catch (e) {
+                    onLog(e instanceof Error ? e.message : String(e), 'error');
+                  } finally {
+                    setHsBusy(false);
+                  }
+                }}
+                className="rounded bg-slate-800 px-2 py-1 text-slate-200 disabled:opacity-40 mr-1"
+              >
+                Prepare bundle
+              </button>
+              <button
+                type="button"
+                disabled={hsBusy || !payer || !offer.unsignedTxA}
+                onClick={async () => {
+                  if (!payer) return;
+                  setHsBusy(true);
+                  try {
+                    const which =
+                      payer === offer.partyA.address ? 'A' : payer === offer.partyB?.address ? 'B' : null;
+                    if (!which) throw new Error('Active wallet is neither party A nor B');
+                    const next = await signHandshakeLeg(offer, which, payer, signTransaction);
+                    setOffer(next);
+                    await copyOffer(next);
+                    onLog(`Party ${which} signed. Pass the blob to the other signer.`, 'success');
+                  } catch (e) {
+                    onLog(e instanceof Error ? e.message : String(e), 'error');
+                  } finally {
+                    setHsBusy(false);
+                  }
+                }}
+                className="rounded bg-slate-800 px-2 py-1 text-slate-200 disabled:opacity-40 mr-1"
+              >
+                Sign my leg
+              </button>
+              <button
+                type="button"
+                data-sealevel-target="handshake-submit"
+                disabled={hsBusy || !offer.partyA.signedTxBase64 || !offer.partyB?.signedTxBase64}
+                onClick={async () => {
+                  setHsBusy(true);
+                  try {
+                    const next = await submitHandshakeBundle(offer);
+                    setOffer(next);
+                    await copyOffer(next);
+                    onLog(
+                      next.status === 'landed'
+                        ? `Bundle landed slot ${next.landedSlot}.`
+                        : `Bundle ${next.status}${next.submitError ? `: ${next.submitError}` : ''}`,
+                      next.status === 'landed' ? 'success' : 'warning'
+                    );
+                  } catch (e) {
+                    onLog(e instanceof Error ? e.message : String(e), 'error');
+                  } finally {
+                    setHsBusy(false);
+                  }
+                }}
+                className="rounded bg-emerald-800 px-2 py-1 text-white disabled:opacity-40"
+              >
+                Submit Jito bundle
               </button>
             </div>
           )}
