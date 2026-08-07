@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import {
   Coins,
   CheckCircle,
@@ -23,7 +23,7 @@ interface PresaleAttestationProps {
 }
 
 export function PresaleAttestation({ connection }: PresaleAttestationProps) {
-  const wallet = useWallet();
+  const wallet = useActiveWallet();
   const { publicKey } = wallet;
   const [isChecking, setIsChecking] = useState(false);
   const [isCreating, setIsCreating] = useState(false);

@@ -20,7 +20,7 @@ import {
   Play,
   Pause,
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
 import { useRiskConsent } from '../hooks/useRiskConsent';
 
@@ -39,7 +39,7 @@ interface SubstackBotProps {
 
 export function SubstackBot({ onBack }: SubstackBotProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('substack-bot');
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [userInfo, setUserInfo] = useState<{ email?: string; name?: string; publicationId?: string } | null>(null);

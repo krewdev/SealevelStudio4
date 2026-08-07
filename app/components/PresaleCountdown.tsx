@@ -1,115 +1,86 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { AlarmClock, BellRing, CheckCircle2, Calendar, X, Move } from 'lucide-react';
-
-const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
-
-interface TimeLeft {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-  completed: boolean;
-}
-
-const formatDateForICS = (date: Date) =>
-  date
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .split('.')[0] + 'Z';
-
-const calculateTimeLeft = (target: Date): TimeLeft => {
-  const diff = target.getTime() - Date.now();
-  if (diff <= 0) {
-    return { days: 0, hours: 0, minutes: 0, seconds: 0, completed: true };
-  }
-
-  return {
-    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-    hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-    minutes: Math.floor((diff / (1000 * 60)) % 60),
-    seconds: Math.floor((diff / 1000) % 60),
-    completed: false,
-  };
-};
-
-const resolveTargetDate = () => {
-  if (typeof window === 'undefined') {
-    // use a deterministic baseline during SSR; client will correct immediately
-    return new Date(Date.now() + TWO_WEEKS_MS);
-  }
-
-  const envValue =
-    process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP ||
-    process.env.NEXT_PUBLIC_PRESALE_DATE;
-  if (envValue) {
-    const parsed = new Date(envValue);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed;
-    }
-  }
-  return new Date(Date.now() + TWO_WEEKS_MS);
-};
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { CheckCircle2, X, Move, Zap, ShoppingCart, ArrowRight, Clock } from 'lucide-react';
+import { DEFAULT_PRESALE_CONFIG } from '../lib/seal-token/presale';
 
 export function PresaleCountdown() {
-  const targetDate = useMemo(() => resolveTargetDate(), []);
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => calculateTimeLeft(targetDate));
-  const [reminderSet, setReminderSet] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [position, setPosition] = useState({ x: 24, y: typeof window !== 'undefined' ? window.innerHeight - 200 : 600 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [isStarted, setIsStarted] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft(targetDate));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('sealevel-presale-reminder');
-    setReminderSet(stored === 'true');
+  // Get presale start time from env var or default config
+  const getPresaleStartTime = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      // Try NEXT_PUBLIC_PRESALE_TIMESTAMP (timestamp in milliseconds)
+      if (process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP) {
+        const timestamp = parseInt(process.env.NEXT_PUBLIC_PRESALE_TIMESTAMP, 10);
+        if (!isNaN(timestamp) && timestamp > 0) {
+          const date = new Date(timestamp);
+          // Validate the date is in the future (or allow past dates if explicitly set)
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+      }
+      // Try NEXT_PUBLIC_PRESALE_DATE (ISO 8601 date string)
+      if (process.env.NEXT_PUBLIC_PRESALE_DATE) {
+        const date = new Date(process.env.NEXT_PUBLIC_PRESALE_DATE);
+        if (!isNaN(date.getTime())) {
+          return date;
+        }
+      }
+    }
+    // Default: return a future date (2 weeks from now) to ensure countdown shows
+    // This prevents the presale from appearing "live" when no config is set
+    return DEFAULT_PRESALE_CONFIG.startTime;
   }, []);
 
-  const handleReminder = useCallback(() => {
-    setReminderSet(true);
+  // Countdown timer
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const startTime = getPresaleStartTime().getTime();
+      
+      const distance = startTime - now;
+      const hasStarted = now >= startTime;
+      setIsStarted(hasStarted);
+
+      if (distance > 0) {
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+        setTimeLeft({ days, hours, minutes, seconds });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setIsStarted(true);
+      }
+    };
+
+    updateCountdown();
+    intervalRef.current = setInterval(updateCountdown, 1000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [getPresaleStartTime]);
+
+  const handlePresaleClick = useCallback(() => {
+    // Navigate to presale page - dispatch custom event that page component listens to
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('sealevel-presale-reminder', 'true');
+      const event = new CustomEvent('navigateToPresale', { bubbles: true });
+      window.dispatchEvent(event);
     }
   }, []);
-
-  const handleDownloadICS = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    const start = formatDateForICS(targetDate);
-    const end = formatDateForICS(new Date(targetDate.getTime() + 60 * 60 * 1000));
-    const ics = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'CALSCALE:GREGORIAN',
-      'BEGIN:VEVENT',
-      `DTSTART:${start}`,
-      `DTEND:${end}`,
-      'SUMMARY:Sealevel Studio Presale',
-      'DESCRIPTION:Presale access for the Sealevel Studio ecosystem goes live.',
-      'LOCATION:sealevel.studio',
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ].join('\r\n');
-
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'sealevel-presale.ics';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  }, [targetDate]);
 
   // Drag functionality
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -154,11 +125,6 @@ export function PresaleCountdown() {
     setIsVisible(false);
   }, []);
 
-  const formattedDate = targetDate.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-
   if (!isVisible) return null;
 
   return (
@@ -190,66 +156,82 @@ export function PresaleCountdown() {
         </div>
 
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-blue-300 flex items-center gap-2">
-              <AlarmClock size={14} />
-              Presale Countdown
-            </p>
-            <p className="text-sm text-gray-400 mt-1">
-              Target launch: {formattedDate}
-            </p>
+          <div className="flex-1">
+            {isStarted ? (
+              <>
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-300 flex items-center gap-2 mb-2">
+                  <ShoppingCart size={14} />
+                  Presale On Sale Now
+                </p>
+                <p className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                  <Zap size={18} className="text-yellow-400" />
+                  SEAL Token Presale is Live!
+                </p>
+                <p className="text-sm text-gray-300 mt-2">
+                  Join the presale and get bonus tokens. Limited time offer.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-[0.2em] text-blue-300 flex items-center gap-2 mb-2">
+                  <Clock size={14} />
+                  Presale Starting Soon
+                </p>
+                <p className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                  <Zap size={18} className="text-yellow-400" />
+                  SEAL Token Presale
+                </p>
+                <div className="mt-2 flex items-center gap-2 text-sm">
+                  <span className="text-gray-400">Starts in:</span>
+                  <div className="flex items-center gap-1.5">
+                    {timeLeft.days > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-blue-900/30 border border-blue-700/50 text-blue-200 font-mono text-xs">
+                        {timeLeft.days}d
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded bg-blue-900/30 border border-blue-700/50 text-blue-200 font-mono text-xs">
+                      {String(timeLeft.hours).padStart(2, '0')}h
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-blue-900/30 border border-blue-700/50 text-blue-200 font-mono text-xs">
+                      {String(timeLeft.minutes).padStart(2, '0')}m
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-blue-900/30 border border-blue-700/50 text-blue-200 font-mono text-xs">
+                      {String(timeLeft.seconds).padStart(2, '0')}s
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-          <span className="px-2 py-1 text-xs rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-200">
-            T-14d
-          </span>
+          {isStarted && (
+            <span className="px-3 py-1 text-xs rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 font-semibold animate-pulse">
+              LIVE
+            </span>
+          )}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-          {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => (
-            <div key={unit} className="bg-white/5 rounded-xl py-2 border border-white/5">
-              <p className="text-xl font-semibold">
-                {String(timeLeft[unit]).padStart(2, '0')}
-              </p>
-              <p className="text-[0.6rem] uppercase tracking-wide text-gray-400">
-                {unit}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {timeLeft.completed ? (
-          <div className="mt-4 flex items-center gap-2 text-emerald-300 text-sm">
-            <CheckCircle2 size={16} />
-            Presale portal is live. Refresh to access minting.
-          </div>
-        ) : (
-          <>
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={handleReminder}
-                disabled={reminderSet}
-                className={`w-full inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/40 px-3 py-2 text-sm font-medium transition ${
-                  reminderSet
-                    ? 'bg-blue-900/30 text-blue-200 cursor-default'
-                    : 'bg-blue-600/20 hover:bg-blue-600/40 text-blue-100'
-                }`}
-              >
-                <BellRing size={16} />
-                {reminderSet ? 'Reminder Saved' : 'Remind Me In-App'}
-              </button>
-              <button
-                onClick={handleDownloadICS}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-medium bg-white/5 hover:bg-white/10 transition"
-              >
-                <Calendar size={16} />
-                Add to Calendar
-              </button>
-            </div>
-            <p className="text-[0.65rem] text-gray-500 mt-3 leading-relaxed">
-              Participation is optional and subject to local regulations. This reminder is stored only on this device.
-            </p>
-          </>
-        )}
+        <button
+          onClick={handlePresaleClick}
+          className={`mt-4 w-full flex items-center justify-center gap-2 text-sm rounded-lg p-3 transition-all group ${
+            isStarted
+              ? 'text-emerald-300 bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-700/50 hover:border-emerald-600/70'
+              : 'text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 border border-blue-700/50 hover:border-blue-600/70 cursor-pointer'
+          }`}
+        >
+          {isStarted ? (
+            <>
+              <CheckCircle2 size={16} />
+              <span className="font-medium">Presale is active. Click to participate!</span>
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </>
+          ) : (
+            <>
+              <Clock size={16} />
+              <span className="font-medium">View presale details</span>
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

@@ -1,535 +1,401 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  X,
-  Send,
-  Brain,
-  ChevronDown,
-  CheckCircle,
-  XCircle,
-  Loader2,
-} from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Brain, Loader2, Send, Sparkles, Square, X } from 'lucide-react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { parseIntent } from '../lib/ai/intent-parser';
-import { executeIntent, ExecutionResult } from '../lib/ai/action-executor';
-import { getAllStakingProviders } from '../lib/staking/staking-providers';
-import { saveContact } from '../lib/send/send-executor';
-import { checkLMStudioAvailable, getAIResponseWithContext } from '../lib/ai/lm-studio-client';
-import { getAIResponseWithMCPContext } from '../lib/ai/mcp-enhanced-client';
+import { useNetwork } from '../contexts/NetworkContext';
+import { useActiveWallet } from '../hooks/useActiveWallet';
+import { collectPageSnapshot, snapshotToPrompt, type GrokMode } from '../lib/ai/page-snapshot';
+import { MUTATING_GROK_TOOLS } from '../lib/ai/grok-tools';
 
-interface Message {
+type ChatRole = 'user' | 'assistant' | 'system';
+
+type ToolTrace = { name: string; ok: boolean; detail?: string };
+
+type ChatMessage = {
   id: string;
-  role: 'user' | 'assistant';
+  role: ChatRole;
   content: string;
   timestamp: Date;
+  traces?: ToolTrace[];
   suggestions?: string[];
-  executionResult?: ExecutionResult;
-}
+};
 
-interface AIAssistantProps {
-  isMinimized?: boolean;
-  onToggleMinimize?: () => void;
-}
+const SUGGEST: Record<GrokMode, string[]> = {
+  explain: [
+    'Explain what this screen is for',
+    'What does quote_verified mean?',
+    'How does replay unlock live without spending?',
+  ],
+  plan: [
+    'Plan: scan arb then load the best opp into the builder',
+    'Plan a paper MM session on the current mint',
+    'Plan how to go from KOL hot board to a gated live start',
+  ],
+  act: [
+    'Open the scanner and tell me what you see',
+    'Attach the session mint to MM desk and start paper',
+    'Run a quote replay, then highlight Start live for me',
+  ],
+};
 
-export function SitewideAIAssistant({ isMinimized = false, onToggleMinimize }: AIAssistantProps) {
-  const { publicKey, connected, wallet } = useWallet();
+export function SitewideAIAssistant() {
   const { connection } = useConnection();
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  const active = useActiveWallet();
+  const { network } = useNetwork();
+  const [open, setOpen] = useState(false);
+  const [wide, setWide] = useState(false);
+  const [mode, setMode] = useState<GrokMode>('act');
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [view, setView] = useState('home');
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: "👋 Hi! I'm your Sealevel AI Assistant. I can execute Solana operations through natural language!\n\n**Try commands like:**\n• \"stake 200 sol\"\n• \"send 5 sol to jimmy\"\n• \"airdrop 10 sol on devnet\"\n• \"show contacts\"\n\nWhat would you like to build today?",
+      content:
+        '**Grok copilot online.** I can see this page, walk you through it, write a plan, or automate safe steps (navigate, paper bots, replay, highlight).\n\nI will **never** click Execute or Start live — those stay yours.\n\nNot financial advice.',
       timestamp: new Date(),
-      suggestions: [
-        "stake 200 sol",
-        "send 5 sol to alice",
-        "airdrop 10 sol on devnet",
-        "show contacts"
-      ]
-    }
+      suggestions: SUGGEST.act,
+    },
   ]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [pendingAction, setPendingAction] = useState<any>(null);
-  const [lmStudioAvailable, setLmStudioAvailable] = useState<boolean | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef(false);
 
-  // Check LM Studio availability on mount
   useEffect(() => {
-    checkLMStudioAvailable().then(setLmStudioAvailable);
+    const sync = () => setView(localStorage.getItem('sealevel-active-view') || 'home');
+    sync();
+    window.addEventListener('sealevel-view', sync as EventListener);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('sealevel-view', sync as EventListener);
+      window.removeEventListener('storage', sync);
+    };
   }, []);
 
-  // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, busy]);
 
-  // Focus input when chat opens
   useEffect(() => {
-    if (isOpen && !isMinimized) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen, isMinimized]);
+    if (open) setTimeout(() => inputRef.current?.focus(), 80);
+  }, [open]);
 
-  const handleSendMessage = async (messageText?: string) => {
-    const textToSend = messageText || input.trim();
-    if (!textToSend) return;
+  const pageChip = useMemo(() => {
+    const pay = active.connected
+      ? `${active.source === 'phantom' ? 'P' : 'S'} ${active.shortLabel}`
+      : 'no wallet';
+    return `${view} · ${network} · ${pay}`;
+  }, [view, network, active.connected, active.source, active.shortLabel]);
 
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: textToSend,
-      timestamp: new Date()
-    };
+  const stop = () => {
+    abortRef.current = true;
+    setBusy(false);
+  };
 
-    setMessages(prev => [...prev, userMessage]);
+  const send = async (text?: string) => {
+    const prompt = (text || input).trim();
+    if (!prompt || busy) return;
+    abortRef.current = false;
     setInput('');
-    setIsTyping(true);
+    const userMsg: ChatMessage = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: prompt,
+      timestamp: new Date(),
+    };
+    setMessages((m) => [...m.filter((x) => x.id !== 'welcome' || m.length < 3), userMsg]);
+    setBusy(true);
 
+    const traces: ToolTrace[] = [];
     try {
-      // Try to use LM Studio with MCP enhancement for better understanding if available
-      let aiResponse: string | null = null;
-      let mcpResourcesUsed = false;
-      if (lmStudioAvailable) {
-        try {
-          // Try MCP-enhanced first (enriched with dataset and transaction examples)
-          const mcpResult = await getAIResponseWithMCPContext(textToSend, {
-            userWallet: publicKey?.toString(),
-            network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
-          });
-          aiResponse = mcpResult.content;
-          mcpResourcesUsed = mcpResult.mcpResourcesUsed;
+      const { runClientGrokTool } = await import('../lib/ai/grok-client-tools');
+      const snap = collectPageSnapshot({
+        phantom: active.phantom,
+        studio: active.studio,
+        source: active.source,
+        active: active.address,
+        canSignVersioned: active.canSignVersioned,
+        network,
+      });
+      const history = [...messages, userMsg]
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .filter((m) => m.id !== 'welcome')
+        .slice(-16)
+        .map((m) => ({ role: m.role, content: m.content }));
 
-          // Fallback to regular if MCP fails
-          if (!aiResponse) {
-            aiResponse = await getAIResponseWithContext(textToSend, {
-              userWallet: publicKey?.toString(),
-              network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
-            });
-          }
-        } catch (error) {
-          console.warn('LM Studio query failed, falling back to rule-based:', error);
-          // Try regular client as fallback
-          try {
-            aiResponse = await getAIResponseWithContext(textToSend, {
-              userWallet: publicKey?.toString(),
-              network: connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet',
-            });
-          } catch (fallbackError) {
-            console.warn('Fallback LM Studio query also failed:', fallbackError);
+      let payload: Record<string, unknown> = {
+        prompt,
+        messages: history,
+        view: snap.view,
+        mode,
+        pageContext: snapshotToPrompt(snap),
+      };
+
+      let aiText = '';
+      for (let hop = 0; hop < 8; hop++) {
+        if (abortRef.current) {
+          aiText = aiText || '_Stopped._';
+          break;
+        }
+        const res = await fetch('/api/ai/grok', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+
+        if (Array.isArray(json.clientActions)) {
+          for (const action of json.clientActions) {
+            if (action?.type === 'navigate' && action.view) {
+              window.dispatchEvent(new CustomEvent('sealevel-navigate', { detail: action.view }));
+              traces.push({ name: `navigate:${action.view}`, ok: true });
+            }
           }
         }
-      }
 
-      // Parse intent
-      const intent = parseIntent(textToSend);
-
-      // Check if wallet is needed
-      if (intent.type !== 'help' && intent.type !== 'contact' && intent.type !== 'unknown' && !connected) {
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: '⚠️ Please connect your wallet first to execute this operation.',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        setIsTyping(false);
-        return;
-      }
-
-      // If it's a help query or unknown intent, use AI response if available
-      if ((intent.type === 'help' || intent.type === 'unknown') && aiResponse) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: aiResponse,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        setIsTyping(false);
-        return;
-      }
-
-      // Execute intent
-      const result = await executeIntent(intent, connection, { publicKey, connected, wallet } as any);
-
-      // Handle result
-      if (result.requiresUserAction) {
-        if (result.actionType === 'select_provider') {
-          // Show provider selection
-          setPendingAction({
-            type: 'select_provider',
-            data: result.actionData,
-            originalIntent: intent,
-          });
-
-          const providerMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: result.message,
-            timestamp: new Date(),
-            executionResult: result,
-          };
-          setMessages(prev => [...prev, providerMessage]);
-        } else if (result.actionType === 'provide_contact_info') {
-          // Prompt for contact info
-          setPendingAction({
-            type: 'provide_contact_info',
-            data: result.actionData,
-            originalIntent: intent,
-          });
-
-          const contactMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: result.message + '\n\nPlease provide their wallet address or email:',
-            timestamp: new Date(),
-            executionResult: result,
-          };
-          setMessages(prev => [...prev, contactMessage]);
-        } else if (result.actionType === 'navigate') {
-          // Navigation action
-          const navMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            content: result.message,
-            timestamp: new Date(),
-            executionResult: result,
-          };
-          setMessages(prev => [...prev, navMessage]);
+        if (!res.ok) {
+          aiText = json.requiresConfiguration
+            ? `Grok key missing. Add \`XAI_API_KEY\` locally or on Vercel **ss4**.\n\n${json.suggestion || ''}`
+            : String(json.error || 'Grok request failed');
+          break;
         }
-      } else {
-        // Regular response
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
+
+        if (Array.isArray(json.pendingClientTools) && json.pendingClientTools.length) {
+          const clientToolResults = [];
+          for (const t of json.pendingClientTools) {
+            if (abortRef.current) break;
+            if (mode !== 'act' && MUTATING_GROK_TOOLS.has(t.name)) {
+              const refused = { refused: true, reason: `MODE=${mode} — switch to Act to run ${t.name}` };
+              traces.push({ name: t.name, ok: false, detail: 'blocked by mode' });
+              clientToolResults.push({ tool_call_id: t.id, content: refused });
+              continue;
+            }
+            try {
+              const result = await runClientGrokTool(t.name, t.args || {});
+              const ok = !(result && typeof result === 'object' && ('error' in (result as any) || (result as any).refused));
+              traces.push({
+                name: t.name,
+                ok,
+                detail: ok ? undefined : JSON.stringify(result).slice(0, 120),
+              });
+              clientToolResults.push({ tool_call_id: t.id, content: result });
+            } catch (err) {
+              const detail = err instanceof Error ? err.message : String(err);
+              traces.push({ name: t.name, ok: false, detail });
+              clientToolResults.push({ tool_call_id: t.id, content: { error: detail } });
+            }
+          }
+          payload = {
+            resumeMessages: json.resumeMessages,
+            clientToolResults,
+            view: snap.view,
+            mode,
+            pageContext: snapshotToPrompt(
+              collectPageSnapshot({
+                phantom: active.phantom,
+                studio: active.studio,
+                source: active.source,
+                active: active.address,
+                canSignVersioned: active.canSignVersioned,
+                network,
+              })
+            ),
+          };
+          continue;
+        }
+
+        aiText = String(json.content || '');
+        break;
+      }
+
+      setMessages((m) => [
+        ...m,
+        {
+          id: `a-${Date.now()}`,
           role: 'assistant',
-          content: result.message,
+          content: aiText || '_No text — check tool trace._',
           timestamp: new Date(),
-          executionResult: result,
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      }
-    } catch (error) {
-      console.error('AI Response error:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "Sorry, I'm having trouble responding right now. Please try again or check your connection.",
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+          traces: traces.length ? traces : undefined,
+          suggestions: SUGGEST[mode],
+        },
+      ]);
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        {
+          id: `e-${Date.now()}`,
+          role: 'assistant',
+          content: `Assistant error: ${err instanceof Error ? err.message : String(err)}`,
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
-      setIsTyping(false);
+      setBusy(false);
     }
   };
 
-  const handleProviderSelection = async (providerId: string) => {
-    if (!pendingAction || pendingAction.type !== 'select_provider') return;
-
-    const { data, originalIntent } = pendingAction;
-    setPendingAction(null);
-
-    // Update intent with selected provider
-    originalIntent.parameters.provider = providerId;
-
-    setIsTyping(true);
-    try {
-      const result = await executeIntent(originalIntent, connection, { publicKey, connected, wallet } as any);
-
-      const message: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: result.message,
-        timestamp: new Date(),
-        executionResult: result,
-      };
-      setMessages(prev => [...prev, message]);
-    } catch (error) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  const handleContactInfo = async (info: string) => {
-    if (!pendingAction || pendingAction.type !== 'provide_contact_info') return;
-
-    const { data, originalIntent } = pendingAction;
-
-    // Determine if info is wallet address or email
-    const isWallet = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(info);
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(info);
-
-    if (!isWallet && !isEmail) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: 'Please provide a valid wallet address or email address.',
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      return;
-    }
-
-    setPendingAction(null);
-    setIsTyping(true);
-
-    try {
-      // Save contact
-      const contactResult = await saveContact(
-        data.contactName,
-        isWallet ? info : undefined,
-        isEmail ? info : undefined
-      );
-
-      if (!contactResult.success) {
-        throw new Error(contactResult.error);
-      }
-
-      // Now execute the send
-      originalIntent.parameters.recipient = data.contactName;
-      const result = await executeIntent(originalIntent, connection, { publicKey, connected, wallet } as any);
-
-      const message: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `✅ Contact "${data.contactName}" saved!\n\n${result.message}`,
-        timestamp: new Date(),
-        executionResult: result,
-      };
-      setMessages(prev => [...prev, message]);
-    } catch (error) {
-      const errorMessage: Message = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInput(suggestion);
-    handleSendMessage(suggestion);
-  };
-
-  if (isMinimized) {
-    return null;
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed bottom-6 left-6 z-[60] group flex items-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 text-white pl-3 pr-4 py-3 shadow-lg shadow-purple-900/40 hover:scale-[1.03] transition"
+        title="Grok copilot"
+        data-sealevel-target="grok-launcher"
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+          <Brain className="h-5 w-5" />
+        </span>
+        <span className="text-left leading-tight">
+          <span className="block text-sm font-semibold">Grok</span>
+          <span className="block text-[10px] text-white/80">Explain · Plan · Act</span>
+        </span>
+      </button>
+    );
   }
 
   return (
-    <>
-      {/* Floating Button */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 left-6 z-50 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg hover:shadow-xl transition-all duration-200"
-          title="AI Assistant"
-        >
-          <Brain className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Chat Window */}
-      {isOpen && (
-        <div className="fixed bottom-6 left-6 z-50 w-96 max-w-[calc(100vw-3rem)] bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-white font-semibold">AI Assistant</h3>
-                <p className="text-white/80 text-sm">
-                  {lmStudioAvailable === true ? '🤖 Powered by LM Studio' : 'Sealevel Studio Helper'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onToggleMinimize}
-                className="text-white/80 hover:text-white p-1"
-                title="Minimize"
-              >
-                <ChevronDown className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-white/80 hover:text-white p-1"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+    <div
+      className={`fixed bottom-4 left-4 z-[60] flex max-h-[min(88vh,760px)] flex-col overflow-hidden rounded-2xl border border-purple-500/30 bg-gray-950/95 shadow-2xl shadow-black/50 backdrop-blur ${
+        wide ? 'w-[min(560px,calc(100vw-1.5rem))]' : 'w-[min(420px,calc(100vw-1.5rem))]'
+      }`}
+    >
+      <header className="shrink-0 border-b border-white/10 bg-gradient-to-r from-fuchsia-700/90 via-purple-700/90 to-indigo-700/90 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-white" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-white">Grok copilot</div>
+            <div className="truncate text-[10px] text-white/75">{pageChip}</div>
           </div>
-
-          {/* Messages */}
-          <div className="h-96 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-800 text-gray-200 border border-gray-700'
-                }`}>
-                  <div className="text-sm whitespace-pre-wrap">{message.content}</div>
-                  {message.executionResult?.success && message.executionResult.data?.signature && (
-                    <div className="mt-2 text-xs text-green-400">
-                      <CheckCircle className="w-3 h-3 inline mr-1" />
-                      Transaction: {message.executionResult.data.signature.slice(0, 8)}...
-                    </div>
-                  )}
-                  {message.executionResult && !message.executionResult.success && (
-                    <div className="mt-2 text-xs text-red-400">
-                      <XCircle className="w-3 h-3 inline mr-1" />
-                      {message.executionResult.message}
-                    </div>
-                  )}
-                  <div className="text-xs opacity-70 mt-2">
-                    {message.timestamp.toLocaleTimeString()}
-                  </div>
-                  {message.suggestions && (
-                    <div className="mt-3 space-y-2">
-                      {message.suggestions.map((suggestion, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className="block w-full text-left text-xs bg-gray-700 hover:bg-gray-600 rounded-lg px-3 py-2 transition-colors"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Provider Selection UI */}
-            {pendingAction?.type === 'select_provider' && (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 space-y-2">
-                <div className="text-sm font-semibold text-gray-200 mb-2">Select Staking Provider:</div>
-                {pendingAction.data.providers.map((provider: any, i: number) => (
-                  <button
-                    key={i}
-                    onClick={() => handleProviderSelection(provider.id)}
-                    className="w-full text-left text-xs bg-gray-700 hover:bg-gray-600 rounded-lg px-3 py-2 transition-colors"
-                  >
-                    {provider.displayText}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Contact Info Input */}
-            {pendingAction?.type === 'provide_contact_info' && (
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-                <div className="text-sm font-semibold text-gray-200 mb-2">
-                  Enter wallet address or email for "{pendingAction.data.contactName}":
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Wallet address or email"
-                    className="flex-1 bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleContactInfo(e.currentTarget.value);
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                      if (input) {
-                        handleContactInfo(input.value);
-                        input.value = '';
-                      }
-                    }}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs"
-                  >
-                    Save
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-gray-800 border border-gray-700 rounded-2xl px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
-                    <span className="text-gray-400 text-sm">Processing...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="border-t border-gray-700 p-4">
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="WHAT ARE WE BUILDING TODAY?"
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!input.trim() || isTyping}
-                className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-colors"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <button
-                onClick={() => handleSendMessage("stake 200 sol")}
-                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded-full transition-colors"
-              >
-                Stake SOL
-              </button>
-              <button
-                onClick={() => handleSendMessage("send 5 sol to alice")}
-                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded-full transition-colors"
-              >
-                Send SOL
-              </button>
-              <button
-                onClick={() => handleSendMessage("airdrop 10 sol on devnet")}
-                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1 rounded-full transition-colors"
-              >
-                Airdrop
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setWide((w) => !w)}
+            className="rounded px-2 py-1 text-[10px] text-white/80 hover:bg-white/10"
+          >
+            {wide ? 'Narrow' : 'Wide'}
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="rounded p-1 text-white/80 hover:bg-white/10">
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      )}
-    </>
+        <div className="mt-2 flex rounded-lg bg-black/25 p-0.5 text-[11px]">
+          {(['explain', 'plan', 'act'] as GrokMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 rounded-md py-1 capitalize ${
+                mode === m ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 custom-scrollbar">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[92%] rounded-2xl px-3 py-2 ${
+                message.role === 'user'
+                  ? 'bg-purple-600 text-white'
+                  : 'border border-white/10 bg-gray-900 text-gray-100'
+              }`}
+            >
+              {message.role === 'assistant' ? (
+                <div className="grok-md markdown-content">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+              )}
+              {message.traces && message.traces.length > 0 && (
+                <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
+                  {message.traces.map((t, i) => (
+                    <div key={`${t.name}-${i}`} className="flex gap-2 text-[10px] text-gray-400">
+                      <span className={t.ok ? 'text-emerald-400' : 'text-amber-300'}>{t.ok ? '●' : '○'}</span>
+                      <span className="font-mono">{t.name}</span>
+                      {t.detail && <span className="truncate opacity-70">{t.detail}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {message.suggestions && message.role === 'assistant' && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {message.suggestions.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => void send(s)}
+                      className="rounded-lg bg-white/5 px-2 py-1 text-left text-[11px] text-purple-100 hover:bg-white/10"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {busy && (
+          <div className="flex items-center gap-2 text-xs text-purple-200">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {mode === 'act' ? 'Acting on the page…' : mode === 'plan' ? 'Planning…' : 'Explaining…'}
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <div className="shrink-0 border-t border-white/10 p-3">
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder={
+              mode === 'act'
+                ? 'e.g. Open scanner and load the best opp into the builder'
+                : mode === 'plan'
+                  ? 'e.g. Plan a paper MM session on this mint'
+                  : 'e.g. Explain the controls on this screen'
+            }
+            className="flex-1 rounded-lg border border-white/10 bg-gray-900 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          {busy ? (
+            <button type="button" onClick={stop} className="rounded-lg bg-gray-800 p-2 text-red-200 hover:bg-gray-700">
+              <Square className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={!input.trim()}
+              className="rounded-lg bg-purple-600 p-2 text-white hover:bg-purple-500 disabled:bg-gray-800"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] text-gray-500">
+          Mode <span className="text-purple-300">{mode}</span>
+          {mode === 'explain' && ' · read-only'}
+          {mode === 'plan' && ' · no page mutations'}
+          {mode === 'act' && ' · can drive UI, never broadcasts'}
+          {connection ? ` · rpc ${connection.rpcEndpoint.includes('devnet') ? 'devnet' : 'mainnet'}` : ''}
+        </p>
+      </div>
+    </div>
   );
 }

@@ -4,10 +4,13 @@ import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ClientOnly } from './components/ClientOnly'
+import { SitewideAIAssistant } from './components/SitewideAIAssistant'
 import { WalletProvider } from './components/WalletProvider'
-import { PresaleCountdown } from './components/PresaleCountdown'
+
 import { NetworkProvider } from './contexts/NetworkContext'
+import { UserProvider } from './contexts/UserContext'
 import { TutorialProvider } from './contexts/TutorialContext'
+import { MultiversXWalletProvider } from './contexts/MultiversXWalletContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ChunkErrorHandler } from './components/ChunkErrorHandler'
 import { DevnetOnlyGuard } from './components/DevnetOnlyGuard'
@@ -62,16 +65,20 @@ export default function RootLayout({
           <NetworkProvider>
             <DevnetOnlyGuard>
               <WalletProvider>
-                <TutorialProvider>
-                  {children}
-                </TutorialProvider>
+                <UserProvider>
+                  <MultiversXWalletProvider>
+                    <TutorialProvider>
+                      {children}
+                      <ClientOnly>
+                        <SitewideAIAssistant />
+                      </ClientOnly>
+                    </TutorialProvider>
+                  </MultiversXWalletProvider>
+                </UserProvider>
               </WalletProvider>
             </DevnetOnlyGuard>
           </NetworkProvider>
         </ErrorBoundary>
-        <ClientOnly>
-          <PresaleCountdown />
-        </ClientOnly>
         <Analytics />
         <SpeedInsights />
       </body>

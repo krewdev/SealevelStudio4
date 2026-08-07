@@ -15,11 +15,11 @@ import {
   getTreeAuthority,
   deriveTreeAuthority,
 } from './config';
-import type { WalletContextState } from '@solana/wallet-adapter-react';
+import { requireSigningWallet, type SigningWallet } from '../wallet/active-signer';
 
 export interface MintAttestationParams {
   connection: Connection;
-  wallet: WalletContextState;
+  wallet: SigningWallet;
   usageCount: number; // Usage count for simple verification (replaces ZK proof)
   proofBytes?: Buffer; // Optional: kept for backward compatibility
   publicInputBytes?: Buffer; // Optional: kept for backward compatibility
@@ -32,7 +32,7 @@ export interface MintAttestationParams {
 
 export interface MintSubscriptionAttestationParams {
   connection: Connection;
-  wallet: WalletContextState;
+  wallet: SigningWallet;
   subscriptionTier: 'basic' | 'pro';
   metadata?: {
     name?: string;
@@ -50,8 +50,9 @@ export async function mintVeriSolAttestation(
 ): Promise<string> {
   const { connection, wallet, usageCount, proofBytes, publicInputBytes, metadata } = params;
 
-  if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
-    throw new Error('Wallet not connected or missing required methods');
+  const walletError = requireSigningWallet(wallet);
+  if (walletError || !wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
+    throw new Error(walletError || 'Wallet not connected or missing required methods');
   }
 
   // Check if custom attestation program is deployed
@@ -244,8 +245,9 @@ export async function mintSubscriptionAttestation(
 ): Promise<string> {
   const { connection, wallet, subscriptionTier, metadata } = params;
 
-  if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
-    throw new Error('Wallet not connected or missing required methods');
+  const walletError = requireSigningWallet(wallet);
+  if (walletError || !wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
+    throw new Error(walletError || 'Wallet not connected or missing required methods');
   }
 
   // Check if custom attestation program is deployed

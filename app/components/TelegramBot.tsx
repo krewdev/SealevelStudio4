@@ -19,7 +19,7 @@ import {
   Pause,
   Hash,
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
 import { useRiskConsent } from '../hooks/useRiskConsent';
 import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
@@ -40,7 +40,7 @@ interface TelegramBotProps {
 
 export function TelegramBot({ onBack }: TelegramBotProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('telegram-bot');
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [botInfo, setBotInfo] = useState<{ username?: string; firstName?: string; id?: string } | null>(null);

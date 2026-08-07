@@ -18,7 +18,7 @@ interface WalletProviderProps {
 }
 
 export const WalletProvider: FC<WalletProviderProps> = ({ children }) => {
-  const { network } = useNetwork();
+  const { network, ready } = useNetwork();
   
   // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
   const networkType = network === 'mainnet' ? WalletAdapterNetwork.Mainnet : WalletAdapterNetwork.Devnet;
@@ -31,10 +31,19 @@ export const WalletProvider: FC<WalletProviderProps> = ({ children }) => {
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
+      new SolflareWalletAdapter({ network: networkType }),
     ],
-    []
+    [networkType]
   );
+
+  // Wait until saved network is known so ConnectionProvider does not remount and drop Phantom.
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-400 flex items-center justify-center text-sm">
+        Loading wallet layer…
+      </div>
+    );
+  }
 
   return (
     <ConnectionProvider endpoint={endpoint}>

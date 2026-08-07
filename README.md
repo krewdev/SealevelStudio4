@@ -136,7 +136,9 @@ A. Funding: $150,000 Pre-Seed / Grant
 
 This 6-month runway will be allocated to:
 
-Core Team (2 Engineers): To build the frontend, simulation backend, and deserialization engine.
+- **Core Team (2 Engineers)**: To build the frontend, simulation backend, and deserialization engine.
+- **Design (1 Part-Time)**: To ensure a world-class, intuitive UX.
+- **Infrastructure Costs**: For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.
 
 
 **Solana Integration:**
@@ -190,19 +192,10 @@ Core Team (2 Engineers): To build the frontend, simulation backend, and deserial
 2. **Drop & Verify**: Drag cNFTs onto the console with instant ZK verification
 3. **Compose Transaction**: Select functions and configure parameters
 4. **Simulate & Execute**: Test with state diffs, then sign and send
-=======
-Design (1 Part-Time): To ensure a world-class, intuitive UX.
 
-Infrastructure Costs: For high-availability simulation RPCs (e.g., Helius, Triton) and hosting.
+### Phase 1: Foundation (Months 1-2)
+**Goal:** Core infrastructure and account inspector
 
-B. Strategic Partnerships
->>>
-
-We are seeking partnerships, not just capital. Our ideal partners are:
-
-L1 Foundations (Solana Foundation): For grant funding, ecosystem promotion, and inclusion in official developer documentation and bootcamps.
-
-<<<
 - [ ] Project setup with Next.js + TypeScript
 - [ ] Basic UI framework (Tailwind + shadcn/ui)
 - [ ] Solana connection and basic account fetching
@@ -349,6 +342,27 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📚 Documentation
+
+### Core Documentation
+- [User Guide](./docs/USER_GUIDE.md) - Complete user guide
+- [API Documentation](./docs/API.md) - API reference
+- [Deployment Guide](./docs/GOING_LIVE.md) - Going live checklist
+
+### Blockchain Support
+- **MultiverX**: 
+  - [Quick Start](./docs/MULTIVERX_QUICK_START.md) - Get started in 5 minutes
+  - [Complete Guide](./docs/MULTIVERX_GUIDE.md) - Comprehensive MultiverX documentation
+  - [Architecture Deep Dive](./docs/MULTIVERX_ARCHITECTURE.md) - Technical architecture details
+
+### Feature Documentation
+- [Arbitrage Scanner](./docs/ADVANCED_ARBITRAGE.md) - Advanced arbitrage features
+- [AI Agents](./docs/AGENT_HIERARCHY.md) - AI agent system
+- [Wallet Recovery](./docs/WALLET_RECOVERY_SETUP.md) - Wallet recovery setup
+- [Attestation System](./docs/ATTESTATION_SETUP_GUIDE.md) - VeriSol attestation
+
+See the [docs](./docs/) directory for complete documentation.
+
 ## 📞 Contact
 
 - **Project Lead**: James Young 
@@ -368,10 +382,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 *Built with ❤️ for the Solana ecosystem - Trust through Zero-Knowledge*
-=======
-Infrastructure Providers (Helius, Triton, QuickNode): For access to high-fidelity simulation RPCs and co-marketing to developer audiences.
-
-Core Tooling Teams (Anchor, Metaplex): To ensure first-class, "out-of-the-box" support for the most-used IDLs and program standards.
-
-Security & Audit Firms (Ottersec, Neodyme): As a "design partner" power-user group to provide critical feedback and ensure the tool meets security-critical standards.
 

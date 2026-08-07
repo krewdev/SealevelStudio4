@@ -14,7 +14,8 @@ import { AgentChat } from './AgentChat';
 import type { SimpleBlock } from './UnifiedTransactionBuilder';
 import { Transaction } from '@solana/web3.js';
 import { ArbitrageOpportunity, PoolData } from '../lib/pools/types';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { AgentSuggestion } from '../lib/agents/types';
 
@@ -43,7 +44,7 @@ interface UnifiedAIAgentsProps {
 }
 
 export function UnifiedAIAgents(props: UnifiedAIAgentsProps) {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const { connection } = useConnection();
   const { checkFeatureAccess, trackFeatureUsage, getStats, getTrialStatus, isTrialActive } = useUsageTracking();
   const [isOpen, setIsOpen] = useState(false);

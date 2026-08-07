@@ -80,6 +80,10 @@ export interface ArbitrageOpportunity {
   requiresFlashLoan?: boolean;
   jitoBundleId?: string;
   signalType?: 'new_pool' | 'large_swap' | 'lsd_depeg' | 'oracle_update';
+  /** heuristic = CP/TVL estimate; quote_verified = Jupiter round-trip checked */
+  accuracy?: 'heuristic' | 'quote_verified';
+  profitTokenSymbol?: string;
+  warnings?: string[];
 }
 
 export interface ScannerConfig {
@@ -118,7 +122,7 @@ export const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
   minProfitThreshold: 0.001, // 0.001 SOL minimum
   minProfitPercent: 0.1, // 0.1% minimum
   maxHops: 5,
-  enabledDEXs: ['raydium', 'orca', 'jupiter', 'meteora', 'lifinity'],
+  enabledDEXs: ['raydium', 'orca', 'jupiter'],
   showUnprofitable: true, // Show all results for training context
 };
 

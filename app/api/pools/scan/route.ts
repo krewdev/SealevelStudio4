@@ -8,8 +8,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Connection } from '@solana/web3.js';
 import { PoolScanner } from '@/app/lib/pools/scanner';
 import { DEFAULT_SCANNER_CONFIG } from '@/app/lib/pools/types';
+import { getSolanaRpcUrl, redactRpc } from '@/app/lib/quicknode/rpc';
 
 export const dynamic = 'force-dynamic';
+
+function jsonSafe(value: unknown): unknown {
+  if (typeof value === 'bigint') return value.toString();
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = jsonSafe(v);
+    }
+    return out;
+  }
+  return value;
+}
 
 /**
  * Scan for pools on-chain
@@ -26,45 +41,16 @@ export async function GET(request: NextRequest) {
       ? parseFloat(searchParams.get('minLiquidity')!) 
       : undefined;
 
-    // Get RPC endpoint - prefer Helius if API key is available
-    let rpcUrl: string;
-    if (network === 'mainnet') {
-      if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-        // Use Helius RPC for mainnet (better rate limits)
-        const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        // Extract API key if it's a full URL
-        let heliusKey = apiKey;
-        if (apiKey.includes('helius-rpc.com')) {
-          const match = apiKey.match(/[?&]api-key=([^&]+)/);
-          heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-        }
-        rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
-      } else {
-        rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 'https://api.mainnet-beta.solana.com';
-      }
-    } else {
-      if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-        const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        let heliusKey = apiKey;
-        if (apiKey.includes('helius-rpc.com')) {
-          const match = apiKey.match(/[?&]api-key=([^&]+)/);
-          heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-        }
-        rpcUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
-      } else {
-        rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 'https://api.devnet.solana.com';
-      }
-    }
+    const rpcUrl = getSolanaRpcUrl(network);
 
-    console.log(`[Pool Scan API] Using RPC: ${rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')}`);
+    console.log(`[Pool Scan API] Using RPC: ${redactRpc(rpcUrl)}`);
     const connection = new Connection(rpcUrl, 'confirmed');
 
-    // Create scanner with config and pass RPC URL
-    const scanner = new PoolScanner({ rpcUrl } as any);
     const config = {
       ...DEFAULT_SCANNER_CONFIG,
-      ...(dexes && { enabledDexes: dexes as any }),
+      ...(dexes && { enabledDEXs: dexes as any }),
     };
+    const scanner = new PoolScanner({ ...config, rpcUrl });
 
     // Scan for pools
     const startTime = Date.now();
@@ -117,20 +103,22 @@ export async function GET(request: NextRequest) {
     if (includeOpportunities) {
       const { ArbitrageDetector } = await import('@/app/lib/pools/arbitrage');
       const { DEFAULT_SCANNER_CONFIG } = await import('@/app/lib/pools/types');
-      const { Connection } = await import('@solana/web3.js');
-      
-      // Create connection for arbitrage detector
-      const rpcUrl = process.env.NEXT_PUBLIC_HELIUS_FAST_RPC || 
-                     (process.env.NEXT_PUBLIC_HELIUS_API_KEY 
-                       ? `https://mainnet.helius-rpc.com/?api-key=${process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
-                       : process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 'https://api.mainnet-beta.solana.com');
-      const connection = new Connection(rpcUrl, 'confirmed');
+
+      const connection = new Connection(getSolanaRpcUrl(network), 'confirmed');
       
       // Use default scanner config
       const config = DEFAULT_SCANNER_CONFIG;
       
       const detector = new ArbitrageDetector(pools, config, connection);
-      opportunities = await detector.detectOpportunities();
+      const detected = await detector.detectOpportunities();
+      const { verifyOpportunitiesWithJupiter } = await import('@/app/lib/arbitrage/quote-verify');
+      const sliced = detected.slice(0, 75);
+      try {
+        opportunities = await verifyOpportunitiesWithJupiter(sliced, 12);
+      } catch (verifyErr) {
+        console.warn('[Pool Scan API] quote verify skipped', verifyErr);
+        opportunities = sliced;
+      }
     }
 
     // Group pools by DEX
@@ -163,9 +151,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       stats,
-      pools,
-      poolsByDex,
-      opportunities,
+      pools: jsonSafe(pools),
+      poolsByDex: jsonSafe(poolsByDex),
+      opportunities: jsonSafe(opportunities),
       errors: scanResult.errors,
     });
   } catch (error) {
@@ -196,68 +184,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get RPC endpoint - prefer Helius Fast RPC or standard Helius if API key is available
-    let rpcUrl: string;
-    if (network === 'mainnet') {
-      // Check for Helius Fast RPC endpoint first
-      if (process.env.NEXT_PUBLIC_HELIUS_FAST_RPC) {
-        rpcUrl = process.env.NEXT_PUBLIC_HELIUS_FAST_RPC;
-        // Add API key if not already in URL
-        if (!rpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-          const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-          let heliusKey = apiKey;
-          if (apiKey.includes('helius-rpc.com')) {
-            const match = apiKey.match(/[?&]api-key=([^&]+)/);
-            heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-          }
-          const separator = rpcUrl.includes('?') ? '&' : '?';
-          rpcUrl = `${rpcUrl}${separator}api-key=${heliusKey}`;
-        }
-      } else if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-        const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        let heliusKey = apiKey;
-        if (apiKey.includes('helius-rpc.com')) {
-          const match = apiKey.match(/[?&]api-key=([^&]+)/);
-          heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-        }
-        rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
-      } else {
-        rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_MAINNET || 'https://api.mainnet-beta.solana.com';
-      }
-    } else {
-      if (process.env.NEXT_PUBLIC_HELIUS_FAST_RPC) {
-        rpcUrl = process.env.NEXT_PUBLIC_HELIUS_FAST_RPC;
-        if (!rpcUrl.includes('api-key') && process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-          const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-          let heliusKey = apiKey;
-          let hostnameIsHelius = false;
-          try {
-            const urlObj = new URL(apiKey);
-            // Check for exact hostname match (optionally allow devnet prefix)
-            hostnameIsHelius = urlObj.hostname === 'helius-rpc.com' || urlObj.hostname === 'devnet.helius-rpc.com';
-          } catch (e) {
-            // Not a URL, ignore
-          }
-          if (hostnameIsHelius) {
-            const match = apiKey.match(/[?&]api-key=([^&]+)/);
-            heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-          }
-          const separator = rpcUrl.includes('?') ? '&' : '?';
-          rpcUrl = `${rpcUrl}${separator}api-key=${heliusKey}`;
-        }
-      } else if (process.env.NEXT_PUBLIC_HELIUS_API_KEY) {
-        const apiKey = process.env.NEXT_PUBLIC_HELIUS_API_KEY;
-        let heliusKey = apiKey;
-        if (apiKey.includes('helius-rpc.com')) {
-          const match = apiKey.match(/[?&]api-key=([^&]+)/);
-          heliusKey = match ? match[1] : apiKey.split('api-key=')[1]?.split('&')[0] || apiKey;
-        }
-        rpcUrl = `https://devnet.helius-rpc.com/?api-key=${heliusKey}`;
-      } else {
-        rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_DEVNET || 'https://api.devnet.solana.com';
-      }
-    }
-
+    const rpcUrl = getSolanaRpcUrl(network);
     const connection = new Connection(rpcUrl, 'confirmed');
 
     // Scan for pools - pass RPC URL to scanner
@@ -277,7 +204,7 @@ export async function POST(request: NextRequest) {
       success: true,
       tokenA,
       tokenB,
-      pools: matchingPools,
+      pools: jsonSafe(matchingPools),
       count: matchingPools.length,
       timestamp: new Date().toISOString(),
     });

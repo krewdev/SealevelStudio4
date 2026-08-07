@@ -22,7 +22,8 @@ import {
   Pause,
   RefreshCw,
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PublicKey } from '@solana/web3.js';
 import { ContextManagerAgent, LocalStorageContextStorage, APIContextStorage } from '../lib/agents/context-manager';
 import { ContextAwareAgent, MasterContextAggregator } from '../lib/agents/context-integration';
@@ -56,7 +57,7 @@ interface Task {
 }
 
 export function AICyberPlayground({ onBack }: { onBack?: () => void }) {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected } = useActiveWallet();
   const { connection } = useConnection();
   
   const [masterActive, setMasterActive] = useState(false);

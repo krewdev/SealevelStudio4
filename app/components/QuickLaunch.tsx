@@ -7,7 +7,8 @@ import {
   Coins,
   Loader2
 } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { createRuglessLaunchTransaction, calculateLaunchEconomics } from '../lib/launch/rugless';
 import { TokenImageUploader } from './TokenImageUploader';
 
@@ -17,7 +18,7 @@ interface QuickLaunchProps {
 
 export function QuickLaunch({ onSuccess }: QuickLaunchProps) {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useActiveWallet();
 
   const [step, setStep] = useState<'input' | 'image' | 'confirm' | 'launching'>('input');
   const [tokenName, setTokenName] = useState('');

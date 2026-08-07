@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-export type BlockchainType = 'polkadot' | 'solana' | 'ethereum' | 'polygon' | 'avalanche' | 'base' | 'arbitrum' | 'optimism' | 'sui' | 'aptos';
+export type BlockchainType = 'polkadot' | 'solana' | 'ethereum' | 'polygon' | 'avalanche' | 'base' | 'arbitrum' | 'optimism' | 'sui' | 'aptos' | 'multiverx';
 
 interface BlockchainInfo {
   id: BlockchainType;
@@ -17,16 +17,6 @@ interface BlockchainInfo {
 
 const BLOCKCHAINS: BlockchainInfo[] = [
   {
-    id: 'polkadot',
-    name: 'Polkadot',
-    description: 'Interoperable blockchain network with parachains',
-    logo: 'https://cryptologos.cc/logos/polkadot-new-dot-logo.png?v=032',
-    color: 'from-pink-500 to-red-600',
-    gradient: 'bg-gradient-to-r from-pink-500 to-red-600',
-    status: 'available',
-    features: ['Transaction Builder', 'Parachain Support', 'Cross-Chain', 'Full Support'],
-  },
-  {
     id: 'solana',
     name: 'Solana',
     description: 'High-performance blockchain with sub-second finality',
@@ -35,6 +25,26 @@ const BLOCKCHAINS: BlockchainInfo[] = [
     gradient: 'bg-gradient-to-r from-purple-500 to-indigo-600',
     status: 'available',
     features: ['Transaction Builder', 'Arbitrage Scanner', 'AI Agents', 'Full Support'],
+  },
+  {
+    id: 'multiverx',
+    name: 'MultiversX',
+    description: 'Adaptive state sharding blockchain with high throughput',
+    logo: 'https://cryptologos.cc/logos/multiversx-egld-egld-logo.png?v=032',
+    color: 'from-orange-500 to-yellow-600',
+    gradient: 'bg-gradient-to-r from-orange-500 to-yellow-600',
+    status: 'available',
+    features: ['Transaction Builder', 'Shard Simulator', 'Cross-Shard', 'Full Support'],
+  },
+  {
+    id: 'polkadot',
+    name: 'Polkadot',
+    description: 'Interoperable blockchain network with parachains',
+    logo: 'https://cryptologos.cc/logos/polkadot-new-dot-logo.png?v=032',
+    color: 'from-pink-500 to-red-600',
+    gradient: 'bg-gradient-to-r from-pink-500 to-red-600',
+    status: 'available',
+    features: ['Transaction Builder', 'Parachain Support', 'Cross-Chain', 'Full Support'],
   },
   {
     id: 'ethereum',
@@ -236,7 +246,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
             The most powerful developer toolkit for blockchain development. Build, simulate, debug, and execute transactions across multiple chains with AI-powered assistance.
           </p>
           <p className="max-w-3xl mx-auto text-sm sm:text-base md:text-lg text-gray-400 mb-8 md:mb-10 px-4">
-            Visual transaction builder • Real-time simulation • Arbitrage scanner • AI agents • Code export • Multi-chain support
+            Visual transaction builder • Real-time simulation • Arbitrage scanner • Grok copilot • Code export • Multi-chain support
           </p>
           
           {/* Blockchain Selector */}
@@ -278,7 +288,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
                   <p className="text-xs sm:text-sm text-gray-400">Choose a blockchain to get started</p>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                  {BLOCKCHAINS.map((blockchain) => (
+                  {BLOCKCHAINS.filter(b => b.status === 'available').map((blockchain) => (
                     <button
                       key={blockchain.id}
                       type="button"

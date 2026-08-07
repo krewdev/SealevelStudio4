@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { 
   Rocket, 
@@ -27,7 +28,7 @@ interface RuglessLaunchpadProps {
 
 export function RuglessLaunchpad({ onBack }: RuglessLaunchpadProps) {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useActiveWallet();
 
   // Form State
   const [tokenName, setTokenName] = useState('');

@@ -20,7 +20,7 @@ export class PoolScanner {
   private rpcUrl?: string;
   private lastScanTime: number = 0;
   private readonly CACHE_TTL = 60000; // 60 seconds cache TTL
-  private readonly MIN_SCAN_INTERVAL = 30000; // Minimum 30 seconds between scans
+  private readonly MIN_SCAN_INTERVAL = 8000; // Minimum 8 seconds between scans
 
   constructor(config: Partial<ScannerConfig> & { rpcUrl?: string } = {}) {
     this.rpcUrl = config.rpcUrl;
@@ -108,7 +108,11 @@ export class PoolScanner {
           if (this.rpcUrl) {
             if (typeof (fetcher as any).setRpcUrl === 'function') {
               (fetcher as any).setRpcUrl(this.rpcUrl);
-              console.log(`[Scanner] Set RPC URL for ${dex}: ${this.rpcUrl.replace(/api-key=[^&]+/, 'api-key=***')}`);
+              console.log(
+                `[Scanner] Set RPC URL for ${dex}: ${this.rpcUrl
+                  .replace(/api-key=[^&]+/gi, 'api-key=***')
+                  .replace(/(quiknode\.pro\/)[^/?#]+/gi, '$1***')}`
+              );
             } else {
               console.warn(`[Scanner] Fetcher ${dex} does not have setRpcUrl method`);
             }

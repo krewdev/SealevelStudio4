@@ -2,7 +2,7 @@
 // Provides easy access to usage tracking functionality
 
 import { useCallback } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from './useActiveWallet';
 import {
   trackUsage,
   getUsageStats,
@@ -16,7 +16,7 @@ import {
 } from '../lib/usage-tracking';
 
 export function useUsageTracking() {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   
   const userId = publicKey?.toString() || '';
   

@@ -18,7 +18,7 @@ import {
   Database,
   ExternalLink,
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { AgentMessage, AgentSuggestion } from '../lib/agents/types';
@@ -41,7 +41,7 @@ interface GlobalScannerAgentProps {
 }
 
 export function GlobalScannerAgent({}: GlobalScannerAgentProps) {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const { connection } = useConnection();
   const { trackFeatureUsage, checkFeatureAccess } = useUsageTracking();
 

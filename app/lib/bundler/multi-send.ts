@@ -14,6 +14,7 @@ import {
 } from '@solana/web3.js';
 import { MultiSendConfig, MultiSendResult, MultiSendEstimate, MultiSendRecipient } from './types';
 import { walletRegistry } from '../wallet-manager';
+import type { SigningWallet } from '../wallet/active-signer';
 
 const MAX_RECIPIENTS = 50;
 const MAX_TRANSACTION_SIZE = 1232; // Solana transaction size limit (actual limit is 1232 bytes)
@@ -248,7 +249,7 @@ export async function buildMultiSendTransaction(
  */
 export async function executeMultiSend(
   connection: Connection,
-  wallet: any, // WalletContextState
+  wallet: SigningWallet,
   config: MultiSendConfig
 ): Promise<MultiSendResult> {
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {

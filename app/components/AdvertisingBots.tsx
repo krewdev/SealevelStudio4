@@ -20,7 +20,7 @@ import {
   Edit,
   Copy
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { TelegramAdvertisingBot } from '../lib/advertising/telegram-bot';
 import { TwitterAdvertisingBot } from '../lib/advertising/twitter-bot';
 import { AdvertisingConfig } from '../lib/advertising/types';
@@ -47,7 +47,7 @@ interface BotInstance {
 
 export function AdvertisingBots({ onBack }: AdvertisingBotsProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('advertising-bots');
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [activeTab, setActiveTab] = useState<'telegram' | 'twitter' | 'dashboard'>('dashboard');
   const [bots, setBots] = useState<BotInstance[]>([]);
   const [isCreating, setIsCreating] = useState(false);

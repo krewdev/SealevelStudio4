@@ -3,7 +3,7 @@
 
 import { Connection, PublicKey } from '@solana/web3.js';
 import { mintSubscriptionAttestation, MintSubscriptionAttestationParams } from './mint';
-import type { WalletContextState } from '@solana/wallet-adapter-react';
+import { requireSigningWallet, type SigningWallet } from '../wallet/active-signer';
 
 export interface SubscriptionVerificationResult {
   wallet: string;
@@ -112,11 +112,12 @@ export async function verifySubscriptionForMint(
  */
 export async function mintSubscriptionAttestationCNFT(
   connection: Connection,
-  wallet: WalletContextState,
+  wallet: SigningWallet,
   subscriptionTier: 'basic' | 'pro'
 ): Promise<string> {
-  if (!wallet.publicKey) {
-    throw new Error('Wallet not connected');
+  const walletError = requireSigningWallet(wallet);
+  if (walletError || !wallet.publicKey) {
+    throw new Error(walletError || 'Wallet not connected');
   }
 
   // First verify subscription status

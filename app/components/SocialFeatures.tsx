@@ -20,7 +20,7 @@ import {
   Link as LinkIcon,
   X
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 
 interface SocialFeaturesProps {
   onBack?: () => void;
@@ -52,7 +52,7 @@ interface PublicProfile {
 }
 
 export function SocialFeatures({ onBack }: SocialFeaturesProps) {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [activeTab, setActiveTab] = useState<'share' | 'profile' | 'marketplace' | 'community'>('share');
   const [templates, setTemplates] = useState<TransactionTemplate[]>([]);
   const [profile, setProfile] = useState<PublicProfile | null>(null);

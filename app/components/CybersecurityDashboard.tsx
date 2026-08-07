@@ -22,14 +22,14 @@ import {
 } from 'lucide-react';
 import { CybersecurityFinder } from './CybersecurityFinder';
 import { SecurityAI } from './SecurityAI';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 
 interface CybersecurityDashboardProps {
   onBack?: () => void;
 }
 
 export function CybersecurityDashboard({ onBack }: CybersecurityDashboardProps) {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [activeTab, setActiveTab] = useState<'overview' | 'code-analyzer' | 'security-scanner' | 'reports'>('overview');
   const [scanHistory, setScanHistory] = useState<any[]>([]);
   const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);

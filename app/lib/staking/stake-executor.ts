@@ -6,7 +6,7 @@
 import {
   Connection,
 } from '@solana/web3.js';
-import { WalletContextState } from '@solana/wallet-adapter-react';
+import { requireSigningWallet, type SigningWallet } from '../wallet/active-signer';
 import { getAllStakingProviders, getStakingProvider, StakingProvider } from './staking-providers';
 
 export interface StakeExecutionResult {
@@ -24,14 +24,15 @@ export interface StakeExecutionResult {
  */
 export async function executeStake(
   connection: Connection,
-  wallet: WalletContextState,
+  wallet: SigningWallet,
   amount: number,
   providerId: string
 ): Promise<StakeExecutionResult> {
-  if (!wallet.publicKey || !wallet.sendTransaction) {
+  const walletError = requireSigningWallet(wallet);
+  if (walletError || !wallet.publicKey || !wallet.sendTransaction) {
     return {
       success: false,
-      error: 'Wallet not connected',
+      error: walletError || 'Wallet not connected',
     };
   }
 

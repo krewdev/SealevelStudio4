@@ -18,7 +18,7 @@ import {
   Clock,
   Gift,
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { AgentMessage, AgentSuggestion } from '../lib/agents/types';
 import { useUsageTracking } from '../hooks/useUsageTracking';
@@ -37,7 +37,7 @@ interface AccountSecurityAgentProps {
 }
 
 export function AccountSecurityAgent({}: AccountSecurityAgentProps) {
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const { connection } = useConnection();
   const {
     getStats,

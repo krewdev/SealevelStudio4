@@ -18,16 +18,15 @@ import {
   Settings,
   Info
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { PublicKey, LAMPORTS_PER_SOL, Connection } from '@solana/web3.js';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { buildMultiSendTransaction, estimateMultiSend } from '../lib/bundler/multi-send';
 import { MultiSendConfig, MultiSendRecipient } from '../lib/bundler/types';
 import { walletRegistry } from '../lib/wallet-manager';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
 import { useRiskConsent } from '../hooks/useRiskConsent';
 import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
-import { useUser } from '../contexts/UserContext';
-import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 
 interface TransactionBundlerProps {
   onBack?: () => void;
@@ -35,9 +34,8 @@ interface TransactionBundlerProps {
 
 export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('bundler');
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, label } = useActiveWallet();
   const { connection } = useConnection();
-  const { user } = useUser();
   const [recipients, setRecipients] = useState<MultiSendRecipient[]>([
     { address: '', amount: 0.1 }
   ]);
@@ -70,13 +68,10 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   };
 
   const handleEstimate = useCallback(async () => {
-    // Use custodial wallet if available, otherwise external wallet
-    const payerPublicKey = user?.walletAddress 
-      ? new PublicKey(user.walletAddress)
-      : publicKey;
-      
+    const payerPublicKey = publicKey;
+
     if (!payerPublicKey) {
-      setError('Please connect your wallet or create a custodial wallet');
+      setError('Connect Phantom or create a studio wallet in the header first');
       return;
     }
 
@@ -118,22 +113,13 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     } finally {
       setIsBuilding(false);
     }
-  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo, user]);
+  }, [connection, publicKey, recipients, createAccounts, priorityFee, memo]);
 
   const handleSend = useCallback(async () => {
-    // Check if we should use custodial wallet
-    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
-    const payerPublicKey = useCustodial && user?.walletAddress 
-      ? new PublicKey(user.walletAddress)
-      : publicKey;
+    const payerPublicKey = publicKey;
 
-    if (!payerPublicKey) {
-      setError('Please connect your wallet or create a custodial wallet');
-      return;
-    }
-
-    if (!useCustodial && (!sendTransaction)) {
-      setError('Please connect your wallet');
+    if (!payerPublicKey || !sendTransaction) {
+      setError('Connect Phantom or create a studio wallet in the header first');
       return;
     }
 
@@ -176,28 +162,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
         }
       }
 
-      // Sign and send
-      let signature: string;
-      if (useCustodial && user?.walletAddress) {
-        // Sign with custodial wallet (includes signing for new keypairs)
-        const signedTx = await signTransactionWithCustodialAndSigners(
-          transaction,
-          signers,
-          {
-            userWalletAddress: user.walletAddress,
-            connection,
-          }
-        );
-        // Send already-signed transaction
-        const serialized = signedTx.serialize({ requireAllSignatures: false });
-        signature = await connection.sendRawTransaction(serialized, {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else {
-        // Use external wallet
-        signature = await sendTransaction(transaction, connection, { signers });
-      }
+      const signature = await sendTransaction(transaction, connection, { signers });
       
       await connection.confirmTransaction(signature, 'confirmed');
 
@@ -213,7 +178,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
     } finally {
       setIsSending(false);
     }
-  }, [connection, publicKey, sendTransaction, recipients, createAccounts, priorityFee, memo, estimate, user]);
+  }, [connection, publicKey, sendTransaction, recipients, createAccounts, priorityFee, memo, estimate]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -224,7 +189,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
   const importRecipients = (text: string) => {
     try {
       const lines = text.split('\n').filter(l => l.trim());
-      const imported = lines.map(line => {
+      const imported = lines.map((line: string) => {
         const parts = line.split(/[\s,]+/);
         const address = parts[0];
         const amount = parseFloat(parts[1] || '0.1');
@@ -322,7 +287,7 @@ export function TransactionBundler({ onBack }: TransactionBundlerProps) {
           {publicKey && (
             <div className="flex items-center gap-2 px-3 py-2 bg-green-900/30 border border-green-700/50 rounded-lg">
               <CheckCircle size={14} className="text-green-400" />
-              <span className="text-sm text-green-400">Wallet Connected</span>
+              <span className="text-sm text-green-400">{label}</span>
             </div>
           )}
         </div>

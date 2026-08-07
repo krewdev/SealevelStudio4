@@ -25,8 +25,10 @@ import {
   PiggyBank,
   TrendingDown,
   Activity,
+  Link2,
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import {
   DEFAULT_PRESALE_CONFIG,
@@ -38,6 +40,17 @@ import {
   getWalletContribution,
   isWhitelisted,
 } from '../lib/seal-token/presale';
+import {
+  DEFAULT_PRESALE_MULTIVERX_CONFIG,
+  PresaleMultiversXConfig,
+  calculateSealTokensMultiversX,
+  validateContributionMultiversX,
+  getPresaleStatsMultiversX,
+  getWalletContributionMultiversX,
+  isWhitelistedMultiversX,
+  createPresaleMultiversXConfig,
+} from '../lib/seal-token/presale-multiversx';
+import { useMultiversXWallet } from '../contexts/MultiversXWalletContext';
 import { SEAL_TOKEN_CONFIG } from '../lib/seal-token/config';
 
 interface BuyNotification {
@@ -52,23 +65,69 @@ interface SealPresaleProps {
   onBack?: () => void;
 }
 
-export function SealPresale({ onBack }: SealPresaleProps) {
-  const { publicKey, sendTransaction, connected } = useWallet();
-  const { connection } = useConnection();
+type PresaleChain = 'solana' | 'multiversx';
 
-  const [config, setConfig] = useState<PresaleConfig>({
+export function SealPresale({ onBack }: SealPresaleProps) {
+  const { publicKey, sendTransaction, connected } = useActiveWallet();
+  const { connection } = useConnection();
+  const multiversXWallet = useMultiversXWallet();
+
+  const [presaleChain, setPresaleChain] = useState<PresaleChain>('solana');
+  const [config, setConfig] = useState<PresaleConfig>(() => ({
     ...DEFAULT_PRESALE_CONFIG,
     treasuryWallet: publicKey || PublicKey.default, // Set to user's wallet
-  });
+    // Create new instances of mutable collections to prevent shared state
+    whitelist: new Set(DEFAULT_PRESALE_CONFIG.whitelist),
+    contributions: new Map(DEFAULT_PRESALE_CONFIG.contributions),
+  }));
+  const [configMx, setConfigMx] = useState<PresaleMultiversXConfig>(() => createPresaleMultiversXConfig());
   const [solAmount, setSolAmount] = useState<string>('1');
+  const [egldAmount, setEgldAmount] = useState<string>('1');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [stats, setStats] = useState(getPresaleStats(DEFAULT_PRESALE_CONFIG));
+  const [statsMx, setStatsMx] = useState(() => getPresaleStatsMultiversX(DEFAULT_PRESALE_MULTIVERX_CONFIG));
   const [buyNotifications, setBuyNotifications] = useState<BuyNotification[]>([]);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [isStarted, setIsStarted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
+
+  // Set MultiversX treasury from env
+  useEffect(() => {
+    const treasury = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_MULTIVERX_TREASURY_ADDRESS
+      ? process.env.NEXT_PUBLIC_MULTIVERX_TREASURY_ADDRESS
+      : '';
+    if (treasury) setConfigMx(prev => ({ ...prev, treasuryAddress: treasury }));
+  }, []);
+
+  // Update isActive based on presale timing (Solana config)
+  useEffect(() => {
+    const updateActiveStatus = () => {
+      const now = new Date();
+      const isCurrentlyActive = now >= config.startTime && now <= config.endTime;
+      if (config.isActive !== isCurrentlyActive) {
+        setConfig(prev => ({ ...prev, isActive: isCurrentlyActive }));
+      }
+    };
+    updateActiveStatus();
+    const activeCheckInterval = setInterval(updateActiveStatus, 1000);
+    return () => clearInterval(activeCheckInterval);
+  }, [config.startTime, config.endTime, config.isActive]);
+
+  // Update isActive for MultiversX config (same timing)
+  useEffect(() => {
+    const updateActiveStatus = () => {
+      const now = new Date();
+      const isCurrentlyActive = now >= configMx.startTime && now <= configMx.endTime;
+      if (configMx.isActive !== isCurrentlyActive) {
+        setConfigMx(prev => ({ ...prev, isActive: isCurrentlyActive }));
+      }
+    };
+    updateActiveStatus();
+    const activeCheckInterval = setInterval(updateActiveStatus, 1000);
+    return () => clearInterval(activeCheckInterval);
+  }, [configMx.startTime, configMx.endTime, configMx.isActive]);
 
   // Countdown timer
   useEffect(() => {
@@ -147,19 +206,29 @@ export function SealPresale({ onBack }: SealPresaleProps) {
   useEffect(() => {
     setStats(getPresaleStats(config));
   }, [config]);
+  useEffect(() => {
+    setStatsMx(getPresaleStatsMultiversX(configMx));
+  }, [configMx]);
 
   // Calculate tokens for current input
   const tokenCalculation = solAmount
     ? calculateSealTokens(parseFloat(solAmount) || 0, config)
+    : { baseTokens: 0, bonusTokens: 0, totalTokens: 0, bonusPercent: 0 };
+  const tokenCalculationMx = egldAmount
+    ? calculateSealTokensMultiversX(parseFloat(egldAmount) || 0, configMx)
     : { baseTokens: 0, bonusTokens: 0, totalTokens: 0, bonusPercent: 0 };
 
   // Get wallet contribution info
   const walletInfo = publicKey
     ? getWalletContribution(publicKey, config)
     : { contributed: 0, sealTokens: 0, canContribute: false, remainingAllowance: 0 };
+  const walletInfoMx = multiversXWallet.address
+    ? getWalletContributionMultiversX(multiversXWallet.address, configMx)
+    : { contributed: 0, sealTokens: 0, canContribute: false, remainingAllowance: 0 };
 
   // Check whitelist status
   const whitelisted = publicKey ? isWhitelisted(publicKey, config) : true;
+  const whitelistedMx = multiversXWallet.address ? isWhitelistedMultiversX(multiversXWallet.address, configMx) : true;
 
   // Handle contribution
   const handleContribute = useCallback(async () => {
@@ -217,13 +286,15 @@ export function SealPresale({ onBack }: SealPresaleProps) {
       );
 
       // Update config (in a real app, this would come from on-chain data)
-      const updatedConfig = { ...config };
-      const existing = updatedConfig.contributions.get(publicKey.toString()) || 0;
-      updatedConfig.contributions.set(publicKey.toString(), existing + amount);
-      updatedConfig.totalRaised += amount;
-      if (existing === 0) {
-        updatedConfig.totalContributors += 1;
-      }
+      const existing = config.contributions.get(publicKey.toString()) || 0;
+      const updatedContributions = new Map(config.contributions);
+      updatedContributions.set(publicKey.toString(), existing + amount);
+      const updatedConfig = {
+        ...config,
+        contributions: updatedContributions,
+        totalRaised: config.totalRaised + amount,
+        totalContributors: existing === 0 ? config.totalContributors + 1 : config.totalContributors,
+      };
       setConfig(updatedConfig);
 
       const sealAmountFormatted = (sealAmount / Math.pow(10, 9)).toLocaleString();
@@ -240,6 +311,73 @@ export function SealPresale({ onBack }: SealPresaleProps) {
       setIsProcessing(false);
     }
   }, [publicKey, connected, solAmount, config, connection, sendTransaction]);
+
+  const handleContributeMultiversX = useCallback(async () => {
+    if (!multiversXWallet.address || !multiversXWallet.isConnected) {
+      setError('Please connect your MultiversX wallet');
+      return;
+    }
+    const amount = parseFloat(egldAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setError('Please enter a valid EGLD amount');
+      return;
+    }
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const validation = validateContributionMultiversX(multiversXWallet.address, amount, configMx);
+      if (!validation.valid) {
+        setError(validation.error ?? 'Invalid contribution');
+        setIsProcessing(false);
+        return;
+      }
+      const buildRes = await fetch('/api/presale/multiversx/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: multiversXWallet.address, egldAmount: amount }),
+      });
+      const buildData = await buildRes.json();
+      if (!buildData.success || !buildData.transaction) {
+        setError(buildData.error ?? 'Failed to build transaction');
+        setIsProcessing(false);
+        return;
+      }
+      const signed = await multiversXWallet.signTransaction(buildData.transaction);
+      const txToSend = typeof signed === 'object' && signed !== null ? signed : buildData.transaction;
+      const sendRes = await fetch('/api/presale/multiversx/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(txToSend),
+      });
+      const sendData = await sendRes.json();
+      if (!sendData.success || !sendData.txHash) {
+        setError(sendData.error ?? 'Failed to send transaction');
+        setIsProcessing(false);
+        return;
+      }
+      const { totalTokens } = calculateSealTokensMultiversX(amount, configMx);
+      const existing = configMx.contributions.get(multiversXWallet.address) ?? 0;
+      const updatedContributions = new Map(configMx.contributions);
+      updatedContributions.set(multiversXWallet.address, existing + amount);
+      const updated = {
+        ...configMx,
+        contributions: updatedContributions,
+        totalRaised: configMx.totalRaised + amount,
+        totalContributors: existing === 0 ? configMx.totalContributors + 1 : configMx.totalContributors,
+      };
+      setConfigMx(updated);
+      setSuccess(
+        `Successfully contributed ${amount} EGLD! You will receive ${Math.floor(totalTokens).toLocaleString()} SEAL tokens. Tx: ${sendData.txHash.slice(0, 10)}...`
+      );
+      setEgldAmount('');
+      setTimeout(() => setSuccess(null), 8000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Transaction failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [multiversXWallet.address, multiversXWallet.isConnected, multiversXWallet.signTransaction, egldAmount, configMx]);
 
   // Format date
   const formatDate = (date: Date) => {
@@ -479,25 +617,108 @@ export function SealPresale({ onBack }: SealPresaleProps) {
           </div>
         </div>
 
-        {/* Vesting Information */}
+          {/* Three Tier Structure */}
         <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 mb-8">
-          <h2 className="text-2xl font-bold text-center mb-6">Token Vesting Schedule</h2>
+          <h2 className="text-2xl font-bold text-center mb-6">Three Progressive Tiers</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-900/50 to-blue-800/50 rounded-xl border border-blue-700">
+              <Crown className="text-blue-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-blue-300">Tier 1</h3>
+              <p className="text-gray-300 font-semibold mb-2">1 - 9.99 SOL</p>
+              <p className="text-blue-400 text-2xl font-bold mb-2">15% Bonus</p>
+              <p className="text-gray-400 text-sm">Entry level tier with solid bonus</p>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-purple-900/50 to-purple-800/50 rounded-xl border border-purple-700">
+              <Star className="text-purple-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-purple-300">Tier 2</h3>
+              <p className="text-gray-300 font-semibold mb-2">10 - 49.99 SOL</p>
+              <p className="text-purple-400 text-2xl font-bold mb-2">25% Bonus</p>
+              <p className="text-gray-400 text-sm">Premium tier with enhanced rewards</p>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-yellow-900/50 to-orange-800/50 rounded-xl border border-yellow-700">
+              <Flame className="text-yellow-400 w-12 h-12 mx-auto mb-3" />
+              <h3 className="font-bold text-lg mb-2 text-yellow-300">Tier 3</h3>
+              <p className="text-gray-300 font-semibold mb-2">50+ SOL</p>
+              <p className="text-yellow-400 text-2xl font-bold mb-2">35% Bonus</p>
+              <p className="text-gray-400 text-sm">Elite tier with maximum benefits</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Structured Vesting Schedule */}
+        <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 mb-8">
+          <h2 className="text-2xl font-bold text-center mb-6">Structured Vesting Schedule</h2>
+          <p className="text-center text-gray-400 mb-6">Progressive unlock schedule based on tier - Higher tiers unlock faster</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-blue-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Week 1</h3>
-              <p className="text-gray-400 text-sm">25% tokens unlocked immediately</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-blue-300">Tier 1 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-blue-400 font-semibold">20%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-blue-400 font-semibold">+30% (50% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-blue-400 font-semibold">+30% (80% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-blue-400 font-semibold">+20% (100% vested)</span>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-purple-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Week 3</h3>
-              <p className="text-gray-400 text-sm">Additional 25% unlocked</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-purple-300">Tier 2 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-purple-400 font-semibold">25%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-purple-400 font-semibold">+35% (60% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-purple-400 font-semibold">+25% (85% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-purple-400 font-semibold">+15% (100% vested)</span>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-              <Clock className="text-green-400 w-12 h-12 mx-auto mb-3" />
-              <h3 className="font-bold text-lg mb-2">Month 1</h3>
-              <p className="text-gray-400 text-sm">Final 50% fully vested</p>
+            <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+              <h3 className="font-bold text-lg mb-3 text-yellow-300">Tier 3 Vesting</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">At Presale End:</span>
+                  <span className="text-yellow-400 font-semibold">30%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 30 days:</span>
+                  <span className="text-yellow-400 font-semibold">+40% (70% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 60 days:</span>
+                  <span className="text-yellow-400 font-semibold">+20% (90% total)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">After 90 days:</span>
+                  <span className="text-yellow-400 font-semibold">+10% (100% vested)</span>
+                </div>
+              </div>
             </div>
+          </div>
+          <div className="mt-6 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
+            <p className="text-sm text-green-300 text-center">
+              <Shield className="inline w-4 h-4 mr-2" />
+              All vesting schedules are enforced on-chain via smart contracts for maximum security and transparency
+            </p>
           </div>
         </div>
 
@@ -508,25 +729,69 @@ export function SealPresale({ onBack }: SealPresaleProps) {
             <p className="text-gray-400">Secure your discounted membership and unlock premium DeFi tools</p>
           </div>
 
+          {/* Chain toggle: Solana (SOL) | MultiversX (EGLD) */}
+          <div className="flex justify-center gap-3 mb-8">
+            <button
+              type="button"
+              onClick={() => setPresaleChain('solana')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all border ${
+                presaleChain === 'solana'
+                  ? 'bg-violet-600/30 border-violet-500 text-violet-300'
+                  : 'bg-slate-800/50 border-slate-700 text-gray-400 hover:border-slate-600'
+              }`}
+            >
+              <Activity className="w-5 h-5" />
+              Solana (SOL)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresaleChain('multiversx')}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all border ${
+                presaleChain === 'multiversx'
+                  ? 'bg-orange-600/30 border-orange-500 text-orange-300'
+                  : 'bg-slate-800/50 border-slate-700 text-gray-400 hover:border-slate-600'
+              }`}
+            >
+              <Link2 className="w-5 h-5" />
+              MultiversX (EGLD)
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Contribution Form */}
             <div className="space-y-6">
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Wallet className="text-purple-400" size={24} />
-                  Make Your Contribution
+                  Make Your Contribution {presaleChain === 'multiversx' && <span className="text-orange-400 text-sm">(MultiversX)</span>}
                 </h3>
 
-                {!connected && (
+                {presaleChain === 'solana' && !connected && (
                   <div className="p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-yellow-400">
                       <AlertCircle size={20} />
-                      <span>Please connect your wallet to contribute</span>
+                      <span>Please connect your Solana wallet to contribute</span>
+                    </div>
+                  </div>
+                )}
+                {presaleChain === 'multiversx' && !multiversXWallet.isConnected && (
+                  <div className="p-4 bg-orange-900/30 border border-orange-700 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 text-orange-400">
+                      <AlertCircle size={20} />
+                      <span>Please connect your MultiversX wallet (xPortal / DeFi) to contribute with EGLD</span>
                     </div>
                   </div>
                 )}
 
-                {connected && !whitelisted && config.whitelistEnabled && (
+                {presaleChain === 'solana' && connected && !whitelisted && config.whitelistEnabled && (
+                  <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
+                    <div className="flex items-center gap-2 text-red-400">
+                      <AlertCircle size={20} />
+                      <span>Your wallet is not whitelisted for this presale</span>
+                    </div>
+                  </div>
+                )}
+                {presaleChain === 'multiversx' && multiversXWallet.isConnected && !whitelistedMx && configMx.whitelistEnabled && (
                   <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-red-400">
                       <AlertCircle size={20} />
@@ -535,7 +800,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
                   </div>
                 )}
 
-                {walletInfo.contributed > 0 && (
+                {presaleChain === 'solana' && walletInfo.contributed > 0 && (
                   <div className="p-4 bg-blue-900/30 border border-blue-700 rounded-lg mb-4">
                     <div className="flex items-center gap-2 text-blue-400 mb-2">
                       <CheckCircle size={20} />
@@ -645,7 +910,7 @@ export function SealPresale({ onBack }: SealPresaleProps) {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <div className="text-gray-400">Duration</div>
-                    <div className="font-medium">5 Months</div>
+                    <div className="font-medium">3 Months (90 days)</div>
                   </div>
                   <div>
                     <div className="text-gray-400">Total Tokens</div>

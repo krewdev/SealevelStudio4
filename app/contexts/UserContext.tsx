@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface UserProfile {
@@ -48,21 +50,62 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const initializeUser = async () => {
     setIsLoading(true);
     try {
+      // Check if localStorage is available (client-side only)
+      if (typeof window === 'undefined' || !localStorage) {
+        console.warn('localStorage not available, skipping wallet initialization');
+        setIsLoading(false);
+        return;
+      }
+
       // Check if user has a wallet in localStorage
       const storedWalletId = localStorage.getItem('wallet_id');
       const storedProfile = localStorage.getItem('user_profile');
 
       if (storedProfile && storedWalletId) {
-        const profile = JSON.parse(storedProfile);
-        setUser(profile);
-        // Refresh balance - pass walletAddress directly to avoid state timing issue
-        await refreshBalance(profile.walletAddress);
+        try {
+          const profile = JSON.parse(storedProfile);
+          // Validate profile has required fields
+          if (profile.walletAddress && profile.walletId) {
+            setUser(profile);
+            // Refresh balance - pass walletAddress directly to avoid state timing issue
+            // Non-blocking: don't fail initialization if balance refresh fails
+            try {
+              await refreshBalance(profile.walletAddress);
+            } catch (balanceError) {
+              console.warn('Failed to refresh balance during initialization, but continuing:', balanceError);
+              // Continue - user can still use the app
+            }
+          } else {
+            // Invalid profile, create new wallet
+            console.warn('Invalid profile in localStorage, creating new wallet');
+            try {
+              await createWallet();
+            } catch (createError) {
+              console.error('Failed to create wallet during initialization:', createError);
+              // Don't throw - let user see LoginGate to manually create wallet
+            }
+          }
+        } catch (parseError) {
+          console.error('Failed to parse stored profile:', parseError);
+          // Clear invalid data and create new wallet
+          localStorage.removeItem('user_profile');
+          localStorage.removeItem('wallet_id');
+          try {
+            await createWallet();
+          } catch (createError) {
+            console.error('Failed to create wallet after clearing invalid data:', createError);
+            // Don't throw - let user see LoginGate to manually create wallet
+          }
+        }
       } else {
-        // Create a new wallet
-        await createWallet();
+        // No stored wallet - don't auto-create, let user manually create via LoginGate
+        // This gives users control and prevents silent failures
+        console.log('No stored wallet found, user will create wallet via LoginGate');
       }
     } catch (error) {
       console.error('Failed to initialize user:', error);
+      // Don't leave user in loading state if initialization fails
+      // They can retry by refreshing the page or use LoginGate
     } finally {
       setIsLoading(false);
     }
@@ -78,6 +121,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
    */
   const createWallet = async (email?: string, vanityPrefix?: string) => {
     try {
+      // Check if localStorage is available (client-side only)
+      if (typeof window === 'undefined' || !localStorage) {
+        throw new Error('localStorage is not available. Please ensure you are running this in a browser environment.');
+      }
+
       // Generate a session ID for this user
       let sessionId = localStorage.getItem('session_id');
       if (!sessionId) {
@@ -91,10 +139,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ sessionId, email, vanityPrefix }),
       });
 
+      // Check if response is OK before parsing
+      if (!response.ok) {
+        let errorMessage = `Failed to create wallet: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If JSON parsing fails, use the default error message
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
       
       if (!data.success || !data.wallet) {
         throw new Error(data.error || 'Failed to create wallet');
+      }
+
+      // Validate required wallet data
+      if (!data.wallet.address || !data.wallet.walletId) {
+        throw new Error('Invalid wallet data received from server');
       }
 
       const newUser: UserProfile = {
@@ -107,9 +172,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
         campaigns: []
       };
 
+      // Set user state and save to localStorage FIRST to ensure user can proceed
+      // This must happen synchronously before any async operations
       setUser(newUser);
       saveProfile(newUser);
       localStorage.setItem('wallet_id', data.wallet.walletId);
+      
+      // Verify localStorage was saved (defensive check)
+      if (typeof window !== 'undefined' && localStorage) {
+        const verifySaved = localStorage.getItem('user_profile');
+        if (!verifySaved) {
+          console.warn('Profile not saved to localStorage, retrying...');
+          // Retry saving
+          localStorage.setItem('user_profile', JSON.stringify(newUser));
+          localStorage.setItem('wallet_id', data.wallet.walletId);
+        }
+      }
+      
+      // Refresh balance after wallet creation (non-blocking - don't fail if this errors)
+      // This ensures users can proceed even if balance check fails
+      try {
+        await refreshBalance(newUser.walletAddress);
+      } catch (balanceError) {
+        console.warn('Failed to refresh balance after wallet creation, but wallet was created successfully:', balanceError);
+        // Don't throw - wallet creation was successful, user can proceed
+      }
     } catch (error) {
       console.error('Failed to create wallet:', error);
       throw error;
@@ -122,30 +209,59 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   const saveProfile = (profile: UserProfile) => {
-    localStorage.setItem('user_profile', JSON.stringify(profile));
+    if (typeof window !== 'undefined' && localStorage) {
+      localStorage.setItem('user_profile', JSON.stringify(profile));
+    }
     setUser(profile);
   };
 
   const refreshBalance = async (walletAddress?: string) => {
     // Use provided walletAddress or fall back to user state
     const address = walletAddress || user?.walletAddress;
-    if (!address) return;
+    if (!address) {
+      console.warn('refreshBalance called without wallet address');
+      return;
+    }
     
     try {
-      const response = await fetch(`/api/wallet/info?address=${address}`);
+      const response = await fetch(`/api/wallet/info?address=${encodeURIComponent(address)}`);
+      
+      // Check if response is OK before parsing
+      if (!response.ok) {
+        console.error(`Failed to fetch wallet info: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
       const data = await response.json();
       
       if (data.success && data.wallet) {
-        // If we have a user state, update it; otherwise just return the balance
-        if (user) {
-          const updated = { ...user, balance: data.wallet.balance };
-          setUser(updated);
-          saveProfile(updated);
-        } else {
-          // If called during initialization, we'll need to update the profile that was just loaded
-          // This will be handled by the caller
-          return data.wallet.balance;
-        }
+        // Update user state if it exists, or update the profile in localStorage
+        setUser((currentUser) => {
+          if (currentUser) {
+            const updated = { ...currentUser, balance: data.wallet.balance };
+            saveProfile(updated);
+            return updated;
+          } else {
+            // If no user state yet, try to load from localStorage and update
+            // Check if localStorage is available (client-side only)
+            if (typeof window !== 'undefined' && localStorage) {
+              const storedProfile = localStorage.getItem('user_profile');
+              if (storedProfile) {
+                try {
+                  const profile = JSON.parse(storedProfile);
+                  const updated = { ...profile, balance: data.wallet.balance };
+                  saveProfile(updated);
+                  return updated;
+                } catch (e) {
+                  console.error('Failed to parse stored profile:', e);
+                }
+              }
+            }
+            return null;
+          }
+        });
+      } else {
+        console.error('Wallet info API returned unsuccessful response:', data.error);
       }
     } catch (error) {
       console.error('Failed to refresh balance:', error);

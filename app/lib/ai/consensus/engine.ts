@@ -10,7 +10,7 @@ import {
   ProviderResponse,
   ConsensusQueryOptions,
 } from './types';
-import { providerRegistry } from './providers/registry';
+import { getProviderRegistry } from './providers/registry';
 import { consensusCache } from './cache';
 import { consensusConfig } from './config';
 
@@ -127,7 +127,7 @@ export async function executeConsensus(
   }
 
   const startTime = Date.now();
-  const providers = providerRegistry.getAll();
+  const providers = getProviderRegistry().getAll();
 
   if (providers.length < finalConfig.minProviders) {
     throw new Error(

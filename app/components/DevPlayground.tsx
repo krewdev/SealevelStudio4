@@ -20,7 +20,8 @@ import {
   X,
   Send
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft } from '../lib/instructions/types';
@@ -75,7 +76,7 @@ interface Log {
 }
 
 const DevPlayground = () => {
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useActiveWallet();
   const { connection } = useConnection();
   const [workflow, setWorkflow] = useState<Block[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);

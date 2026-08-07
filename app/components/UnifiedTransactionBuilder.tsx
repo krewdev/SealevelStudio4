@@ -28,24 +28,42 @@ import {
   Clipboard,
   ClipboardCheck,
   Info,
-  TrendingUp
+  TrendingUp,
+  Search,
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { TransactionBuilder } from '../lib/transaction-builder';
-import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
+import { getTemplateById, getTemplatesByCategory, INSTRUCTION_TEMPLATES } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
-import { importTransaction } from '../lib/transaction-importer';
-import { PublicKey } from '@solana/web3.js';
-import { UnifiedAIAgents } from './UnifiedAIAgents';
+import { importTransactionDetailed } from '../lib/transaction-importer';
+import { exportDraftToTypeScript } from '../lib/tx/export-typescript';
+import {
+  evaluateFirewall,
+  flattenToTimeTravelSteps,
+  hydrateTimeTravelSnapshots,
+  ingestLandedSignature,
+  LANDED_EVENT,
+  loadFirewallPolicy,
+  openStudioDebugTab,
+  worstPayerDelta,
+  type AdversarialFork,
+  type TimeTravelStep,
+} from '../lib/studio';
+import { StudioRail, isFirewallOverrideChecked } from './studio/StudioRail';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
 import { AdvancedInstructionCard } from './AdvancedInstructionCard';
 import { TemplateSelectorModal } from './TemplateSelectorModal';
 import { useTransactionLogger } from '../hooks/useTransactionLogger';
-import { RecentTransactions } from './RecentTransactions';
-import { useUser } from '../contexts/UserContext';
-import { signTransactionWithCustodialAndSigners, shouldUseCustodialWallet } from '../lib/wallet-recovery/custodial-signer';
-import { Connection } from '@solana/web3.js';
+import { useActiveWallet } from '../hooks/useActiveWallet';
+import { Connection, VersionedTransaction } from '@solana/web3.js';
+import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
+import { buildAtomicArbTransaction } from '../lib/arbitrage/atomic-build';
+import { diffAnyTransaction, type StateDiffResult } from '../lib/tx/state-diff';
+import { patchDeskSession } from '../lib/session/desk-session';
+import { AccountDiffPanel } from './AccountDiffPanel';
 
 // --- Block to Instruction Template Mapping ---
 const BLOCK_TO_TEMPLATE: Record<string, string> = {
@@ -498,14 +516,18 @@ function BlockTooltip({
 interface UnifiedTransactionBuilderProps {
   onTransactionBuilt?: (transaction: any, cost: any) => void;
   onBack?: () => void;
+  initialOpportunity?: ArbitrageOpportunity | null;
 }
 
-export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: UnifiedTransactionBuilderProps) {
+export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
-  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
-  const { user } = useUser();
-  const [viewMode, setViewMode] = useState<ViewMode>('simple');
+  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const active = useActiveWallet();
+  const connecting = active.connecting;
+  const payerAddress = active.address;
+  const walletLabel = active.connected ? active.label : null;
+  const [viewMode, setViewMode] = useState<ViewMode>('advanced');
   
   // Shared transaction state
   const [transactionDraft, setTransactionDraft] = useState<TransactionDraft>({
@@ -542,33 +564,259 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
 
   // Arbitrage panel state
   const [showArbitragePanel, setShowArbitragePanel] = useState(false);
+  const [arbOpportunity, setArbOpportunity] = useState<ArbitrageOpportunity | null>(null);
+  const [arbStatus, setArbStatus] = useState<string | null>(null);
+  const [arbWarnings, setArbWarnings] = useState<string[]>([]);
+  const [jitoTipLamports, setJitoTipLamports] = useState(0);
+  const [arbDiff, setArbDiff] = useState<StateDiffResult | null>(null);
+  const [simDiff, setSimDiff] = useState<StateDiffResult | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const arbLoadRef = useRef(false);
 
   // Import state
   const [importSignature, setImportSignature] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [timeTravelSteps, setTimeTravelSteps] = useState<TimeTravelStep[]>([]);
+  const [adversaryForks, setAdversaryForks] = useState<AdversarialFork[]>([]);
+
+  useEffect(() => {
+    const onLanded = (e: Event) => {
+      const rec = (e as CustomEvent).detail as { signature?: string; source?: string; payer?: string; mint?: string };
+      if (!rec?.signature || rec.source === 'builder' || !connection) return;
+      void ingestLandedSignature(connection, {
+        signature: rec.signature,
+        source: (rec.source as any) || 'import',
+        payer: rec.payer || active.address,
+        mint: rec.mint,
+        runLivePrefix: false,
+      })
+        .then(({ record, instructions, steps }) => {
+          setTimeTravelSteps(steps);
+          if (instructions.length) setTransactionDraft({ instructions });
+          openStudioDebugTab();
+          addLog(
+            `Ingested ${record.source} ${record.signature.slice(0, 8)}… · DNA ${record.dnaHash || '—'}`,
+            'success'
+          );
+        })
+        .catch((err) => {
+          addLog(`Landed ingest failed: ${err instanceof Error ? err.message : err}`, 'warning');
+        });
+    };
+    window.addEventListener(LANDED_EVENT, onLanded as EventListener);
+    return () => window.removeEventListener(LANDED_EVENT, onLanded as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, active.address]);
+
+  useEffect(() => {
+    if (arbLoadRef.current) return;
+    const pending = initialOpportunity || consumePendingArbOpportunity();
+    if (!pending) return;
+    arbLoadRef.current = true;
+    void loadArbitrageOpportunity(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOpportunity]);
+
+  const loadArbitrageOpportunity = async (opportunity: ArbitrageOpportunity) => {
+    setArbOpportunity(opportunity);
+    setViewMode('advanced');
+    const hops = opportunity.steps?.length ? opportunity.steps : opportunity.path?.steps || [];
+    setSimpleWorkflow(
+      hops.map((step, i) => ({
+        id: 'jup_swap',
+        name: `${step.tokenIn.symbol} → ${step.tokenOut.symbol}`,
+        icon: 'Zap',
+        color: i === 0 ? 'bg-teal-500' : i === hops.length - 1 ? 'bg-orange-500' : 'bg-indigo-500',
+        verified: true,
+        params: {
+          amount: step.amountIn.toString(),
+          minAmountOut: step.amountOut.toString(),
+          dex: String(step.dex),
+          pool: step.pool?.poolAddress || '',
+        },
+        instanceId: `arb-hop-${i}-${step.dex}`,
+      }))
+    );
+    setTransactionDraft({
+      instructions: [],
+      memo: `Atomic arb ${opportunity.type} ${opportunity.id}`,
+    });
+    setArbStatus('Loading opportunity into builder…');
+    setArbWarnings(opportunity.warnings || []);
+    addLog(`Loaded arb opportunity ${opportunity.id}`, 'info');
+    (opportunity.steps?.length ? opportunity.steps : opportunity.path?.steps || []).forEach((step, i) => {
+      addLog(
+        `Hop ${i + 1}: ${step.tokenIn.symbol}→${step.tokenOut.symbol} on ${step.dex}`,
+        'info'
+      );
+    });
+
+    const payer = payerAddress;
+    if (!payer) {
+      setArbStatus('Connect a wallet to compile the atomic transaction.');
+      setTransactionDraft({
+        instructions: (await import('../lib/arbitrage/atomic-build')).opportunityToBuiltInstructions(opportunity),
+      });
+      return;
+    }
+
+    try {
+      setIsBuilding(true);
+      const built = await buildAtomicArbTransaction({
+        opportunity,
+        userPublicKey: payer,
+        connection,
+        jitoTipLamports,
+      });
+      setTransactionDraft({ instructions: built.instructions, memo: 'atomic-arb' });
+      setBuiltTransaction(built.transaction);
+      setArbWarnings(built.warnings);
+      const diff: StateDiffResult = {
+        diffs: built.stateDiff || [],
+        unitsConsumed: built.unitsConsumed,
+        err: built.simulationOk ? undefined : built.warnings.find((w) => /sim/i.test(w)),
+        logs: built.simulationLogs || [],
+      };
+      setArbDiff(diff);
+      setSimDiff(diff);
+      const hop0 = opportunity.steps?.[0] || opportunity.path?.steps?.[0];
+      if (hop0?.tokenIn?.mint) {
+        patchDeskSession({
+          mint: hop0.tokenOut?.mint || hop0.tokenIn.mint,
+          source: 'scanner',
+          lastSim: {
+            ok: built.simulationOk,
+            units: built.unitsConsumed,
+            profitHint: built.profitableAfterQuotes ? 'quote profitable' : 'unprofitable',
+            at: Date.now(),
+          },
+          opportunityId: opportunity.id,
+        });
+      }
+      const profitHint = built.profitableAfterQuotes
+        ? `Live quotes profitable (raw Δ ${built.expectedProfitRaw.toString()})`
+        : 'Live quotes NOT profitable';
+      const simHint = built.simulationOk ? 'simulation OK' : 'simulation FAILED';
+      setArbStatus(`Atomic TX ready — ${profitHint}; ${simHint}${built.unitsConsumed ? `; ${built.unitsConsumed} CU` : ''}`);
+      addLog(profitHint, built.profitableAfterQuotes ? 'success' : 'error');
+      addLog(simHint, built.simulationOk ? 'success' : 'error');
+      onTransactionBuilt?.(built.transaction, {
+        sol: (built.unitsConsumed || 0) / 1e9,
+        platformFee: { sol: 0 },
+        total: { sol: (built.unitsConsumed || 0) / 1e9 },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBuildError(msg);
+      setArbStatus(`Failed to compile atomic arb: ${msg}`);
+      addLog(msg, 'error');
+      const { opportunityToBuiltInstructions } = await import('../lib/arbitrage/atomic-build');
+      setTransactionDraft({ instructions: opportunityToBuiltInstructions(opportunity) });
+    } finally {
+      setIsBuilding(false);
+    }
+  };
+
+  const handleExportTs = async () => {
+    const draft: TransactionDraft =
+      viewMode === 'simple'
+        ? { instructions: await convertSimpleBlocksToInstructions().catch(() => transactionDraft.instructions) }
+        : transactionDraft;
+    if (!draft.instructions.length && !arbOpportunity) {
+      addLog('Nothing to export — add instructions or Build first.', 'warning');
+      setShowLogs(true);
+      return;
+    }
+    const code = exportDraftToTypeScript({
+      draft,
+      payer: payerAddress,
+      sim: simDiff || arbDiff,
+    });
+    try {
+      await navigator.clipboard.writeText(code);
+      addLog(`Copied ${draft.instructions.length} instruction(s) as TypeScript (matches last sim if you hit Build).`, 'success');
+    } catch {
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sealevel-tx.ts';
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog('Download started: sealevel-tx.ts', 'success');
+    }
+    setShowLogs(true);
+  };
 
   const handleImport = async () => {
     if (!importSignature || !connection) return;
     setIsImporting(true);
+    const sig = importSignature.trim();
     try {
-      addLog(`Fetching transaction ${importSignature}...`, 'info');
-      const instructions = await importTransaction(connection, importSignature);
-      
-      // Merge with existing or replace? Let's replace for now as "Import" usually implies loading a specific tx.
-      // But to be safe/flexible, maybe append? No, users likely want to edit THAT tx.
-      // Let's append to avoid data loss, or offer choice. For now, append.
-      // Actually, user said "plugged into the builder", usually implies loading that tx state.
-      // Let's append to draft.
-      setTransactionDraft(prev => ({
-        ...prev,
-        instructions: [...prev.instructions, ...instructions]
-      }));
-      
-      setViewMode('advanced'); // Switch to advanced to see the instructions
+      addLog(`Fetching transaction ${sig}...`, 'info');
+      const { instructions, parsed } = await importTransactionDetailed(connection, sig);
+      try {
+        const flat = flattenToTimeTravelSteps(parsed as any, sig);
+        const hydrated = await hydrateTimeTravelSnapshots({
+          connection,
+          signature: sig,
+          steps: flat,
+          payer: active.address,
+          runLivePrefix: Boolean(active.address),
+        });
+        setTimeTravelSteps(hydrated);
+        addLog(
+          'Time-travel: historical pre/post from landed meta. Mid-CPI banks do not exist in RPC; live prefix sims are current-bank only.',
+          'info'
+        );
+      } catch {
+        try {
+          setTimeTravelSteps(flattenToTimeTravelSteps(parsed as any, sig));
+        } catch {
+          setTimeTravelSteps([]);
+        }
+      }
+
+      setTransactionDraft({ instructions });
+      setViewMode('advanced');
       setShowImportModal(false);
       setImportSignature('');
-      addLog(`Successfully imported ${instructions.length} instructions`, 'success');
+      setSimpleWorkflow([]);
+      setArbOpportunity(null);
+      addLog(`Imported ${instructions.length} instruction card(s) from ${sig.slice(0, 8)}…`, 'success');
+
+      const payerPublicKey = active.payerPublicKey;
+      if (!payerPublicKey) {
+        addLog('Cards loaded. Connect a wallet and hit Build to simulate diffs.', 'warning');
+        setShowLogs(true);
+        return;
+      }
+
+      addLog('Rebuilding imported tx and simulating…', 'info');
+      const builder = new TransactionBuilder(connection);
+      const transaction = await builder.buildTransaction(
+        { instructions, priorityFee: 0, memo: `import ${sig.slice(0, 8)}` },
+        { skipUnsupported: true }
+      );
+      if (!transaction.instructions.length) {
+        addLog('Imported cards need edits before they can simulate (unsupported / incomplete ixs).', 'warning');
+        setBuiltTransaction(null);
+        setSimDiff(null);
+        setShowLogs(true);
+        return;
+      }
+      builder.addPlatformFee(transaction, payerPublicKey);
+      await builder.prepareTransaction(transaction, payerPublicKey);
+      const cost = await builder.estimateCost(transaction);
+      setBuiltTransaction(transaction);
+      setTransactionCost(cost);
+      const diff = await diffAnyTransaction(connection, transaction, {
+        payer: payerPublicKey.toBase58(),
+      });
+      setSimDiff(diff);
+      if (diff.err) addLog(`Simulation: ${diff.err}`, 'error');
+      else addLog(`Simulation OK · ${diff.unitsConsumed ?? '?'} CU · ${diff.diffs.length} account delta(s)`, 'success');
     } catch (e: any) {
       addLog(`Import failed: ${e.message}`, 'error');
       console.error(e);
@@ -700,30 +948,30 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       };
 
       if (block.id === 'system_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['from'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['from'] = payerAddress;
         accounts['to'] = block.params.to || '';
         args['amount'] = convertSolToLamports(block.params.amount || '0');
       } else if (block.id === 'token_transfer') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['authority'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['authority'] = payerAddress;
         accounts['source'] = '';
         accounts['destination'] = block.params.destination || '';
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'create_token_and_mint') {
         // Combined operation: Create mint + Create token account + Mint tokens with ALL features
-        if (!publicKey) throw new Error('Wallet not connected');
+        if (!payerAddress) throw new Error('Wallet not connected');
         
         // Core SPL Mint Attributes
         const decimals = parseInt(block.params.decimals || '9');
         const initialSupply = convertSolToLamports(block.params.initialSupply || '0');
-        const mintAuthority = block.params.mintAuthority || publicKey.toString();
-        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? publicKey.toString() : '');
+        const mintAuthority = block.params.mintAuthority || payerAddress;
+        const freezeAuthority = block.params.freezeAuthority || (block.params.enableFreeze === 'true' ? payerAddress : '');
         const enableFreeze = block.params.enableFreeze === 'true';
         const revokeMintAuthority = block.params.revokeMintAuthority === 'true';
         
         // Token Account Attributes
-        const tokenAccountOwner = block.params.tokenAccountOwner || publicKey.toString();
+        const tokenAccountOwner = block.params.tokenAccountOwner || payerAddress;
         const delegate = block.params.delegate || '';
         const delegatedAmount = BigInt(block.params.delegatedAmount || '0');
         const freezeInitialAccount = block.params.freezeInitialAccount === 'true';
@@ -791,7 +1039,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         args['metadataPointer'] = metadataPointer;
         args['supplyCap'] = supplyCap;
         
-        accounts['payer'] = publicKey.toString();
+        accounts['payer'] = payerAddress;
         accounts['tokenAccountOwner'] = tokenAccountOwner;
         if (freezeAuthority) {
           accounts['freezeAuthority'] = freezeAuthority;
@@ -808,14 +1056,14 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
         instructions.push({ template: placeholderTemplate, accounts, args });
         continue; // Skip normal processing
       } else if (block.id === 'token_mint') {
-        if (!publicKey) throw new Error('Wallet not connected');
+        if (!payerAddress) throw new Error('Wallet not connected');
         accounts['mint'] = block.params.mint || '';
         accounts['destination'] = block.params.destination || '';
-        accounts['authority'] = publicKey.toString();
+        accounts['authority'] = payerAddress;
         args['amount'] = BigInt(block.params.amount || '0');
       } else if (block.id === 'jup_swap') {
-        if (!publicKey) throw new Error('Wallet not connected');
-        accounts['userTransferAuthority'] = publicKey.toString();
+        if (!payerAddress) throw new Error('Wallet not connected');
+        accounts['userTransferAuthority'] = payerAddress;
         args['amount'] = BigInt(block.params.amount || '0');
         args['minAmountOut'] = BigInt(block.params.minAmountOut || '0');
       } else {
@@ -905,13 +1153,10 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       return;
     }
 
-    // Use custodial wallet as payer if available, otherwise external wallet
-    const payerPublicKey = user?.walletAddress 
-      ? new PublicKey(user.walletAddress)
-      : publicKey;
+    const payerPublicKey = active.payerPublicKey;
 
     if (!payerPublicKey) {
-      setBuildError('Please connect your wallet or create a custodial wallet to build transactions');
+      setBuildError('Connect Phantom or create a studio wallet to build transactions');
       return;
     }
 
@@ -965,6 +1210,26 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       setBuiltTransaction(transaction);
       setTransactionCost(cost);
 
+      try {
+        const diff = await diffAnyTransaction(connection, transaction, {
+          payer: payerPublicKey.toBase58(),
+        });
+        setSimDiff(diff);
+        if (diff.err) {
+          addLog(`Simulation: ${diff.err}`, 'error');
+          setShowLogs(true);
+        } else {
+          addLog(
+            `Simulation OK · ${diff.unitsConsumed ?? '?'} CU · ${diff.diffs.length} account delta(s)`,
+            'success'
+          );
+        }
+      } catch (simErr) {
+        const msg = simErr instanceof Error ? simErr.message : String(simErr);
+        addLog(`Simulation failed: ${msg}`, 'error');
+        setSimDiff({ diffs: [], err: msg, logs: [] });
+      }
+
       addLog(`Transaction built successfully!`, 'success');
       addLog(`Base transaction cost: ${cost.sol.toFixed(9)} SOL (${cost.lamports} lamports)`, 'info');
       addLog(`Platform fee: ${cost.platformFee.sol.toFixed(9)} SOL (${cost.platformFee.lamports} lamports)`, 'info');
@@ -1017,69 +1282,85 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       return;
     }
 
-    // Check if we should use custodial wallet
-    const useCustodial = shouldUseCustodialWallet(user?.walletAddress);
-    
-    if (!useCustodial && (!sendTransaction || !publicKey)) {
+    if (!active.connected || !active.payerPublicKey) {
       addLog('Error: Transaction not built or wallet not connected', 'error');
+      return;
+    }
+
+    const fwDraft =
+      viewMode === 'advanced'
+        ? transactionDraft
+        : { instructions: await convertSimpleBlocksToInstructions().catch(() => transactionDraft.instructions) };
+    const fw = evaluateFirewall({
+      policy: loadFirewallPolicy(),
+      sim: simDiff,
+      draft: fwDraft,
+      worstAdversaryDeltaSol: worstPayerDelta(adversaryForks.filter((f) => f.method === 'simulated')),
+    });
+    if (!fw.ok && !isFirewallOverrideChecked()) {
+      addLog(`Firewall blocked Execute: ${fw.violations.map((v) => v.message).join(' ')}`, 'error');
+      setShowLogs(true);
+      return;
+    }
+    if (isFirewallOverrideChecked()) {
+      addLog('Firewall override armed — signing anyway.', 'warning');
+    }
+
+    const isVersioned =
+      builtTransaction instanceof VersionedTransaction ||
+      (builtTransaction && typeof builtTransaction === 'object' && 'message' in builtTransaction && !('instructions' in builtTransaction));
+    if (isVersioned && !active.canSignVersioned) {
+      addLog('Atomic arb uses a versioned transaction — switch to Phantom in the header to Execute.', 'error');
       return;
     }
 
     setIsExecuting(true);
     addLog('Sending transaction to network...', 'info');
 
+    let txToSend = builtTransaction;
+
+    if (arbOpportunity && active.address) {
+      try {
+        addLog('Recompiling atomic arb with fresh blockhash…', 'info');
+        const rebuilt = await buildAtomicArbTransaction({
+          opportunity: arbOpportunity,
+          userPublicKey: active.address,
+          connection,
+          jitoTipLamports,
+        });
+        if (!rebuilt.profitableAfterQuotes) {
+          throw new Error('Live quotes are no longer profitable');
+        }
+        if (!rebuilt.simulationOk) {
+          throw new Error(rebuilt.warnings.find((w) => /sim/i.test(w)) || 'Simulation failed');
+        }
+        txToSend = rebuilt.transaction;
+        setBuiltTransaction(rebuilt.transaction);
+        setArbWarnings(rebuilt.warnings);
+        setArbStatus('Fresh atomic TX simulated OK — sending');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        addLog(msg, 'error');
+        setBuildError(msg);
+        setIsExecuting(false);
+        return;
+      }
+    }
+
     try {
       // Check for additional signers (like mint keypairs from create_token_and_mint)
-      const additionalSigners = (builtTransaction as any)._additionalSigners || [];
+      const additionalSigners = (txToSend as any)._additionalSigners || [];
       
-      let signedTransaction = builtTransaction;
-      
-      if (useCustodial && user?.walletAddress) {
-        // Sign with custodial wallet (and additional signers if any)
-        addLog('Signing with custodial wallet...', 'info');
-        signedTransaction = await signTransactionWithCustodialAndSigners(
-          builtTransaction,
-          additionalSigners,
-          {
-            userWalletAddress: user.walletAddress,
-            connection,
-          }
-        );
-        addLog('Transaction signed with custodial wallet', 'success');
-      } else {
-        // Use external wallet (Phantom, etc.)
-        if (additionalSigners.length > 0) {
-          addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
-          // Sign transaction with additional signers
-          additionalSigners.forEach((signer: any) => {
-            signedTransaction.partialSign(signer);
-          });
-        }
-        
-        // External wallet will sign when sendTransaction is called
-        if (!sendTransaction) {
-          throw new Error('No wallet available for signing');
-        }
+      if (additionalSigners.length > 0) {
+        addLog(`Found ${additionalSigners.length} additional signer(s) (e.g., mint keypair)`, 'info');
       }
-      
-      // Send transaction
-      let signature: string;
-      if (useCustodial) {
-        // For custodial wallet, we need to send the already-signed transaction
-        const serialized = signedTransaction.serialize({ requireAllSignatures: false });
-        signature = await connection.sendRawTransaction(serialized, {
-          skipPreflight: false,
-          maxRetries: 3,
-        });
-      } else {
-        // For external wallet, use sendTransaction which will prompt for signature
-        signature = await sendTransaction(signedTransaction, connection);
-      }
+      addLog(`Signing with ${active.label}...`, 'info');
+      const signature = await active.sendWithActive(txToSend, connection, additionalSigners);
       addLog(`Transaction sent! Signature: ${signature}`, 'success');
       addLog(`View on Solscan: https://solscan.io/tx/${signature}`, 'info');
       
       // Update transaction log with signature
-      const transactionLogId = (builtTransaction as any)._transactionLogId;
+      const transactionLogId = (txToSend as any)._transactionLogId;
       if (transactionLogId) {
         await updateStatus(transactionLogId, 'pending', signature);
       }
@@ -1091,6 +1372,27 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
       // Update transaction log to success
       if (transactionLogId) {
         await updateStatus(transactionLogId, 'success', signature);
+      }
+
+      try {
+        const { record, instructions: landedIxs, steps } = await ingestLandedSignature(connection, {
+          signature,
+          source: 'builder',
+          payer: active.address,
+          runLivePrefix: txToSend instanceof Transaction,
+        });
+        setTimeTravelSteps(steps);
+        if (landedIxs.length) setTransactionDraft({ instructions: landedIxs });
+        openStudioDebugTab();
+        addLog(
+          `Loop closed · chain DNA ${record.dnaHash} · ${record.instructionCount} ixs. Pre-send sim kept above for compare.`,
+          'success'
+        );
+      } catch (ingestErr) {
+        addLog(
+          `Confirmed but loop ingest failed: ${ingestErr instanceof Error ? ingestErr.message : ingestErr}`,
+          'warning'
+        );
       }
       
       // Log mint address if created
@@ -1133,9 +1435,12 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
     return icons[iconName] || <Cpu className={className} />;
   };
 
-  const filteredTemplates = getTemplatesByCategory(selectedCategory).filter(template =>
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTemplates = (
+    searchQuery.trim() ? INSTRUCTION_TEMPLATES : getTemplatesByCategory(selectedCategory)
+  ).filter(
+    (template) =>
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Render Simple Mode
@@ -1196,29 +1501,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             position: 'relative',
           }}
         >
-          {/* Logo background layer - behind dot grid */}
-          <div 
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-            }}
-          >
-            <img
-              src="/transaction-builder-logo.jpeg"
-              alt="Transaction Builder Logo"
-              className="absolute inset-0 w-full h-full object-contain opacity-[0.08]"
-              style={{
-                objectPosition: 'center',
-              }}
-              onError={(e) => {
-                // Fallback if logo doesn't exist - hide it
-                console.warn('Transaction builder logo not found at /transaction-builder-logo.jpeg');
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-          {/* Dot grid overlay */}
-          <div 
+          <div
             className="absolute inset-0 pointer-events-none"
             style={{
               backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
@@ -1226,65 +1509,47 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
               zIndex: 1,
             }}
           />
-          <div className="absolute top-4 left-4 right-4 h-12 pointer-events-none flex justify-between items-start z-20">
-            <div className="pointer-events-auto flex gap-2">
-              <button 
-                onClick={buildTransaction}
-                disabled={isBuilding || isExecuting}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                  isBuilding || isExecuting
-                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                  : 'bg-teal-500 hover:bg-teal-400 text-slate-900 hover:scale-105 active:scale-95'
-                }`}
-              >
-                {isBuilding ? <Cpu className="animate-spin" size={16} /> : <Play size={16} />}
-                {isBuilding ? 'Building...' : 'Build Transaction'}
-              </button>
-              
-              {builtTransaction && (
-                <button 
-                  onClick={executeTransaction}
-                  disabled={isExecuting || !publicKey}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                    isExecuting || !publicKey
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                    : 'bg-green-500 hover:bg-green-400 text-slate-900 hover:scale-105 active:scale-95'
-                  }`}
-                >
-                  {isExecuting ? <Cpu className="animate-spin" size={16} /> : <Send size={16} />}
-                  {isExecuting ? 'Sending...' : 'Execute'}
-                </button>
-              )}
-              
-              {transactionCost && (
-                <div className="flex flex-col gap-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Base Cost:</span>
-                    <span className="text-green-400 font-mono">{transactionCost.sol.toFixed(9)} SOL</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Platform Fee:</span>
-                    <span className="text-yellow-400 font-mono">{transactionCost.platformFee.sol.toFixed(9)} SOL</span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-600 pt-1 mt-1">
-                    <span className="text-slate-300 font-medium">Total:</span>
-                    <span className="text-white font-mono font-bold">{transactionCost.total.sol.toFixed(9)} SOL</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="pointer-events-auto flex gap-2">
-              <button 
-                className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
-                onClick={() => setSimpleWorkflow([])}
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
+          <div className="absolute top-3 right-3 z-20">
+            <button
+              type="button"
+              className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white"
+              onClick={() => setSimpleWorkflow([])}
+              title="Clear blocks"
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0 relative z-10">
+          <div className="flex-1 overflow-y-auto p-6 pt-12 flex flex-col items-center gap-4 min-h-0 relative z-10">
+            {simDiff && (
+              <div className="w-full max-w-xl relative z-20">
+                <AccountDiffPanel result={simDiff} />
+              </div>
+            )}
+            {arbOpportunity && (
+              <div className="w-full max-w-md bg-slate-900/90 border border-teal-700/50 rounded-xl p-3 text-left space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-teal-200">Atomic arb path</p>
+                  <span className="text-[10px] uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    {arbOpportunity.accuracy || 'heuristic'}
+                  </span>
+                </div>
+                {arbStatus && <p className="text-xs text-slate-300">{arbStatus}</p>}
+                <label className="flex items-center justify-between text-xs text-slate-400">
+                  Jito tip
+                  <select
+                    value={jitoTipLamports}
+                    onChange={(e) => setJitoTipLamports(Number(e.target.value))}
+                    className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200"
+                  >
+                    <option value={0}>Off</option>
+                    <option value={10000}>0.00001 SOL</option>
+                    <option value={100000}>0.0001 SOL</option>
+                    <option value={1000000}>0.001 SOL</option>
+                  </select>
+                </label>
+              </div>
+            )}
             {simpleWorkflow.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-4 opacity-50 relative w-full z-2">
                 <div className="relative z-10 flex flex-col items-center gap-4">
@@ -1316,7 +1581,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
                         <div>
                           <h3 className="text-sm font-bold text-slate-200">{block.name}</h3>
                           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">
-                            {block.verified ? <span className="text-teal-500 flex items-center gap-1"><ShieldCheck size={10}/> Verified</span> : 'External'}
+                            {block.params?.dex ? (
+                              <span className="text-teal-400">{block.params.dex}</span>
+                            ) : block.verified ? (
+                              <span className="text-teal-500 flex items-center gap-1"><ShieldCheck size={10}/> Verified</span>
+                            ) : (
+                              'External'
+                            )}
                           </p>
                         </div>
                       </div>
@@ -1345,36 +1616,42 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
             )}
           </div>
 
-          {/* Terminal */}
-          <div className="h-48 bg-slate-900 border-t border-slate-800 flex flex-col font-mono text-xs">
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Terminal size={14} />
-                <span>Runtime Output</span>
+          <div className="border-t border-slate-800 bg-slate-950 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowLogs((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-1.5 text-[11px] text-slate-400 hover:text-white"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Terminal size={12} />
+                Logs {logs.length ? `(${logs.length})` : ''}
+              </span>
+              <span>{showLogs ? 'Hide' : 'Show'}</span>
+            </button>
+            {showLogs && (
+              <div className="h-36 border-t border-slate-800 font-mono text-xs overflow-y-auto p-3 space-y-1">
+                {logs.length === 0 && <span className="text-slate-600 italic">Ready.</span>}
+                {logs.map((log, i) => (
+                  <div key={i} className="flex gap-3">
+                    <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
+                    <span
+                      className={
+                        log.type === 'error'
+                          ? 'text-red-400'
+                          : log.type === 'success'
+                            ? 'text-green-400'
+                            : log.type === 'warning'
+                              ? 'text-orange-400'
+                              : 'text-slate-300'
+                      }
+                    >
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
               </div>
-              <button onClick={() => setLogs([])} className="hover:text-white text-slate-500">Clear</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-1">
-              {logs.length === 0 && (
-                <span className="text-slate-600 italic">Ready to build transaction...</span>
-              )}
-              {logs.map((log, i) => (
-                <div key={i} className="flex gap-3">
-                  <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
-                  <span className={`
-                    ${log.type === 'error' ? 'text-red-400' : ''}
-                    ${log.type === 'success' ? 'text-green-400' : ''}
-                    ${log.type === 'warning' ? 'text-orange-400' : ''}
-                    ${log.type === 'info' ? 'text-slate-300' : ''}
-                  `}>
-                    {log.type === 'success' ? '✔ ' : ''}
-                    {log.type === 'error' ? '✖ ' : ''}
-                    {log.msg}
-                  </span>
-                </div>
-              ))}
-              <div ref={terminalEndRef} />
-            </div>
+            )}
           </div>
         </main>
 
@@ -1652,228 +1929,342 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
     </div>
   );
 
-  // Render Advanced Mode (InstructionAssembler)
+  // Render Advanced Mode: templates | instructions | pinned sim diff
   const renderAdvancedMode = () => {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 p-6 pb-4">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Instruction Assembler</h1>
-            <p className="text-gray-400">
-              Build transactions by adding and configuring instructions
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowTemplateSelector(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Instruction</span>
-            </button>
-            
-            {transactionDraft.instructions.length > 0 && (
-              <button
-                onClick={buildTransaction}
-                disabled={isBuilding || isExecuting}
-                className="flex items-center space-x-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
-              >
-                {isBuilding ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Building...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    <span>Build Transaction</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {builtTransaction && (
-              <button
-                onClick={executeTransaction}
-                disabled={isExecuting || !publicKey}
-                className="flex items-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
-              >
-                {isExecuting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    <span>Execute</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {buildError && (
-          <div className="mb-4 p-4 bg-red-900/20 border border-red-700 rounded-lg flex items-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-            <span className="text-red-400">{buildError}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
-        {transactionDraft.instructions.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-gray-700 rounded-lg">
-            <Wrench className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">No instructions added yet</p>
-            <button
-              onClick={() => setShowTemplateSelector(true)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white transition-colors"
-            >
-              Add Your First Instruction
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {transactionDraft.instructions.map((instruction, index) => (
-              <AdvancedInstructionCard
-                key={index}
-                instruction={instruction}
-                index={index}
-                onUpdateAccount={(accountName, value) => updateAdvancedInstructionAccount(index, accountName, value)}
-                onUpdateArg={(argName, value) => updateAdvancedInstructionArg(index, argName, value)}
-                onRemove={() => removeAdvancedInstruction(index)}
-                validationErrors={validateAdvancedInstruction(instruction)}
-                onCopyAddress={copyAddress}
-                copiedAddresses={copiedAddresses}
-                justCopied={justCopied}
-                focusedInputField={focusedInputField}
-                setFocusedInputField={setFocusedInputField}
+      <div className="h-full flex overflow-hidden bg-slate-950 text-slate-200">
+        <aside className="w-64 shrink-0 border-r border-slate-800 bg-slate-900/40 flex flex-col min-h-0">
+          <div className="p-3 border-b border-slate-800 space-y-2">
+            <div className="text-[11px] uppercase tracking-wide text-slate-500">Templates</div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search instructions…"
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
               />
-            ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setSearchQuery('');
+                  }}
+                  className={`text-[10px] px-2 py-1 rounded ${
+                    !searchQuery.trim() && selectedCategory === cat.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+            {filteredTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => addAdvancedInstruction(t)}
+                className="w-full text-left rounded-lg border border-slate-800 bg-slate-900/80 hover:border-teal-500/50 px-3 py-2 transition-colors"
+              >
+                <div className="text-xs font-medium text-white">{t.name}</div>
+                <div className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{t.description}</div>
+              </button>
+            ))}
+            {filteredTemplates.length === 0 && (
+              <p className="text-xs text-slate-500 p-2">No templates match.</p>
+            )}
+          </div>
+        </aside>
 
-      {showTemplateSelector && (
-        <TemplateSelectorModal
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          templates={filteredTemplates}
-          onSelectTemplate={addAdvancedInstruction}
-          onClose={() => setShowTemplateSelector(false)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
-      )}
+        <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b border-slate-800">
+            <p className="text-xs text-slate-500">
+              {transactionDraft.instructions.length} instruction
+              {transactionDraft.instructions.length === 1 ? '' : 's'} · Build to refresh the sim
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowTemplateSelector(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 text-xs font-medium"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Browse all
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4">
+            {transactionDraft.instructions.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-700 rounded-lg">
+                <Wrench className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-500 mb-1">No instructions yet</p>
+                <p className="text-xs text-slate-600 mb-4">Pick a template on the left, then hit Build.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {transactionDraft.instructions.map((instruction, index) => (
+                  <AdvancedInstructionCard
+                    key={`${instruction.template.id}-${index}`}
+                    instruction={instruction}
+                    index={index}
+                    onUpdateAccount={(accountName, value) => updateAdvancedInstructionAccount(index, accountName, value)}
+                    onUpdateArg={(argName, value) => updateAdvancedInstructionArg(index, argName, value)}
+                    onRemove={() => removeAdvancedInstruction(index)}
+                    validationErrors={validateAdvancedInstruction(instruction)}
+                    onCopyAddress={copyAddress}
+                    copiedAddresses={copiedAddresses}
+                    justCopied={justCopied}
+                    focusedInputField={focusedInputField}
+                    setFocusedInputField={setFocusedInputField}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+
+        <aside className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/50 flex flex-col min-h-0">
+          <div className="p-3 border-b border-slate-800 text-[11px] uppercase tracking-wide text-teal-300/80">
+            Live sim
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+            {buildError && (
+              <div className="p-3 bg-red-900/20 border border-red-700 rounded-lg flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <span className="text-xs text-red-400">{buildError}</span>
+              </div>
+            )}
+            {(arbOpportunity || arbStatus) && (
+              <div className="p-3 bg-teal-900/20 border border-teal-700/60 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-teal-200 text-xs font-semibold">
+                  <Zap size={14} />
+                  Atomic arb loaded
+                  {arbOpportunity?.accuracy && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                      {arbOpportunity.accuracy}
+                    </span>
+                  )}
+                </div>
+                {arbStatus && <p className="text-xs text-slate-300">{arbStatus}</p>}
+                {arbOpportunity && (
+                  <p className="text-[11px] text-slate-400">
+                    Est. {arbOpportunity.netProfit.toFixed(6)} {arbOpportunity.profitTokenSymbol || 'units'} ·{' '}
+                    {(arbOpportunity.confidence * 100).toFixed(0)}% confidence
+                  </p>
+                )}
+                {arbWarnings.slice(0, 3).map((w, i) => (
+                  <p key={i} className="text-[11px] text-amber-300">• {w}</p>
+                ))}
+              </div>
+            )}
+            {simDiff ? (
+              <AccountDiffPanel result={simDiff} />
+            ) : (
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Hit Build. Account SOL/token deltas stay pinned here while you edit instructions.
+              </p>
+            )}
+            <StudioRail
+              draft={transactionDraft}
+              sim={simDiff}
+              payer={payerAddress}
+              connection={connection}
+              timeTravelSteps={timeTravelSteps}
+              builtTx={builtTransaction instanceof Transaction ? builtTransaction : null}
+              builtKind={
+                !builtTransaction ? 'none' : builtTransaction instanceof Transaction ? 'legacy' : 'versioned'
+              }
+              adversaryForks={adversaryForks}
+              onAdversaryForks={setAdversaryForks}
+              signTransaction={active.signTransaction}
+              onDraftChange={setTransactionDraft}
+              onLog={addLog}
+              onTimeTravelSteps={setTimeTravelSteps}
+            />
+          </div>
+          <div className="border-t border-slate-800 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowLogs((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-slate-400 hover:text-white"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Terminal size={12} />
+                Logs {logs.length ? `(${logs.length})` : ''}
+              </span>
+              <span>{showLogs ? 'Hide' : 'Show'}</span>
+            </button>
+            {showLogs && (
+              <div className="h-40 border-t border-slate-800 font-mono text-[11px] overflow-y-auto p-3 space-y-1">
+                {logs.length === 0 && <span className="text-slate-600 italic">Ready.</span>}
+                {logs.map((log, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
+                    <span
+                      className={
+                        log.type === 'error'
+                          ? 'text-red-400'
+                          : log.type === 'success'
+                            ? 'text-green-400'
+                            : log.type === 'warning'
+                              ? 'text-orange-400'
+                              : 'text-slate-300'
+                      }
+                    >
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {showTemplateSelector && (
+          <TemplateSelectorModal
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            templates={filteredTemplates}
+            onSelectTemplate={addAdvancedInstruction}
+            onClose={() => setShowTemplateSelector(false)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        )}
       </div>
     );
   };
 
   // Main Transaction Builder layout
   return (
-    <div className="flex flex-col h-full bg-gray-900">
-      {/* Mode Toggle Header */}
-      <div className="border-b border-gray-700 bg-gray-800/50 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Logo */}
-          <img
-            src="/sea-level-logo.png"
-            alt="Sealevel Studio"
-            className="h-8 w-auto"
-            style={{ maxHeight: '32px' }}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+    <div className="h-full w-full flex flex-col bg-gray-900 overflow-hidden">
+      <div className="shrink-0 border-b border-slate-800 bg-slate-950/90 px-3 py-2 flex items-center gap-2 sm:gap-3">
+        <h1 className="text-sm font-semibold text-white shrink-0">TX Builder</h1>
+        <div className="flex items-center bg-slate-900 rounded-lg p-0.5">
           <button
-            onClick={onBack || (() => {})}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-            title="Go back to Account Inspector"
+            onClick={() => setViewMode('advanced')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'advanced' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <ArrowLeft size={18} />
-            <span className="text-sm">Back</span>
+            Advanced
           </button>
-          <h1 className="text-xl font-bold text-white">Transaction Builder</h1>
-          <div className="flex items-center gap-2 bg-gray-900 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('simple')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'simple'
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <Layers size={16} />
-              Simple
-            </button>
-            <button
-              onClick={() => setViewMode('advanced')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'advanced'
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <img
-                src="/transaction-builder-logo.jpeg"
-                alt="Transaction Builder Logo"
-                className="w-4 h-4 rounded-sm"
-              />
-              Advanced
-            </button>
-          </div>
+          <button
+            onClick={() => setViewMode('simple')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'simple' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Recipes
+          </button>
         </div>
-
-        <div className="flex items-center gap-3">
+        <button
+          onClick={buildTransaction}
+          disabled={isBuilding || isExecuting}
+          data-sealevel-target="builder-build"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          {isBuilding ? <Cpu className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+          Build
+        </button>
+        <button
+          onClick={executeTransaction}
+          disabled={isExecuting || !builtTransaction || !payerAddress}
+          data-sealevel-target="builder-execute"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          {isExecuting ? <Cpu className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          Execute
+        </button>
+        {transactionCost && (
+          <span className="hidden md:inline text-[11px] font-mono text-slate-400">
+            ~{transactionCost.total.sol.toFixed(6)} SOL
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => void handleExportTs()}
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
+            title="Copy TypeScript that matches the simulated draft"
+          >
+            Export TS
+          </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
-            title="Import Transaction from Signature"
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
           >
-            <span className="text-lg">📥</span>
-            Import
+            Import sig
           </button>
           <button
             onClick={() => setShowArbitragePanel(!showArbitragePanel)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-              showArbitragePanel
-                ? 'bg-teal-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`rounded-lg px-2.5 py-1.5 text-xs ${
+              showArbitragePanel ? 'bg-teal-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
-            title="Toggle Arbitrage Panel"
           >
-            <TrendingUp size={16} />
-            Arbitrage
+            Arb
           </button>
-          {publicKey ? (
-            <button
-              onClick={() => copyAddress(publicKey.toString())}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
-              title="Click to copy wallet address"
-            >
-              {justCopied === publicKey.toString() ? (
-                <>
-                  <ClipboardCheck size={14} />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span>{publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}</span>
-                </>
+          {walletLabel && payerAddress ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => copyAddress(payerAddress)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded bg-green-900/30 text-green-400 border border-green-700/50 hover:bg-green-900/50 hover:border-green-600 transition-colors cursor-pointer group"
+                title="Click to copy wallet address"
+              >
+                {justCopied === payerAddress ? (
+                  <>
+                    <ClipboardCheck size={14} />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Clipboard size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span>{walletLabel}</span>
+                  </>
+                )}
+              </button>
+              {!active.phantomConnected && (
+                <button
+                  type="button"
+                  onClick={() => setWalletModalVisible(true)}
+                  className="h-8 text-xs px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white"
+                >
+                  Connect Phantom
+                </button>
               )}
-            </button>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
-              Wallet Not Connected
+              {active.source === 'studio' && active.phantomConnected && (
+                <button
+                  type="button"
+                  onClick={() => active.setPreferred('phantom')}
+                  className="text-[11px] px-2 py-1 rounded bg-emerald-900/40 text-emerald-200 border border-emerald-700/50 hover:bg-emerald-900/70"
+                >
+                  Use Phantom
+                </button>
+              )}
+            </div>
+          ) : connecting ? (
+            <span className="text-xs px-2 py-1 rounded bg-amber-900/30 text-amber-300 border border-amber-700/50">
+              Connecting…
             </span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
+                Wallet not connected
+              </span>
+              <button
+                type="button"
+                onClick={() => setWalletModalVisible(true)}
+                className="h-8 text-xs px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white"
+              >
+                Connect Phantom
+              </button>
+            </div>
           )}
           <button
             onClick={() => setShowClipboard(!showClipboard)}
@@ -1992,41 +2383,6 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack }: Unifie
           />
         )}
       </div>
-
-      {/* Recent Transactions */}
-      <div className="border-t border-gray-700/50 p-6 bg-gray-800/30">
-        <RecentTransactions featureName="transaction-builder" limit={5} />
-      </div>
-
-      {/* Unified AI Agents */}
-      <UnifiedAIAgents
-        simpleWorkflow={viewMode === 'simple' ? simpleWorkflow : []}
-        transactionDraft={viewMode === 'advanced' ? transactionDraft : undefined}
-        transaction={builtTransaction}
-        onAddBlock={viewMode === 'simple' ? addSimpleBlock : undefined}
-        onUpdateBlock={viewMode === 'simple' ? (blockId, params) => {
-          const block = simpleWorkflow.find(b => b.instanceId === blockId);
-          if (block) {
-            updateSimpleBlockParams(blockId, params);
-          }
-        } : undefined}
-        errors={buildError ? [buildError] : []}
-        warnings={[]}
-        availableBlocks={viewMode === 'simple' ? Object.values(SIMPLE_BLOCK_CATEGORIES).flat() : []}
-        onExplainBlock={(blockId) => {
-          const block = simpleWorkflow.find(b => b.instanceId === blockId);
-          if (block) {
-            const templateId = BLOCK_TO_TEMPLATE[block.id];
-            const template = templateId ? getTemplateById(templateId) : null;
-            if (template) {
-              addLog(`Block: ${block.name}\n${template.description}\nAccounts: ${template.accounts.length}\nArgs: ${template.args.length}`, 'info');
-            }
-          }
-        }}
-        onOptimize={() => {
-          addLog('Analyzing transaction for optimizations...', 'info');
-        }}
-      />
 
       {/* Import Modal */}
       {showImportModal && (

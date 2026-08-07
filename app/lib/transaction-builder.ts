@@ -27,6 +27,7 @@ import {
   getAssociatedTokenAddress
 } from '@solana/spl-token';
 import { BuiltInstruction, TransactionDraft } from './instructions/types';
+import bs58 from 'bs58';
 
 // Platform fee configuration
 // 0.0002 SOL per transaction
@@ -39,7 +40,10 @@ const PLATFORM_FEE_RECIPIENT_ENV = process.env.NEXT_PUBLIC_PLATFORM_FEE_ADDRESS 
 export class TransactionBuilder {
   constructor(private connection: Connection) {}
 
-  async buildTransaction(draft: TransactionDraft): Promise<Transaction> {
+  async buildTransaction(
+    draft: TransactionDraft,
+    opts?: { skipUnsupported?: boolean }
+  ): Promise<Transaction> {
     const transaction = new Transaction();
     
     // Add priority fee if specified
@@ -52,17 +56,25 @@ export class TransactionBuilder {
     
     // Convert each instruction to Solana instruction
     for (const instruction of draft.instructions) {
-      // Handle special multi-instruction operations
-      if (instruction.args._operation === 'create_token_and_mint') {
-        const result = await this.buildCreateTokenAndMint(instruction);
-        for (const inst of result.instructions) {
-          transaction.add(inst);
+      try {
+        // Handle special multi-instruction operations
+        if (instruction.args._operation === 'create_token_and_mint') {
+          const result = await this.buildCreateTokenAndMint(instruction);
+          for (const inst of result.instructions) {
+            transaction.add(inst);
+          }
+          // Add mint keypair to signers
+          additionalSigners.push(...result.signers);
+        } else {
+          const solanaInstruction = await this.buildInstruction(instruction);
+          transaction.add(solanaInstruction);
         }
-        // Add mint keypair to signers
-        additionalSigners.push(...result.signers);
-      } else {
-        const solanaInstruction = await this.buildInstruction(instruction);
-        transaction.add(solanaInstruction);
+      } catch (err) {
+        if (!opts?.skipUnsupported) throw err;
+        console.warn(
+          `Skipping unsupported ix ${instruction.template.id}:`,
+          err instanceof Error ? err.message : err
+        );
       }
     }
     
@@ -152,10 +164,63 @@ export class TransactionBuilder {
       
       case 'mpl_update_metadata':
         return this.buildUpdateMetadata(accountKeys, args);
+
+      case 'custom_instruction':
+        return this.buildCustomInstruction(builtInstruction);
       
       default:
         throw new Error(`Unsupported instruction template: ${template.id}`);
     }
+  }
+
+  private decodeIxData(data: unknown): Buffer {
+    if (!data) return Buffer.alloc(0);
+    if (Buffer.isBuffer(data)) return data;
+    if (data instanceof Uint8Array) return Buffer.from(data);
+    if (typeof data === 'string') {
+      const s = data.trim();
+      if (!s || s.startsWith('{') || s.startsWith('[')) return Buffer.alloc(0);
+      try {
+        return Buffer.from(bs58.decode(s));
+      } catch {
+        /* not base58 */
+      }
+      try {
+        const hex = Buffer.from(s, 'hex');
+        if (hex.length) return hex;
+      } catch {
+        /* ignore */
+      }
+    }
+    return Buffer.alloc(0);
+  }
+
+  private buildCustomInstruction(built: BuiltInstruction): TransactionInstruction {
+    const programId = new PublicKey(built.template.programId || SystemProgram.programId);
+    const keys = built.template.accounts
+      .map((acc) => {
+        const addr = built.accounts[acc.name];
+        if (!addr) return null;
+        return {
+          pubkey: new PublicKey(addr),
+          isSigner: acc.type === 'signer',
+          isWritable: acc.type !== 'readonly',
+        };
+      })
+      .filter((k): k is { pubkey: PublicKey; isSigner: boolean; isWritable: boolean } => Boolean(k));
+
+    if (!keys.length) {
+      for (const addr of Object.values(built.accounts)) {
+        if (!addr) continue;
+        keys.push({ pubkey: new PublicKey(addr), isSigner: false, isWritable: true });
+      }
+    }
+
+    return new TransactionInstruction({
+      programId,
+      keys,
+      data: this.decodeIxData(built.args?.data),
+    });
   }
 
   // ===== SYSTEM PROGRAM INSTRUCTIONS =====

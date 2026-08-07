@@ -3,15 +3,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
-import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import WalletButton from './components/WalletButton';
+import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket, Network } from 'lucide-react';
+import { UnifiedWalletControl } from './components/UnifiedWalletControl';
+import { useActiveWallet } from './hooks/useActiveWallet';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
 import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
 import { ArbitrageScanner } from './components/ArbitrageScanner';
+import { setPendingArbOpportunity } from './lib/arbitrage/pending-build';
+import { patchDeskSession } from './lib/session/desk-session';
+import { clearDisarm, disarmAll, subscribeDisarm } from './lib/bots/kill-switch';
 import { FreeTrialBanner } from './components/FreeTrialBanner';
-import { UnifiedAIAgents } from './components/UnifiedAIAgents';
 import { useNetwork } from './contexts/NetworkContext';
 import { useTutorial } from './contexts/TutorialContext';
 import { TutorialFlow } from './components/TutorialFlow';
@@ -46,7 +48,6 @@ import { DeveloperCommunity } from './components/DeveloperCommunity';
 import { DeveloperDashboard } from './components/DeveloperDashboard';
 import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
 import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
-import { UserProvider, useUser } from './contexts/UserContext';
 import { UserProfileWidget } from './components/UserProfileWidget';
 import { LoginGate } from './components/LoginGate';
 import { RecentTransactions } from './components/RecentTransactions';
@@ -54,10 +55,14 @@ import { SocialConnectButton } from './components/SocialConnectButton';
 import { QuickLaunch } from './components/QuickLaunch';
 import { MarketingBot } from './components/MarketingBot';
 import { RuglessLaunchpad } from './components/RuglessLaunchpad';
-import { PumpFunSniper } from './components/PumpFunSniper';
+import { TradingDesk } from './components/TradingDesk';
+import { BotChartsView } from './components/BotChartsView';
+import { KolMapper } from './components/KolMapper';
+import { HomeDashboard } from './components/HomeDashboard';
 import { BleedingEdgeWrapper } from './components/BleedingEdgeWrapper';
 import { PricingBanner } from './components/PricingBanner';
 import { CustodialWalletTool } from './components/CustodialWalletTool';
+import { ShardTransactionSimulatorComponent } from './components/ShardTransactionSimulator';
 
 // Suppress hydration warnings during development
 if (typeof window !== 'undefined') {
@@ -674,51 +679,93 @@ function AccountInspectorView({ connection, network, publicKey }: { connection: 
   );
 }
 
+function DisarmHeaderButton() {
+  const [on, setOn] = React.useState(false);
+  React.useEffect(() => subscribeDisarm((s) => setOn(s.disarmed)), []);
+  return (
+    <button
+      type="button"
+      onClick={() => (on ? clearDisarm() : disarmAll('header'))}
+      data-sealevel-target={on ? 'header-rearm' : 'header-disarm'}
+      className={`hidden sm:inline text-[11px] px-2 py-1 rounded border ${
+        on ? 'border-slate-500 text-slate-200' : 'border-red-700/80 text-red-200 hover:bg-red-950/60'
+      }`}
+      title="Stop paper bots, live MM, and sniper arm"
+    >
+      {on ? 'Re-arm' : 'Disarm'}
+    </button>
+  );
+}
+
 // 1. Header Component
 function Header({ 
   network,
   setNetwork,
   networks,
-  wallet,
-  onBackToLanding
+  onBackToLanding,
+  activeView,
+  setActiveView,
 }: {
   network: keyof typeof NETWORKS;
   setNetwork: (network: keyof typeof NETWORKS) => void;
   networks: typeof NETWORKS;
-  wallet: React.ReactNode;
   onBackToLanding?: () => void;
+  activeView: string;
+  setActiveView: (view: string) => void;
 }) {
+  const links = [
+    { id: 'home', label: 'Home' },
+    { id: 'scanner', label: 'Scanner' },
+    { id: 'builder', label: 'Builder' },
+    { id: 'bots', label: 'Bots' },
+    { id: 'charts', label: 'Charts' },
+    { id: 'kol-mapper', label: 'KOL' },
+    { id: 'wallets', label: 'Wallets' },
+  ];
   return (
-    <header className="flex h-16 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/80 backdrop-blur-xl px-3 sm:px-6 shrink-0 shadow-lg shadow-purple-500/5">
-      <div className="flex items-center space-x-2 sm:space-x-4">
-        {onBackToLanding && (
-          <button
-            onClick={onBackToLanding}
-            className="text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
-          >
-            <span className="hidden sm:inline">← Back to Home</span>
-            <span className="sm:hidden">←</span>
-          </button>
-        )}
-        {/* Logo */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+    <header className="flex h-14 w-full items-center justify-between border-b border-gray-700/50 bg-gray-900/90 backdrop-blur-xl px-3 sm:px-4 shrink-0 shadow-lg shadow-purple-500/5 z-40">
+      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+        <button type="button" onClick={() => setActiveView('home')} className="flex items-center gap-2 shrink-0">
           <img
             src="/sea-level-logo.png"
             alt="Sealevel Studio"
-            className="h-8 sm:h-10 w-auto"
-            style={{ maxHeight: '40px' }}
+            className="h-8 w-8 rounded-full object-contain bg-gray-800/60"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
           />
-          <div className="text-lg sm:text-xl font-bold tracking-tighter">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 animate-gradient hidden sm:inline">
-              Sealevel Studio
-            </span>
-          </div>
-        </div>
+          <span className="text-sm sm:text-base font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500 hidden md:inline">
+            Sealevel
+          </span>
+        </button>
+        <nav className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto max-w-[55vw] sm:max-w-none">
+          {links.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              onClick={() => setActiveView(l.id)}
+              data-sealevel-target={`nav-${l.id}`}
+              className={`px-2 sm:px-2.5 py-1 rounded-md text-xs sm:text-sm whitespace-nowrap transition-colors ${
+                activeView === l.id
+                  ? 'bg-purple-600/30 text-purple-200'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </nav>
+        {onBackToLanding && (
+          <button
+            onClick={onBackToLanding}
+            className="hidden lg:inline text-xs text-gray-500 hover:text-gray-300"
+          >
+            Landing
+          </button>
+        )}
       </div>
       <div className="flex items-center space-x-1.5 sm:space-x-3">
+        <DisarmHeaderButton />
         {/* Social Connect - Compact */}
         <SocialConnectButton />
         
@@ -731,31 +778,19 @@ function Header({
             value={network}
             onChange={(e) => {
               const newNetwork = e.target.value as keyof typeof NETWORKS;
-              // Block mainnet access
-              if (newNetwork === 'mainnet') {
-                console.warn('Mainnet access is disabled. This site is devnet-only.');
-                return;
-              }
               setNetwork(newNetwork);
             }}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           >
-            {Object.entries(networks)
-              .filter(([key]) => key !== 'mainnet') // Hide mainnet option
-              .map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.name}
-                </option>
-              ))}
+            {Object.entries(networks).map(([key, config]) => (
+              <option key={key} value={key}>
+                {config.name}
+              </option>
+            ))}
           </select>
         </button>
         
-        {/* Wallet Button */}
-        <div className="flex items-center">
-          {wallet}
-        </div>
-        
-        {/* User Profile - Compact Dropdown */}
+        <UnifiedWalletControl />
         <UserProfileWidget />
       </div>
     </header>
@@ -772,50 +807,24 @@ function Sidebar({
   setActiveView: (view: string) => void;
   onViewChange?: () => void;
 }) {
-  const navItems = [
-    // Core Tools
-    { id: 'inspector', label: 'Account Inspector', icon: <Search className="h-4 w-4" />, section: 'core' },
-    { id: 'builder', label: 'Transaction Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
-    { id: 'scanner', label: 'Arbitrage Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
-    { id: 'bundler', label: 'Transaction Bundler', icon: <Layers className="h-4 w-4" />, section: 'core' },
-    { id: 'quick-launch', label: 'Quick Launch', icon: <Rocket className="h-4 w-4" />, section: 'core', badge: 'New' },
-    { id: 'pumpfun-sniper', label: 'Pump.fun Sniper', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
-    { id: 'marketing-bot', label: 'Marketing Bot', icon: <Zap className="h-4 w-4" />, section: 'core', badge: 'AI' },
-    
-    // Revenue
-    { id: 'presale', label: 'SEAL Presale', icon: <TrendingUp className="h-4 w-4" />, section: 'revenue', badge: 'Hot' },
-    { id: 'premium', label: 'Premium Services', icon: <Zap className="h-4 w-4" />, section: 'revenue' },
-    { id: 'revenue', label: 'Pricing & Revenue', icon: <DollarSign className="h-4 w-4" />, section: 'revenue' },
-    
-    // AI
-    { id: 'cyber-playground', label: 'AI Cyber Playground', icon: <Brain className="h-4 w-4" />, section: 'ai' },
-    
-    // Tools Hub
-    { id: 'tools', label: 'Developer Dashboard', icon: <Code className="h-4 w-4" />, section: 'tools', badge: 'Pro' },
-    { id: 'rent-reclaimer', label: 'Rent Reclaimer', icon: <Coins className="h-4 w-4" />, section: 'tools' },
-    { id: 'faucet', label: 'Devnet Faucet', icon: <Droplet className="h-4 w-4" />, section: 'tools' },
-    
-    // Legacy/Other
-    { id: 'simulation', label: 'Simulation', icon: <Play className="h-4 w-4" />, section: 'other' },
-    { id: 'exporter', label: 'Code Exporter', icon: <Code className="h-4 w-4" />, section: 'other' },
-    { id: 'attestation', label: 'VeriSol Attestation', icon: <ShieldCheck className="h-4 w-4" />, section: 'other' },
-    { id: 'web2', label: 'Web2 Tools', icon: <Terminal className="h-4 w-4" /> },
-    { id: 'twitter-bot', label: 'Twitter Bot', icon: <Twitter className="h-4 w-4" />, section: 'social' },
-    { id: 'substack-bot', label: 'Substack Bot', icon: <Book className="h-4 w-4" />, section: 'social' },
-    { id: 'telegram-bot', label: 'Telegram Bot', icon: <MessageCircle className="h-4 w-4" />, section: 'social' },
-    { id: 'charts', label: 'Charts & Visualizations', icon: <LineChart className="h-4 w-4" />, section: 'tools' },
-    { id: 'wallets', label: 'Wallet Manager', icon: <Wallet className="h-4 w-4" /> },
-    { id: 'rd-console', label: 'R&D Console', icon: <Lock className="h-4 w-4" /> },
-    { id: 'cybersecurity', label: 'Cybersecurity Dashboard', icon: <Shield className="h-4 w-4" /> },
-    { id: 'docs', label: 'Documentation', icon: <Book className="h-4 w-4" /> },
-    { id: 'admin', label: 'Admin Analytics', icon: <BarChart3 className="h-4 w-4" /> },
+  const navItems: { id: string; label: string; icon: React.ReactNode; section: string; badge?: string }[] = [
+    { id: 'home', label: 'Home', icon: <Layers className="h-4 w-4" />, section: 'core' },
+    { id: 'scanner', label: 'Arb Scanner', icon: <TrendingUp className="h-4 w-4" />, section: 'core' },
+    { id: 'builder', label: 'TX Builder', icon: <Wrench className="h-4 w-4" />, section: 'core' },
+    { id: 'bots', label: 'Bots', icon: <Bot className="h-4 w-4" />, section: 'core' },
+    { id: 'charts', label: 'Bot Charts', icon: <LineChart className="h-4 w-4" />, section: 'core' },
+    { id: 'kol-mapper', label: 'KOL Mapper', icon: <Network className="h-4 w-4" />, section: 'intel' },
+    { id: 'wallets', label: 'Wallets', icon: <Wallet className="h-4 w-4" />, section: 'intel' },
+    { id: 'inspector', label: 'Inspector', icon: <Search className="h-4 w-4" />, section: 'dev' },
   ];
 
   const coreItems = navItems.filter(item => item.section === 'core');
-  const revenueItems = navItems.filter(item => item.section === 'revenue');
-  const aiItems = navItems.filter(item => item.section === 'ai');
-  const toolsItems = navItems.filter(item => item.section === 'tools');
-  const otherItems = navItems.filter(item => !item.section || item.section === 'other');
+  const intelItems = navItems.filter(item => item.section === 'intel');
+  const devItems = navItems.filter(item => item.section === 'dev');
+  const revenueItems: typeof navItems = [];
+  const aiItems: typeof navItems = [];
+  const toolsItems: typeof navItems = [];
+  const otherItems: typeof navItems = [];
 
   return (
     <nav className="flex w-64 flex-col border-r border-gray-700 bg-gray-900/50 p-4 shrink-0 custom-scrollbar overflow-y-auto">
@@ -884,6 +893,60 @@ function Sidebar({
                         {item.badge}
                       </span>
                     )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {intelItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Intel</div>
+            <ul className="space-y-1">
+              {intelItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )}
+
+        {devItems.length > 0 && (
+          <li>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-2 px-3">Dev</div>
+            <ul className="space-y-1">
+              {devItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveView(item.id)}
+                    className={`
+                      flex w-full items-center space-x-3 rounded-md px-3 py-2 text-left text-sm font-medium
+                      transition-colors
+                      ${
+                        activeView === item.id
+                          ? 'bg-purple-600/20 text-purple-300'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                      }
+                    `}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
                   </button>
                 </li>
               ))}
@@ -1066,20 +1129,51 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   };
 
   const handleArbitrageBuild = (opportunity: any) => {
-    // Switch to builder view and pass opportunity
+    setPendingArbOpportunity(opportunity);
+    const step = opportunity?.steps?.[0] || opportunity?.path?.steps?.[0];
+    const mint = step?.tokenOut?.mint || step?.tokenIn?.mint || '';
+    if (mint) {
+      patchDeskSession({
+        mint,
+        source: 'scanner',
+        reason: `arb ${opportunity.accuracy || 'heuristic'} net ${opportunity.netProfit}`,
+        opportunityId: opportunity.id,
+        intentTab: 'mm',
+      });
+    }
     setActiveView('builder');
-    // The opportunity will be handled by the builder
-    console.log('Building transaction for opportunity:', opportunity);
   };
+
+  if (activeView === 'home') {
+    return <HomeDashboard onOpen={setActiveView} />;
+  }
 
   // Transaction Builder has its own full-screen layout
   if (activeView === 'builder') {
-    return <UnifiedTransactionBuilder onTransactionBuilt={handleTransactionBuilt} onBack={() => setActiveView('inspector')} />;
+    return (
+      <UnifiedTransactionBuilder
+        onTransactionBuilt={handleTransactionBuilt}
+        onBack={() => setActiveView('home')}
+      />
+    );
   }
 
   // Scanner has its own full-screen layout
   if (activeView === 'scanner') {
-    return <ArbitrageScanner onBuildTransaction={handleArbitrageBuild} onBack={() => setActiveView('inspector')} />;
+    return <ArbitrageScanner onBuildTransaction={handleArbitrageBuild} onBack={() => setActiveView('home')} />;
+  }
+
+  if (activeView === 'bots' || activeView === 'pumpfun-sniper') {
+    return (
+      <TradingDesk
+        onBack={() => setActiveView('home')}
+        initialTab={activeView === 'pumpfun-sniper' ? 'sniper' : undefined}
+      />
+    );
+  }
+
+  if (activeView === 'kol-mapper') {
+    return <KolMapper onBack={() => setActiveView('home')} />;
   }
 
   // Developer Dashboard has its own full-screen layout
@@ -1090,11 +1184,6 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Rugless Launchpad has its own full-screen layout
   if (activeView === 'launchpad') {
     return <RuglessLaunchpad onBack={() => setActiveView('inspector')} />;
-  }
-
-  // Pump.fun AI Sniper has its own full-screen layout
-  if (activeView === 'pumpfun-sniper') {
-    return <PumpFunSniper onBack={() => setActiveView('inspector')} />;
   }
 
   if (activeView === 'premium') {
@@ -1110,6 +1199,22 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
   // Transaction Bundler has its own full-screen layout
   if (activeView === 'bundler') {
     return <TransactionBundler onBack={() => setActiveView('inspector')} />;
+  }
+
+  // Shard Transaction Simulator has its own full-screen layout
+  if (activeView === 'shard-simulator') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <button 
+          onClick={() => setActiveView('inspector')} 
+          className="mb-4 text-gray-400 hover:text-white flex items-center gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+        <ShardTransactionSimulatorComponent />
+      </div>
+    );
   }
 
   // Quick Launch has its own layout
@@ -1157,7 +1262,7 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   // Wallet Manager has its own full-screen layout
   if (activeView === 'wallets') {
-    return <WalletManager onBack={() => setActiveView('inspector')} />;
+    return <WalletManager onBack={() => setActiveView('home')} />;
   }
 
   if (activeView === 'custodial-wallet') {
@@ -1236,7 +1341,12 @@ function MainContent({ activeView, setActiveView, connection, network, publicKey
 
   // Charts View has its own full-screen layout
   if (activeView === 'charts') {
-    return <ChartsView onBack={() => setActiveView('inspector')} />;
+    return (
+      <BotChartsView
+        onBack={() => setActiveView('home')}
+        onOpenBots={() => setActiveView('bots')}
+      />
+    );
   }
 
   // Developer Community has its own full-screen layout
@@ -1374,11 +1484,7 @@ interface LoaderContextInfo {
 
 // Main App Component
 export default function App() {
-  return (
-    <UserProvider>
-      <AppContent />
-    </UserProvider>
-  );
+  return <AppContent />;
 }
 
 function AppContent() {
@@ -1386,11 +1492,46 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<'landing' | 'feature-loader' | 'wallet-connect' | 'disclaimer' | 'tutorial' | 'app'>('landing');
   const [isPageLoading, setIsPageLoading] = useState(false);
   const [previousView, setPreviousView] = useState<string>('');
-  const [activeView, setActiveView] = useState('inspector');
+  const [activeView, setActiveView] = useState('home');
+
+  useEffect(() => {
+    if (activeView === 'ai-agents') {
+      setActiveView('home');
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('sealevel-active-view', activeView);
+      window.dispatchEvent(new CustomEvent('sealevel-view', { detail: activeView }));
+    } catch {
+      /* ignore */
+    }
+  }, [activeView]);
+
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const view = (e as CustomEvent<string>).detail;
+      if (typeof view === 'string' && view.trim()) {
+        setCurrentScreen('app');
+        setActiveView(view);
+      }
+    };
+    window.addEventListener('sealevel-navigate', onNav as EventListener);
+    return () => window.removeEventListener('sealevel-navigate', onNav as EventListener);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hs = new URLSearchParams(window.location.search).get('hs');
+    if (hs) {
+      setCurrentScreen('app');
+      setActiveView('builder');
+    }
+  }, []);
   const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
   const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const bleedingEdgeEnabled = process.env.NEXT_PUBLIC_BLEEDING_EDGE_ENABLED === 'true';
-  const { publicKey } = useWallet();
+  const { publicKey, connected: walletConnected } = useActiveWallet();
   const { network, setNetwork } = useNetwork();
   const { shouldShowTutorial, completeTutorial } = useTutorial();
   
@@ -1406,10 +1547,24 @@ function AppContent() {
     }
   }, [activeView]);
 
-  // Store selected blockchain in localStorage
+  // Listen for presale navigation event from PresaleCountdown banner
+  useEffect(() => {
+    const handleNavigateToPresale = () => {
+      setActiveView('presale');
+    };
+
+    window.addEventListener('navigateToPresale', handleNavigateToPresale);
+    return () => {
+      window.removeEventListener('navigateToPresale', handleNavigateToPresale);
+    };
+  }, []);
+
+  // Store selected blockchain in localStorage and notify other components
   useEffect(() => {
     if (selectedBlockchain && typeof window !== 'undefined') {
       localStorage.setItem('sealevel-blockchain', selectedBlockchain);
+      // Dispatch custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('blockchainChanged'));
     }
   }, [selectedBlockchain]);
 
@@ -1417,7 +1572,7 @@ function AppContent() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sealevel-blockchain');
-      if (saved && ['polkadot', 'solana', 'ethereum', 'polygon', 'avalanche', 'base', 'arbitrum', 'optimism', 'sui', 'aptos'].includes(saved)) {
+      if (saved && ['polkadot', 'solana', 'ethereum', 'polygon', 'avalanche', 'base', 'arbitrum', 'optimism', 'sui', 'aptos', 'multiverx'].includes(saved)) {
         setSelectedBlockchain(saved as BlockchainType);
       } else {
         // Default to Solana if nothing saved
@@ -1429,60 +1584,61 @@ function AppContent() {
   // Stable callbacks for loader to prevent re-renders - MUST be before any conditional returns
   const handleLoaderComplete = useCallback(() => {
     setIsPageLoading(false);
-    // After feature loader completes, go to wallet connect
-    if (currentScreen === 'feature-loader') {
-      setCurrentScreen('wallet-connect');
-    }
-  }, [currentScreen]);
+    setCurrentScreen((prev) => (prev === 'feature-loader' || prev === 'landing' ? 'wallet-connect' : prev));
+  }, []);
 
   const handleLoaderEnter = useCallback(() => {
-    // Stay on current view when entering
     setIsPageLoading(false);
   }, []);
 
-  const handleGetStarted = (blockchain?: BlockchainType) => {
-    // Wrap everything in a try-catch to catch any errors
+  const enterAfterAuth = useCallback(() => {
+    const disclaimerAgreed =
+      typeof window !== 'undefined' ? localStorage.getItem('sealevel-disclaimer-agreed') : null;
+    if (!disclaimerAgreed) {
+      setCurrentScreen('disclaimer');
+      return;
+    }
+    let showTutorial = false;
     try {
-      // Ensure we're on the client side
+      if (shouldShowTutorial && typeof shouldShowTutorial === 'function') {
+        showTutorial = shouldShowTutorial('accountInspector') || shouldShowTutorial('instructionAssembler');
+      }
+    } catch (tutorialError) {
+      console.error('Error checking tutorial:', tutorialError);
+      showTutorial = false;
+    }
+    setActiveView('home');
+    setCurrentScreen('app');
+  }, [shouldShowTutorial]);
+
+  const handleGetStarted = useCallback((blockchain?: BlockchainType) => {
+    try {
       if (typeof window === 'undefined') {
         return;
       }
-      
-      console.log('handleGetStarted called', { blockchain });
-      
-      // Set blockchain first
+
       const targetBlockchain = blockchain || 'solana';
-      if (targetBlockchain !== 'polkadot' && targetBlockchain !== 'solana') {
-        alert(`${targetBlockchain.charAt(0).toUpperCase() + targetBlockchain.slice(1)} support is coming soon! For now, you can use Polkadot or Solana which have full feature support.`);
+      if (targetBlockchain !== 'polkadot' && targetBlockchain !== 'solana' && targetBlockchain !== 'multiverx') {
         setSelectedBlockchain('solana');
       } else {
         setSelectedBlockchain(targetBlockchain);
       }
-      
-      // Show feature loader first
-      setIsPageLoading(true);
-      setCurrentScreen('feature-loader');
-      
+
+      setIsPageLoading(false);
+      const disclaimerAgreed = localStorage.getItem('sealevel-disclaimer-agreed');
+      if (!disclaimerAgreed) {
+        setCurrentScreen('disclaimer');
+        return;
+      }
+      setActiveView('home');
+      setCurrentScreen('app');
     } catch (error) {
       console.error('Error in handleGetStarted:', error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Show user-friendly error message
-      alert('Something went wrong. Please try again or refresh the page.');
-      
-      // Fallback: try to navigate to app
-      try {
-        setCurrentScreen('app');
-        setIsPageLoading(false);
-      } catch (fallbackError) {
-        console.error('Fallback navigation failed:', fallbackError);
-        // Last resort: reload the page
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-      }
+      setActiveView('home');
+      setCurrentScreen('app');
+      setIsPageLoading(false);
     }
-  };
+  }, []);
 
   const handleDisclaimerAgree = () => {
     try {
@@ -1503,8 +1659,8 @@ function AppContent() {
         showTutorial = false;
       }
       
-      // Navigate to appropriate screen
-      setCurrentScreen(showTutorial ? 'tutorial' : 'app');
+      setActiveView('home');
+      setCurrentScreen('app');
       
     } catch (error) {
       console.error('Error in handleDisclaimerAgree:', error);
@@ -1520,31 +1676,12 @@ function AppContent() {
     setCurrentScreen('landing');
   };
 
-  // Check if user has wallet (for wallet-connect screen)
-  const { user } = useUser();
-
-  // Effect to handle wallet connection completion
+  // Effect to handle wallet connection completion (Phantom or studio)
   useEffect(() => {
-    if (currentScreen === 'wallet-connect' && user) {
-      // User just connected wallet, proceed to disclaimer or app
-      const disclaimerAgreed = typeof window !== 'undefined' ? localStorage.getItem('sealevel-disclaimer-agreed') : null;
-      if (!disclaimerAgreed) {
-        setCurrentScreen('disclaimer');
-      } else {
-        // Check tutorial and proceed to app
-        let showTutorial = false;
-        try {
-          if (shouldShowTutorial && typeof shouldShowTutorial === 'function') {
-            showTutorial = shouldShowTutorial('accountInspector') || shouldShowTutorial('instructionAssembler');
-          }
-        } catch (tutorialError) {
-          console.error('Error checking tutorial:', tutorialError);
-          showTutorial = false;
-        }
-        setCurrentScreen(showTutorial ? 'tutorial' : 'app');
-      }
+    if (currentScreen === 'wallet-connect' && walletConnected) {
+      enterAfterAuth();
     }
-  }, [currentScreen, user, shouldShowTutorial]);
+  }, [currentScreen, walletConnected, enterAfterAuth]);
 
   let content: React.ReactNode;
 
@@ -1570,8 +1707,11 @@ function AppContent() {
       />
     );
   } else if (currentScreen === 'wallet-connect') {
-    // Show wallet connect (LoginGate) - it will show until user connects
-    content = <LoginGate>{null}</LoginGate>;
+    content = (
+      <LoginGate onSkip={enterAfterAuth}>
+        {null}
+      </LoginGate>
+    );
   } else if (currentScreen === 'disclaimer') {
     content = (
       <div className="min-h-screen bg-gray-900">
@@ -1581,12 +1721,15 @@ function AppContent() {
   } else if (currentScreen === 'tutorial') {
     content = (
       <TutorialFlow 
-        onComplete={() => setCurrentScreen('app')} 
+        onComplete={() => {
+          setActiveView('home');
+          setCurrentScreen('app');
+        }} 
       />
     );
   } else {
     // Main app interface
-    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'tools' || activeView === 'premium' || activeView === 'web2' || activeView === 'wallets' || activeView === 'cybersecurity' || activeView === 'docs' || activeView === 'admin' || activeView === 'bundler' || activeView === 'advertising' || activeView === 'social' || activeView === 'service-bot' || activeView === 'presale' || activeView === 'cyber-playground' || activeView === 'tools-hub' || activeView === 'revenue' || activeView === 'rent-reclaimer' || activeView === 'faucet' || activeView === 'launchpad' || activeView === 'pumpfun-sniper' || activeView === 'twitter-bot' || activeView === 'substack-bot' || activeView === 'telegram-bot' || activeView === 'charts' || activeView === 'custodial-wallet';
+    const isFullScreenView = activeView === 'builder' || activeView === 'scanner' || activeView === 'bots' || activeView === 'pumpfun-sniper' || activeView === 'charts' || activeView === 'kol-mapper' || activeView === 'wallets' || activeView === 'advertising';
 
     // Get loading quote based on destination view
     const getLoadingQuote = () => {
@@ -2017,7 +2160,7 @@ function AppContent() {
         case 'builder':
           return 'transaction-builder';
         case 'ai-agents':
-          return 'ai-agents';
+          return 'ai-agents'; // loader card only — Grok is sitewide
         case 'charts':
           return 'market-analytics';
         case 'cybersecurity':
@@ -2036,31 +2179,25 @@ function AppContent() {
 
     const appLayout = (
       <div className="h-screen flex flex-col bg-gray-900">
-        {!isFullScreenView && (
-          <Header 
-            network={network} 
-            setNetwork={setNetwork} 
-            networks={NETWORKS} 
-            wallet={<WalletButton />}
-            onBackToLanding={handleBackToLanding}
-          />
-        )}
+        <Header 
+          network={network} 
+          setNetwork={setNetwork} 
+          networks={NETWORKS} 
+          onBackToLanding={handleBackToLanding}
+          activeView={activeView}
+          setActiveView={setActiveView}
+        />
         
-        <div className="flex-1 flex overflow-hidden">
-          {!isFullScreenView && (
-            <Sidebar 
-              activeView={activeView} 
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          <div className="flex-1 min-w-0 min-h-0 h-full w-full">
+            <MainContent 
+              activeView={activeView}
               setActiveView={setActiveView}
-              onViewChange={() => setIsPageLoading(true)}
+              connection={connection} 
+              network={network} 
+              publicKey={publicKey} 
             />
-          )}
-          <MainContent 
-            activeView={activeView}
-            setActiveView={setActiveView}
-            connection={connection} 
-            network={network} 
-            publicKey={publicKey} 
-          />
+          </div>
         </div>
       </div>
     );
@@ -2078,7 +2215,7 @@ function AppContent() {
             if (featureId === 'transaction-builder') {
               setActiveView('builder');
             } else if (featureId === 'ai-agents') {
-              setActiveView('ai-agents');
+              setActiveView('home');
             } else if (featureId === 'decentralized-exchange') {
               setActiveView('charts'); // DEX features in charts view
             } else if (featureId === 'security-tools') {
@@ -2097,12 +2234,8 @@ function AppContent() {
         ) : (
           appLayout
         )}
-        
-        {/* R&D Console - Floating (always available) */}
-        <AdvancedRAndDConsole 
-          initialMinimized={rdConsoleMinimized}
-          onToggle={setRdConsoleMinimized}
-        />
+
+        {/* R&D console disabled in cleaned UI */}
       </ClientOnly>
     );
   }

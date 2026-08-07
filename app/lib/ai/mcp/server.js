@@ -31,16 +31,26 @@ const tools = {
 const { registerResources } = require('./resource-loader');
 
 // MCP Resources Registry
-// Resources are registered by the resource loader
+// Resources are registered by the resource loader (lazy initialization)
 let resources = {};
+let resourcesInitialized = false;
 
-// Initialize resources
-try {
-  resources = registerResources();
-  console.log(`[INFO] Registered ${Object.keys(resources).length} MCP resources`);
-} catch (error) {
-  console.error('[ERROR] Failed to register resources:', error.message);
-  resources = {};
+/**
+ * Get resources (lazy initialization)
+ */
+function getResources() {
+  if (!resourcesInitialized) {
+    try {
+      resources = registerResources();
+      console.log(`[INFO] Registered ${Object.keys(resources).length} MCP resources`);
+      resourcesInitialized = true;
+    } catch (error) {
+      console.error('[ERROR] Failed to register resources:', error.message);
+      resources = {};
+      resourcesInitialized = true; // Mark as initialized even on error to prevent retries
+    }
+  }
+  return resources;
 }
 
 // Health check endpoint
@@ -96,6 +106,7 @@ function handleToolCall(req, res, toolName) {
 
 // List resources endpoint
 function handleResources(req, res) {
+  const resources = getResources();
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     resources: Object.keys(resources).map(uri => ({
@@ -107,6 +118,7 @@ function handleResources(req, res) {
 
 // Get resource endpoint
 function handleResource(req, res, resourceUri) {
+  const resources = getResources();
   // Handle parameterized URIs (e.g., tx://examples/{id})
   const parsedUrl = url.parse(req.url, true);
   const query = parsedUrl.query || {};

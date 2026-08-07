@@ -176,7 +176,7 @@ function buildEnhancedSystemPrompt(
     resources.transactionExamples.forEach((ex, i) => {
       enhancedPrompt += `${i + 1}. ${ex.name}: ${ex.description}\n`;
       if (ex.codeSnippet) {
-        enhancedPrompt += `   Code:\n${ex.codeSnippet.split('\n').map(line => `   ${line}`).join('\n')}\n`;
+        enhancedPrompt += `   Code:\n${ex.codeSnippet.split('\n').map((line: string) => `   ${line}`).join('\n')}\n`;
       }
       if (ex.explanation) {
         enhancedPrompt += `   Explanation: ${ex.explanation}\n`;

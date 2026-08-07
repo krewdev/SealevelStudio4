@@ -7,7 +7,7 @@ import { Transaction, VersionedTransaction, Keypair, Connection, PublicKey } fro
 
 export interface CustodialSignerOptions {
   userWalletAddress?: string | null;
-  connection: Connection;
+  connection?: Connection;
 }
 
 /**
@@ -82,10 +82,5 @@ export async function signTransactionWithCustodialAndSigners(
   return signedTx;
 }
 
-/**
- * Check if user has custodial wallet and should use it for signing
- */
-export function shouldUseCustodialWallet(userWalletAddress: string | null | undefined): boolean {
-  return !!userWalletAddress;
-}
+export { shouldUseCustodialWallet } from '../wallet/active-signer';
 

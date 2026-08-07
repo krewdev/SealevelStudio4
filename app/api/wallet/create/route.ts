@@ -153,11 +153,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Encrypt the secret key using AES-256-GCM for secure storage in cookies
-    // Note: Even with encryption, storing secrets in cookies is not ideal for production.
-    // Consider using a secure key management service (AWS KMS, HashiCorp Vault, etc.)
-    // or database storage with proper access controls.
-    const encryptedKey = encryptWalletKey(secretKey);
+    let encryptedKey: string;
+    try {
+      encryptedKey = encryptWalletKey(secretKey);
+    } catch (encErr) {
+      const msg = encErr instanceof Error ? encErr.message : String(encErr);
+      console.error('Wallet key encryption failed:', msg);
+      return NextResponse.json(
+        {
+          success: false,
+          error: msg,
+          suggestion: 'Set WALLET_ENCRYPTION_KEY (64 hex chars) in the hosting environment and redeploy.',
+        },
+        { status: 503 }
+      );
+    }
     
     // Base wallet data
     const walletData = {

@@ -23,7 +23,8 @@ import {
   ArrowLeft,
   Brain,
 } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PoolScanner } from '../lib/pools/scanner';
 import { ArbitrageDetector } from '../lib/pools/arbitrage';
 import {
@@ -33,7 +34,6 @@ import {
   DEFAULT_SCANNER_CONFIG,
   DEXProtocol,
 } from '../lib/pools/types';
-import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { executeArbitrage, validateOpportunity, calculateSafeSlippage, ExecutionConfig } from '../lib/pools/execution';
 import { getUserMessage } from '../lib/error-handling';
@@ -50,7 +50,7 @@ interface ArbitrageScannerProps {
 
 export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScannerProps) {
   const { connection } = useConnection();
-  const wallet = useWallet();
+  const wallet = useActiveWallet();
   const { trackFeatureUsage, checkFeatureAccess, getTrialStatus } = useUsageTracking();
   const [executing, setExecuting] = useState<string | null>(null);
   const [executionResult, setExecutionResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -86,11 +86,13 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
   const handleScan = useCallback(async () => {
     if (isScanning) return;
 
-    // Check if user can use scanner (free trial or subscription)
-    const access = checkFeatureAccess('scanner_scan');
-    if (!access.allowed) {
-      alert(access.reason || 'Scanner scan not available. Please check your subscription or free trial status.');
-      return;
+    // Wallet is only required to execute trades. Scanning is read-only.
+    if (wallet.publicKey) {
+      const access = checkFeatureAccess('scanner_scan');
+      if (!access.allowed) {
+        setErrors([access.reason || 'Scanner scan not available on this account.']);
+        return;
+      }
     }
 
     setIsScanning(true);
@@ -107,11 +109,29 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       });
 
       scanner.updateConfig(config);
-      const state = await scanner.scan(connection);
-      
-      setPools(state.pools);
-      setLastScanTime(state.lastScanTime);
-      setErrors(state.errors || []);
+      const dexes = (config.enabledDEXs || []).join(',');
+      const scanUrl = `/api/pools/scan?network=mainnet&dexes=${encodeURIComponent(dexes)}&opportunities=true`;
+      const scanRes = await fetch(scanUrl);
+      if (!scanRes.ok) {
+        throw new Error(`Scan API ${scanRes.status}`);
+      }
+      const scanJson = await scanRes.json();
+      const apiPools = (scanJson.pools || []) as PoolData[];
+      const apiOpps = (scanJson.opportunities || []) as ArbitrageOpportunity[];
+      const apiErrors = (scanJson.errors || []) as string[];
+
+      setPools(apiPools);
+      setLastScanTime(scanJson.stats?.timestamp ? new Date(scanJson.stats.timestamp) : new Date());
+      setErrors(apiErrors);
+
+      if (apiOpps.length > 0) {
+        setOpportunities(apiOpps);
+        setSelectedOpportunity(apiOpps[0]);
+        return;
+      }
+
+      // Fall through to local detection if API returned pools but no opportunities
+      const state = { pools: apiPools, errors: apiErrors, lastScanTime: new Date() };
 
       // Detect arbitrage opportunities (with Birdeye optimization if available)
       if (state.pools.length > 0) {
@@ -181,7 +201,35 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
     } finally {
       setIsScanning(false);
     }
-  }, [connection, config, isScanning, scanner, checkFeatureAccess, trackFeatureUsage]);
+  }, [connection, config, isScanning, scanner, checkFeatureAccess, trackFeatureUsage, wallet.publicKey]);
+
+  const [rpcHealth, setRpcHealth] = useState<{
+    ok: boolean;
+    provider?: string;
+    slot?: number;
+    latencyMs?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/health/rpc')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setRpcHealth(data);
+      })
+      .catch(() => {
+        if (!cancelled) setRpcHealth({ ok: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    void handleScan();
+    // initial scan only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-refresh effect - defined AFTER handleScan to ensure it's available
   useEffect(() => {
@@ -244,6 +292,13 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
   const handleExecute = useCallback(async (opportunity: ArbitrageOpportunity) => {
     if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
       setExecutionResult({ success: false, message: 'Please connect your wallet to execute arbitrage' });
+      return;
+    }
+    if (!wallet.hotWalletSafe) {
+      setExecutionResult({
+        success: false,
+        message: 'Atomic arb needs Phantom. Switch the active signer in the header.',
+      });
       return;
     }
 
@@ -333,15 +388,8 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
   }, [opportunities, analyzeScan, aiError]);
 
   return (
-    <>
-      <UnifiedAIAgents
-        opportunities={opportunities}
-        pools={pools}
-        selectedOpportunity={selectedOpportunity}
-        onSelectOpportunity={setSelectedOpportunity}
-        onBuildTransaction={handleBuildTransaction}
-      />
-      <div className="h-full flex flex-col animated-bg text-white relative">
+    <div className="h-full w-full flex flex-col animated-bg bg-slate-950 text-white overflow-hidden">
+      <div className="relative flex-1 min-h-0 flex flex-col">
       {/* Background Logo */}
       <div
         className="fixed inset-0 pointer-events-none z-0"
@@ -400,6 +448,20 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           )}
         </div>
         <div className="flex items-center gap-2">
+          {rpcHealth && (
+            <span
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border ${
+                rpcHealth.ok
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50'
+                  : 'bg-red-950/60 text-red-300 border-red-700/50'
+              }`}
+              title={rpcHealth.slot ? `slot ${rpcHealth.slot}` : 'rpc unhealthy'}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${rpcHealth.ok ? 'bg-emerald-400' : 'bg-red-400'}`} />
+              {rpcHealth.provider || 'rpc'}
+              {typeof rpcHealth.latencyMs === 'number' ? ` ${rpcHealth.latencyMs}ms` : ''}
+            </span>
+          )}
           <button
             onClick={() => setShowConfig(!showConfig)}
             className="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded flex items-center gap-2"
@@ -543,10 +605,16 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           <div className="flex items-center gap-2">
             <span className="text-slate-400">Best Profit:</span>
             <span className="font-bold text-green-400">
-              {filteredOpportunities[0].profit.toFixed(4)} SOL ({filteredOpportunities[0].profitPercent.toFixed(2)}%)
+              {filteredOpportunities[0].profit.toFixed(4)}{' '}
+              {filteredOpportunities[0].profitTokenSymbol || 'SOL'} ({filteredOpportunities[0].profitPercent.toFixed(2)}%)
             </span>
           </div>
         )}
+      </div>
+      <div className="relative z-10 px-4 py-2 text-xs text-amber-200/90 bg-amber-950/40 border-b border-amber-900/40">
+        Top opportunities are Jupiter quote-checked. <span className="text-emerald-300">quote_verified</span> means a live
+        round-trip still prints; <span className="text-amber-300">heuristic</span> is snapshot math only. Build opens the
+        visual atomic TX; Execute simulates then sends one versioned transaction.
       </div>
 
       {/* Filters */}
@@ -663,8 +731,14 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
                     </td>
                     <td className="py-3">
                       <span className={opp.netProfit > 0 ? 'text-green-400' : 'text-red-400'}>
-                        {opp.netProfit.toFixed(4)} SOL
+                        {opp.netProfit.toFixed(4)} {opp.profitTokenSymbol || 'SOL'}
                       </span>
+                      {opp.accuracy === 'quote_verified' && (
+                        <div className="text-[10px] text-emerald-400/80">quote verified</div>
+                      )}
+                      {opp.accuracy === 'heuristic' && (
+                        <div className="text-[10px] text-amber-400/80">heuristic</div>
+                      )}
                     </td>
                     <td className="py-3">
                       <span className={`px-2 py-1 rounded text-xs ${
@@ -915,7 +989,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 

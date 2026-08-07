@@ -18,17 +18,28 @@ function getEncryptionKey(): Buffer {
   const masterKey = process.env.WALLET_ENCRYPTION_KEY;
   
   if (masterKey) {
-    // Use provided master key (should be 64 hex characters = 32 bytes)
-    if (masterKey.length !== 64) {
-      throw new Error('WALLET_ENCRYPTION_KEY must be 64 hex characters (32 bytes)');
+    const trimmed = masterKey.trim();
+    // Prefer 64 hex characters = 32 bytes. Also accept any passphrase via SHA-256.
+    if (/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+      return Buffer.from(trimmed, 'hex');
     }
-    return Buffer.from(masterKey, 'hex');
+    return crypto.createHash('sha256').update(trimmed).digest();
   }
 
-  // Generate a key from a combination of environment variables (less secure, for development)
-  // In production, WALLET_ENCRYPTION_KEY MUST be set
+  // Last-resort production derivation so wallet create is not hard-down if only DB secrets exist.
+  // Prefer setting WALLET_ENCRYPTION_KEY explicitly and never rotating the fallback.
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('WALLET_ENCRYPTION_KEY must be set in production');
+    const fallback =
+      process.env.WALLET_RECOVERY_KEY ||
+      process.env.SUPABASE_JWT_SECRET ||
+      process.env.POSTGRES_PASSWORD;
+    if (fallback && fallback.trim().length >= 16) {
+      console.error(
+        'WALLET_ENCRYPTION_KEY is not set; deriving a key from an existing secret. Set WALLET_ENCRYPTION_KEY to a dedicated 64-hex value.'
+      );
+      return crypto.createHash('sha256').update(`sealevel-wallet-v1:${fallback.trim()}`).digest();
+    }
+    throw new Error('WALLET_ENCRYPTION_KEY must be set in production (64 hex chars). Wallet create cannot encrypt keys.');
   }
 
   console.warn('⚠️  WALLET_ENCRYPTION_KEY not set. Using development key (NOT SECURE FOR PRODUCTION).');

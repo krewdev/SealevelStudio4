@@ -25,7 +25,7 @@ import {
   Pause,
   Key,
 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { RiskAcknowledgement } from './compliance/RiskAcknowledgement';
 import { useRiskConsent } from '../hooks/useRiskConsent';
 import { SEAL_TOKEN_ECONOMICS } from '../lib/seal-token/config';
@@ -45,7 +45,7 @@ interface TwitterBotProps {
 
 export function TwitterBot({ onBack }: TwitterBotProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('twitter-bot');
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [userInfo, setUserInfo] = useState<{ username?: string; name?: string } | null>(null);

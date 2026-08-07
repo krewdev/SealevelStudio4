@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSolanaAddress, validateNumeric, safeEncodeParam, ALLOWED_API_BASES } from '@/app/lib/security/validation';
 
-const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/v6`;
+const JUPITER_API_BASE = `${ALLOWED_API_BASES.JUPITER}/swap/v1`;
 
 export const dynamic = 'force-dynamic';
 
@@ -99,6 +99,7 @@ export async function GET(request: NextRequest) {
       const fee = data.routePlan?.[0]?.swapInfo?.feeAmount || 30;
       
       return NextResponse.json({
+        ...data,
         price,
         fee,
         inAmount: data.inAmount,
