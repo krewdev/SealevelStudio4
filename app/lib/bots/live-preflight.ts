@@ -139,7 +139,7 @@ export function buildLivePreflightPlan(input: LivePreflightInput): LivePreflight
     blockers.push(input.venue.error || 'No Jupiter route and mint is not on a pump curve.');
   }
   if (input.venue.kind === 'pump-curve') {
-    warnings.push('Venue is pump bonding curve (pumpportal assemble + your signature). Higher slippage than Jupiter.');
+    warnings.push('Venue is pump bonding curve via official Pump SDK. Higher slippage than Jupiter.');
   }
 
   if (dailyUsed >= LIVE_DAILY_LOSS_CAP) {
@@ -201,7 +201,7 @@ export async function resolveLiveVenue(
       if (await isOnPumpBondingCurve(connection, pk)) {
         return {
           kind: 'pump-curve',
-          label: 'Pump.fun bonding curve',
+          label: 'Pump.fun bonding curve (official SDK)',
           quoteOk: false,
           error: jupErr,
         };

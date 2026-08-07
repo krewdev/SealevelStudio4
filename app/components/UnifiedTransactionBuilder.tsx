@@ -48,8 +48,9 @@ import { useActiveWallet } from '../hooks/useActiveWallet';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
 import { buildAtomicArbTransaction } from '../lib/arbitrage/atomic-build';
-import { formatLamportsDelta, type AccountDiffRow } from '../lib/tx/state-diff';
+import { diffAnyTransaction, type StateDiffResult } from '../lib/tx/state-diff';
 import { patchDeskSession } from '../lib/session/desk-session';
+import { AccountDiffPanel } from './AccountDiffPanel';
 
 // --- Block to Instruction Template Mapping ---
 const BLOCK_TO_TEMPLATE: Record<string, string> = {
@@ -553,7 +554,8 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [arbStatus, setArbStatus] = useState<string | null>(null);
   const [arbWarnings, setArbWarnings] = useState<string[]>([]);
   const [jitoTipLamports, setJitoTipLamports] = useState(0);
-  const [arbDiff, setArbDiff] = useState<AccountDiffRow[]>([]);
+  const [arbDiff, setArbDiff] = useState<StateDiffResult | null>(null);
+  const [simDiff, setSimDiff] = useState<StateDiffResult | null>(null);
   const arbLoadRef = useRef(false);
 
   // Import state
@@ -624,7 +626,14 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       setTransactionDraft({ instructions: built.instructions, memo: 'atomic-arb' });
       setBuiltTransaction(built.transaction);
       setArbWarnings(built.warnings);
-      setArbDiff(built.stateDiff || []);
+      const diff: StateDiffResult = {
+        diffs: built.stateDiff || [],
+        unitsConsumed: built.unitsConsumed,
+        err: built.simulationOk ? undefined : built.warnings.find((w) => /sim/i.test(w)),
+        logs: built.simulationLogs || [],
+      };
+      setArbDiff(diff);
+      setSimDiff(diff);
       const hop0 = opportunity.steps?.[0] || opportunity.path?.steps?.[0];
       if (hop0?.tokenIn?.mint) {
         patchDeskSession({
@@ -1077,6 +1086,24 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       setBuiltTransaction(transaction);
       setTransactionCost(cost);
 
+      try {
+        const diff = await diffAnyTransaction(connection, transaction, {
+          payer: payerPublicKey.toBase58(),
+        });
+        setSimDiff(diff);
+        if (diff.err) addLog(`Simulation: ${diff.err}`, 'error');
+        else {
+          addLog(
+            `Simulation OK · ${diff.unitsConsumed ?? '?'} CU · ${diff.diffs.length} account delta(s)`,
+            'success'
+          );
+        }
+      } catch (simErr) {
+        const msg = simErr instanceof Error ? simErr.message : String(simErr);
+        addLog(`Simulation failed: ${msg}`, 'error');
+        setSimDiff({ diffs: [], err: msg, logs: [] });
+      }
+
       addLog(`Transaction built successfully!`, 'success');
       addLog(`Base transaction cost: ${cost.sol.toFixed(9)} SOL (${cost.lamports} lamports)`, 'info');
       addLog(`Platform fee: ${cost.platformFee.sol.toFixed(9)} SOL (${cost.platformFee.lamports} lamports)`, 'info');
@@ -1212,6 +1239,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       
       setBuiltTransaction(null);
       setTransactionCost(null);
+      setSimDiff(null);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Transaction failed';
       addLog(`Error: ${errorMsg}`, 'error');
@@ -1394,6 +1422,11 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
           </div>
 
           <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0 relative z-10">
+            {simDiff && (
+              <div className="w-full max-w-xl relative z-20">
+                <AccountDiffPanel result={simDiff} />
+              </div>
+            )}
             {arbOpportunity && (
               <div className="w-full max-w-md bg-slate-900/90 border border-teal-700/50 rounded-xl p-3 text-left space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -1886,19 +1919,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             {arbWarnings.slice(0, 3).map((w, i) => (
               <p key={i} className="text-xs text-amber-300">• {w}</p>
             ))}
-            {arbDiff.length > 0 && (
-              <div className="mt-2 border-t border-teal-900/50 pt-2">
-                <div className="text-[11px] uppercase tracking-wide text-teal-300/80 mb-1">Simulated account diff</div>
-                <div className="space-y-1 max-h-36 overflow-auto">
-                  {arbDiff.slice(0, 8).map((d) => (
-                    <div key={d.address} className="flex justify-between gap-2 text-[11px] font-mono text-slate-300">
-                      <span className="truncate" title={d.address}>{d.address.slice(0, 4)}…{d.address.slice(-4)}</span>
-                      <span className={d.deltaLamports >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                        {formatLamportsDelta(d.deltaLamports)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            {(simDiff || arbDiff) && (
+              <div className="mt-2">
+                <AccountDiffPanel result={(simDiff || arbDiff)!} compact />
               </div>
             )}
           </div>
@@ -1907,6 +1930,11 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
+        {simDiff && (
+          <div className="mb-4">
+            <AccountDiffPanel result={simDiff} />
+          </div>
+        )}
         {transactionDraft.instructions.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-gray-700 rounded-lg">
             <Wrench className="h-12 w-12 text-gray-600 mx-auto mb-4" />

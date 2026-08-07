@@ -5,6 +5,7 @@ import { executeJupiterSwap, fetchJupiterQuote, WSOL_MINT, type WalletSender } f
 import { isDisarmed, disarmAll } from './kill-switch';
 import { addDailyLoss, getDailyLoss } from '../session/desk-session';
 import { fetchOnchainPosition } from './position';
+import { executePumpCurveBuy, executePumpCurveSell, isOnPumpBondingCurve } from '../pumpfun/curve-buy';
 
 /** Patterns that are not two-sided wash/volume tape. */
 export const LIVE_ALLOWED_PATTERNS: BotPatternId[] = ['inventory-mm', 'buy-drip', 'sell-drip'];
@@ -111,13 +112,24 @@ export function startLiveBot(
 
     try {
       const probeSol = Math.min(cfg.maxSolPerTrade, 0.01);
-      const probe = await fetchJupiterQuote({
-        inputMint: WSOL_MINT,
-        outputMint: mintStr,
-        amount: String(Math.floor(probeSol * 1e9)),
-        slippageBps: cfg.slippageBps,
-      });
-      const spot = Number(probe.outAmount) / Math.max(Number(probe.inAmount), 1);
+      let venue: 'jupiter' | 'pump-curve' = 'jupiter';
+      let spot = 0;
+      try {
+        const probe = await fetchJupiterQuote({
+          inputMint: WSOL_MINT,
+          outputMint: mintStr,
+          amount: String(Math.floor(probeSol * 1e9)),
+          slippageBps: cfg.slippageBps,
+        });
+        spot = Number(probe.outAmount) / Math.max(Number(probe.inAmount), 1);
+      } catch (quoteErr) {
+        if (await isOnPumpBondingCurve(cfg.connection, mint)) {
+          venue = 'pump-curve';
+          spot = mid > 0 ? mid : 1;
+        } else {
+          throw quoteErr;
+        }
+      }
       if (mid <= 0) mid = spot;
       else mid = mid * 0.7 + spot * 0.3;
       const devPct = mid > 0 ? ((spot - mid) / mid) * 100 : 0;
@@ -129,25 +141,49 @@ export function startLiveBot(
       else if (devPct >= cfg.sellAboveMidPct && inventoryTokens > 0) side = 'sell';
 
       if (side === 'skip') {
-        onStatus?.(`Live idle · spot ${spot.toExponential(3)} mid ${mid.toExponential(3)} (${devPct.toFixed(2)}%)`);
+        onStatus?.(`Live idle · ${venue} · spot ${spot.toExponential(3)} mid ${mid.toExponential(3)} (${devPct.toFixed(2)}%)`);
         schedule();
         return;
       }
 
       const sol = rand(cfg.maxSolPerTrade * 0.5, cfg.maxSolPerTrade);
-      onStatus?.(`Signing live ${side.toUpperCase()} ${sol.toFixed(4)} SOL…`);
+      onStatus?.(`Signing live ${side.toUpperCase()} ${sol.toFixed(4)} SOL via ${venue}…`);
 
       if (side === 'buy') {
-        const result = await executeJupiterSwap({
-          connection: cfg.connection,
-          publicKey: cfg.publicKey,
-          sendTransaction: cfg.sendTransaction,
-          inputMint: WSOL_MINT,
-          outputMint: mintStr,
-          amountRaw: String(Math.floor(sol * 1e9)),
-          slippageBps: cfg.slippageBps,
-        });
-        const tokens = Number(result.outAmount);
+        let signature = '';
+        let tokens = 0;
+        let price = spot;
+        try {
+          if (venue === 'jupiter') {
+            const result = await executeJupiterSwap({
+              connection: cfg.connection,
+              publicKey: cfg.publicKey,
+              sendTransaction: cfg.sendTransaction,
+              inputMint: WSOL_MINT,
+              outputMint: mintStr,
+              amountRaw: String(Math.floor(sol * 1e9)),
+              slippageBps: cfg.slippageBps,
+            });
+            signature = result.signature;
+            tokens = Number(result.outAmount);
+            price = result.price;
+          } else {
+            throw new Error('curve-only');
+          }
+        } catch (jupErr) {
+          if (!(await isOnPumpBondingCurve(cfg.connection, mint))) throw jupErr;
+          const curve = await executePumpCurveBuy({
+            connection: cfg.connection,
+            publicKey: cfg.publicKey,
+            sendTransaction: cfg.sendTransaction as any,
+            mint: mintStr,
+            solAmount: sol,
+            slippagePercent: Math.max(5, Math.round(cfg.slippageBps / 100)),
+          });
+          signature = curve.signature;
+          tokens = Number(curve.tokenAmount);
+          venue = 'pump-curve';
+        }
         inventoryTokens += tokens;
         trades += 1;
         solSpent += sol;
@@ -156,13 +192,13 @@ export function startLiveBot(
           side: 'buy',
           sol,
           tokens,
-          price: result.price,
+          price,
           bot: 'mm',
-          pattern: cfg.pattern,
+          pattern: `${cfg.pattern}:${venue}`,
           live: true,
-          signature: result.signature,
+          signature,
         });
-        onStatus?.(`LIVE BUY ${sol.toFixed(4)} SOL · ${result.signature.slice(0, 8)}…`);
+        onStatus?.(`LIVE BUY ${sol.toFixed(4)} SOL · ${venue} · ${signature.slice(0, 8)}…`);
       } else {
         try {
           const pos = await fetchOnchainPosition(cfg.connection, cfg.publicKey, mintStr);
@@ -171,31 +207,55 @@ export function startLiveBot(
           /* keep local inventory */
         }
         const tokenRaw = Math.max(1, Math.floor(inventoryTokens * 0.35));
-        const result = await executeJupiterSwap({
-          connection: cfg.connection,
-          publicKey: cfg.publicKey,
-          sendTransaction: cfg.sendTransaction,
-          inputMint: mintStr,
-          outputMint: WSOL_MINT,
-          amountRaw: String(tokenRaw),
-          slippageBps: cfg.slippageBps,
-        });
+        let signature = '';
+        let solOut = 0;
+        let price = spot;
+        try {
+          if (venue === 'jupiter') {
+            const result = await executeJupiterSwap({
+              connection: cfg.connection,
+              publicKey: cfg.publicKey,
+              sendTransaction: cfg.sendTransaction,
+              inputMint: mintStr,
+              outputMint: WSOL_MINT,
+              amountRaw: String(tokenRaw),
+              slippageBps: cfg.slippageBps,
+            });
+            signature = result.signature;
+            solOut = Number(result.outAmount) / 1e9;
+            price = result.price;
+          } else {
+            throw new Error('curve-only');
+          }
+        } catch (jupErr) {
+          if (!(await isOnPumpBondingCurve(cfg.connection, mint))) throw jupErr;
+          const curve = await executePumpCurveSell({
+            connection: cfg.connection,
+            publicKey: cfg.publicKey,
+            sendTransaction: cfg.sendTransaction as any,
+            mint: mintStr,
+            tokenAmountRaw: tokenRaw,
+            slippagePercent: Math.max(5, Math.round(cfg.slippageBps / 100)),
+          });
+          signature = curve.signature;
+          solOut = curve.solOut;
+          venue = 'pump-curve';
+        }
         inventoryTokens = Math.max(0, inventoryTokens - tokenRaw);
         trades += 1;
-        const solOut = Number(result.outAmount) / 1e9;
         solGot += solOut;
         pushPaperTrade({
           mint: mintStr,
           side: 'sell',
           sol: solOut,
           tokens: tokenRaw,
-          price: result.price,
+          price,
           bot: 'mm',
-          pattern: cfg.pattern,
+          pattern: `${cfg.pattern}:${venue}`,
           live: true,
-          signature: result.signature,
+          signature,
         });
-        onStatus?.(`LIVE SELL ~${solOut.toFixed(4)} SOL · ${result.signature.slice(0, 8)}…`);
+        onStatus?.(`LIVE SELL ~${solOut.toFixed(4)} SOL · ${venue} · ${signature.slice(0, 8)}…`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -216,7 +276,7 @@ export function startLiveBot(
     if (!stopped) schedule();
   };
 
-  onStatus?.('Live bot armed — first Jupiter tick shortly. Approve each wallet popup.');
+  onStatus?.('Live bot armed — Jupiter first, pump SDK curve if no route. Approve each wallet popup.');
   schedule(1500);
 
   return () => {

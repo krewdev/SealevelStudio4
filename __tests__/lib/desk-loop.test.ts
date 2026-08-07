@@ -8,7 +8,7 @@ import type { ArbitrageOpportunity } from '../../app/lib/pools/types';
 import { CLIENT_TOOL_NAMES } from '../../app/lib/ai/grok-tools';
 import { HIGHLIGHT_ONLY_TARGETS, SAFE_CLICK_TARGETS } from '../../app/lib/ai/page-actions';
 import { isLivePatternAllowed } from '../../app/lib/bots/live-engine';
-import { formatLamportsDelta } from '../../app/lib/tx/state-diff';
+import { formatLamportsDelta, formatTokenDelta, parseSplTokenMeta } from '../../app/lib/tx/state-diff';
 import { pnlFromTrades } from '../../app/lib/bots/position';
 import { bondingCurvePda, PUMP_PROGRAM_ID } from '../../app/lib/pumpfun/curve-buy';
 import { PublicKey } from '@solana/web3.js';
@@ -80,6 +80,17 @@ describe('desk loop unit tests', () => {
     expect(isLivePatternAllowed('wash-chop')).toBe(false);
     expect(isLivePatternAllowed('buy-pump')).toBe(false);
     expect(isLivePatternAllowed('shake-out')).toBe(false);
+  });
+
+  it('parses SPL token account amount and formats token deltas', () => {
+    const buf = Buffer.alloc(72);
+    const mint = Buffer.alloc(32, 1);
+    mint.copy(buf, 0);
+    buf.writeBigUInt64LE(BigInt(1_500), 64);
+    const meta = parseSplTokenMeta(buf);
+    expect(meta?.amount).toBe(BigInt(1500));
+    expect(formatTokenDelta('42')).toBe('+42');
+    expect(formatTokenDelta('-7')).toBe('-7');
   });
 
   it('formats lamport deltas and tape PnL', () => {
