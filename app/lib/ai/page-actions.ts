@@ -26,6 +26,9 @@ export const HIGHLIGHT_ONLY_TARGETS = new Set([
   'desk-start-live',
   'desk-confirm-live',
   'connect-wallet',
+  'firewall-override',
+  'handshake-create',
+  'handshake-counter',
 ]);
 
 const HIGHLIGHT_CLASS = 'sealevel-ai-focus';

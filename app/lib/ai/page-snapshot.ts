@@ -90,6 +90,8 @@ export function snapshotToPrompt(snap: PageSnapshot): string {
     `PAPER_BOT=${snap.paperRunning ? JSON.stringify(snap.paperBot) : 'stopped'}`,
     `DISARMED=${snap.disarmed}${snap.disarmReason ? `(${snap.disarmReason})` : ''}`,
     `RECENT_TRADES=${snap.recentTrades}`,
+    `FIREWALL=${typeof window !== 'undefined' ? localStorage.getItem('sealevel-last-firewall') || 'none' : 'n/a'}`,
+    `TX_DNA=${typeof window !== 'undefined' ? localStorage.getItem('sealevel-last-dna') || 'none' : 'n/a'}`,
     `UI_TARGETS=${snap.visibleTargets.join(',') || 'none'}`,
   ].join('\n');
 }

@@ -2,6 +2,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import type { BotPatternId } from './patterns';
 import { pushPaperTrade } from './trade-store';
 import { resolveFillAmounts } from './fill-from-chain';
+import { counterfactualFill } from '../studio/counterfactual';
 import { executeJupiterSwap, fetchJupiterQuote, WSOL_MINT, type WalletSender } from './live-swap';
 import { isDisarmed, disarmAll } from './kill-switch';
 import { addDailyLoss, getDailyLoss } from '../session/desk-session';
@@ -206,6 +207,11 @@ export function startLiveBot(
           signature,
           settled: fill.settled,
           feeSol: fill.feeSol,
+          counterfactual: counterfactualFill({
+            quoteSol: sol,
+            chainSol: fill.sol,
+            feeSol: fill.feeSol,
+          }),
         });
         onStatus?.(
           `LIVE BUY ${fill.sol.toFixed(4)} SOL · ${venue}${fill.settled ? ' · chain' : ' · quote'} · ${signature.slice(0, 8)}…`
@@ -273,6 +279,11 @@ export function startLiveBot(
           signature,
           settled: fill.settled,
           feeSol: fill.feeSol,
+          counterfactual: counterfactualFill({
+            quoteSol: solOut,
+            chainSol: fill.sol,
+            feeSol: fill.feeSol,
+          }),
         });
         onStatus?.(
           `LIVE SELL ~${fill.sol.toFixed(4)} SOL · ${venue}${fill.settled ? ' · chain' : ' · quote'} · ${signature.slice(0, 8)}…`

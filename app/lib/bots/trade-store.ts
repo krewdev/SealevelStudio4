@@ -14,6 +14,15 @@ export type PaperTrade = {
   /** True when sol/tokens came from confirmed tx meta, not the quote. */
   settled?: boolean;
   feeSol?: number;
+  counterfactual?: {
+    quoteSol: number;
+    chainSol: number;
+    sandwichSol: number;
+    waitSol: number;
+    slipSol: number;
+    extractedSol: number;
+    waitEdgeSol: number;
+  };
 };
 
 type Listener = () => void;
@@ -38,6 +47,7 @@ export function pushPaperTrade(trade: Omit<PaperTrade, 'id' | 'ts'> & { ts?: num
     error: trade.error,
     settled: trade.settled,
     feeSol: trade.feeSol,
+    counterfactual: trade.counterfactual,
   };
   trades.push(full);
   if (trades.length > MAX) trades.splice(0, trades.length - MAX);

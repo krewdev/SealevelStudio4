@@ -25,6 +25,8 @@ import {
   subscribeDeskSession,
 } from '../lib/session/desk-session';
 import { buildLivePreflightPlan, resolveLiveVenue, type LiveVenueKind } from '../lib/bots/live-preflight';
+import { evaluateLiveCapability } from '../lib/studio/live-capability';
+import { LIVE_DAILY_LOSS_CAP } from '../lib/bots/live-engine';
 
 type Tab = 'volume' | 'mm' | 'sniper';
 type Mode = 'paper' | 'live';
@@ -51,6 +53,7 @@ export function TradingDesk({
   const [tick, setTick] = useState(0);
   const [sniperArm, setSniperArm] = useState<string | null>(null);
   const [ackLive, setAckLive] = useState(false);
+  const [ackLiveAt, setAckLiveAt] = useState<number | null>(null);
   const [maxSol, setMaxSol] = useState(0.01);
   const [intervalMs, setIntervalMs] = useState(12000);
   const [maxTrades, setMaxTrades] = useState(8);
@@ -195,15 +198,18 @@ export function TradingDesk({
   }, []);
 
   const liveGateMessage = (): string | null => {
-    if (disarmed) return `Disarmed: ${disarmWhy || 'kill switch'}. Re-arm first.`;
-    if (!liveSignerReady || !publicKey || !sendTransaction) {
-      return active.source === 'studio'
-        ? 'Studio wallet cannot sign live swaps. Switch to Phantom in the header.'
-        : 'Connect Phantom/Solflare for live swaps.';
-    }
-    if (!liveOkPattern) return 'This pattern is paper-only.';
-    if (!ackLive) return 'Check the live-risk box first.';
-    if (!replayUnlocksLive(mint.trim())) return 'Run 60s quote replay before live.';
+    const cap = evaluateLiveCapability({
+      signerSource: active.source,
+      canSignVersioned: active.canSignVersioned,
+      disarmed,
+      patternAllowed: liveOkPattern,
+      replayOk: replayOk || replayUnlocksLive(mint.trim()),
+      riskAck: ackLive,
+      riskAckAt: ackLiveAt,
+      dailyLossSol: getDailyLoss(),
+      dailyLossCap: LIVE_DAILY_LOSS_CAP,
+    });
+    if (!cap.ok) return cap.blockers[0] || 'Live capability denied.';
     return null;
   };
 
@@ -601,7 +607,15 @@ export function TradingDesk({
                   />
                 </label>
                 <label className="flex items-start gap-2 text-xs text-amber-100">
-                  <input type="checkbox" checked={ackLive} onChange={(e) => setAckLive(e.target.checked)} className="mt-0.5" />
+                  <input
+                    type="checkbox"
+                    checked={ackLive}
+                    onChange={(e) => {
+                      setAckLive(e.target.checked);
+                      setAckLiveAt(e.target.checked ? Date.now() : null);
+                    }}
+                    className="mt-0.5"
+                  />
                   I understand this spends real SOL / tokens. Not financial advice. Grok cannot start live bots.
                 </label>
                 <button
@@ -701,6 +715,8 @@ export function TradingDesk({
                     <th className="text-left p-2">Time</th>
                     <th className="text-left p-2">Side</th>
                     <th className="text-left p-2">SOL</th>
+                    <th className="text-left p-2">Quote→chain</th>
+                    <th className="text-left p-2">vs sandwich</th>
                     <th className="text-left p-2">Price</th>
                     <th className="text-left p-2">Pattern</th>
                     <th className="text-left p-2">Tx</th>
@@ -720,6 +736,12 @@ export function TradingDesk({
                         ) : null}
                       </td>
                       <td className="p-2">{t.sol.toFixed(4)}</td>
+                      <td className="p-2 font-mono text-slate-400" title="quote minus chain">
+                        {t.counterfactual ? t.counterfactual.slipSol.toFixed(4) : '—'}
+                      </td>
+                      <td className="p-2 font-mono text-slate-400" title="chain minus sandwich fork">
+                        {t.counterfactual ? t.counterfactual.extractedSol.toFixed(4) : '—'}
+                      </td>
                       <td className="p-2 font-mono">{t.price ? t.price.toExponential(3) : t.error || '—'}</td>
                       <td className="p-2 text-slate-500">{t.pattern}</td>
                       <td className="p-2 font-mono">

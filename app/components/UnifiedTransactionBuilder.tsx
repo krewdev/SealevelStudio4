@@ -36,8 +36,10 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById, getTemplatesByCategory, INSTRUCTION_TEMPLATES } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
-import { importTransaction } from '../lib/transaction-importer';
+import { importTransactionDetailed } from '../lib/transaction-importer';
 import { exportDraftToTypeScript } from '../lib/tx/export-typescript';
+import { evaluateFirewall, flattenToTimeTravelSteps, loadFirewallPolicy, type TimeTravelStep } from '../lib/studio';
+import { StudioRail, isFirewallOverrideChecked } from './studio/StudioRail';
 import { PublicKey } from '@solana/web3.js';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
@@ -564,6 +566,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [importSignature, setImportSignature] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [timeTravelSteps, setTimeTravelSteps] = useState<TimeTravelStep[]>([]);
 
   useEffect(() => {
     if (arbLoadRef.current) return;
@@ -711,7 +714,12 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     const sig = importSignature.trim();
     try {
       addLog(`Fetching transaction ${sig}...`, 'info');
-      const instructions = await importTransaction(connection, sig);
+      const { instructions, parsed } = await importTransactionDetailed(connection, sig);
+      try {
+        setTimeTravelSteps(flattenToTimeTravelSteps(parsed as any, sig));
+      } catch {
+        setTimeTravelSteps([]);
+      }
 
       setTransactionDraft({ instructions });
       setViewMode('advanced');
@@ -1220,6 +1228,24 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     if (!active.connected || !active.payerPublicKey) {
       addLog('Error: Transaction not built or wallet not connected', 'error');
       return;
+    }
+
+    const fwDraft =
+      viewMode === 'advanced'
+        ? transactionDraft
+        : { instructions: await convertSimpleBlocksToInstructions().catch(() => transactionDraft.instructions) };
+    const fw = evaluateFirewall({
+      policy: loadFirewallPolicy(),
+      sim: simDiff,
+      draft: fwDraft,
+    });
+    if (!fw.ok && !isFirewallOverrideChecked()) {
+      addLog(`Firewall blocked Execute: ${fw.violations.map((v) => v.message).join(' ')}`, 'error');
+      setShowLogs(true);
+      return;
+    }
+    if (isFirewallOverrideChecked()) {
+      addLog('Firewall override armed — signing anyway.', 'warning');
     }
 
     const isVersioned =
@@ -1965,6 +1991,15 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
                 Hit Build. Account SOL/token deltas stay pinned here while you edit instructions.
               </p>
             )}
+            <StudioRail
+              draft={transactionDraft}
+              sim={simDiff}
+              payer={payerAddress}
+              connection={connection}
+              timeTravelSteps={timeTravelSteps}
+              onDraftChange={setTransactionDraft}
+              onLog={addLog}
+            />
           </div>
           <div className="border-t border-slate-800 shrink-0">
             <button

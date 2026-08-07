@@ -197,10 +197,13 @@ export function mapParsedMessageToBuiltInstructions(
   return out;
 }
 
-export async function importTransaction(
+export async function importTransactionDetailed(
   connection: Connection,
   signature: string
-): Promise<BuiltInstruction[]> {
+): Promise<{
+  instructions: BuiltInstruction[];
+  parsed: NonNullable<Awaited<ReturnType<Connection['getParsedTransaction']>>>;
+}> {
   const tx = await connection.getParsedTransaction(signature.trim(), {
     maxSupportedTransactionVersion: 0,
   });
@@ -211,5 +214,13 @@ export async function importTransaction(
   if (!instructions.length) {
     throw new Error('No instructions found in that transaction');
   }
+  return { instructions, parsed: tx };
+}
+
+export async function importTransaction(
+  connection: Connection,
+  signature: string
+): Promise<BuiltInstruction[]> {
+  const { instructions } = await importTransactionDetailed(connection, signature);
   return instructions;
 }
