@@ -11,6 +11,9 @@ export type PaperTrade = {
   live?: boolean;
   signature?: string;
   error?: string;
+  /** True when sol/tokens came from confirmed tx meta, not the quote. */
+  settled?: boolean;
+  feeSol?: number;
 };
 
 type Listener = () => void;
@@ -33,11 +36,21 @@ export function pushPaperTrade(trade: Omit<PaperTrade, 'id' | 'ts'> & { ts?: num
     live: trade.live,
     signature: trade.signature,
     error: trade.error,
+    settled: trade.settled,
+    feeSol: trade.feeSol,
   };
   trades.push(full);
   if (trades.length > MAX) trades.splice(0, trades.length - MAX);
   listeners.forEach((l) => l());
   return full;
+}
+
+export function patchPaperTrade(id: string, patch: Partial<PaperTrade>): PaperTrade | null {
+  const row = trades.find((t) => t.id === id);
+  if (!row) return null;
+  Object.assign(row, patch);
+  listeners.forEach((l) => l());
+  return row;
 }
 
 export function listPaperTrades(mint?: string): PaperTrade[] {

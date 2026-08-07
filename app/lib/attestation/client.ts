@@ -3,7 +3,7 @@
 
 import { Program, AnchorProvider, web3, BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import type { WalletContextState } from '@solana/wallet-adapter-react';
+import type { SigningWallet } from '../wallet/active-signer';
 
 // Import IDL - this will be generated after building the Anchor program
 // For now, we'll define a basic structure
@@ -114,7 +114,7 @@ export function getTierInfo(tier: number): TierInfo {
  */
 export function createAttestationClient(
   connection: Connection,
-  wallet: WalletContextState
+  wallet: SigningWallet
 ): AttestationClient {
   if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
     throw new Error('Wallet not connected or missing required methods');

@@ -27,7 +27,8 @@ import {
   Activity,
   Link2,
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import {
   DEFAULT_PRESALE_CONFIG,
@@ -67,7 +68,7 @@ interface SealPresaleProps {
 type PresaleChain = 'solana' | 'multiversx';
 
 export function SealPresale({ onBack }: SealPresaleProps) {
-  const { publicKey, sendTransaction, connected } = useWallet();
+  const { publicKey, sendTransaction, connected } = useActiveWallet();
   const { connection } = useConnection();
   const multiversXWallet = useMultiversXWallet();
 

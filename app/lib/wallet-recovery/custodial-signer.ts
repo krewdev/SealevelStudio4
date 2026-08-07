@@ -7,7 +7,7 @@ import { Transaction, VersionedTransaction, Keypair, Connection, PublicKey } fro
 
 export interface CustodialSignerOptions {
   userWalletAddress?: string | null;
-  connection: Connection;
+  connection?: Connection;
 }
 
 /**

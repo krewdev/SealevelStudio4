@@ -4,7 +4,7 @@
  */
 
 import { Connection } from '@solana/web3.js';
-import { WalletContextState } from '@solana/wallet-adapter-react';
+import type { SigningWallet } from '../wallet/active-signer';
 import { ParsedIntent, IntentType } from './intent-parser';
 import { executeStake, getStakingOptions, validateStakingAmount } from '../staking/stake-executor';
 import { executeSendSOL, saveContact, validateSendAmount } from '../send/send-executor';
@@ -27,7 +27,7 @@ export interface ExecutionResult {
 export async function executeIntent(
   intent: ParsedIntent,
   connection: Connection,
-  wallet: WalletContextState
+  wallet: SigningWallet
 ): Promise<ExecutionResult> {
   switch (intent.type) {
     case 'stake':
@@ -89,7 +89,7 @@ export async function executeIntent(
 async function executeStakeIntent(
   intent: ParsedIntent,
   connection: Connection,
-  wallet: WalletContextState
+  wallet: SigningWallet
 ): Promise<ExecutionResult> {
   const { amount, provider } = intent.parameters;
 
@@ -152,7 +152,7 @@ async function executeStakeIntent(
 async function executeSendIntent(
   intent: ParsedIntent,
   connection: Connection,
-  wallet: WalletContextState
+  wallet: SigningWallet
 ): Promise<ExecutionResult> {
   const { amount, recipient, token } = intent.parameters;
 
@@ -230,7 +230,7 @@ async function executeSendIntent(
 async function executeAirdropIntent(
   intent: ParsedIntent,
   connection: Connection,
-  wallet: WalletContextState
+  wallet: SigningWallet
 ): Promise<ExecutionResult> {
   const { amount, network, recipient } = intent.parameters;
 

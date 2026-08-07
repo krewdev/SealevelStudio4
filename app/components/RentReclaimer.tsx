@@ -15,7 +15,8 @@ import {
   getAssociatedTokenAddress,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import {
   ArrowLeft,
   Coins,
@@ -45,7 +46,7 @@ interface AccountInfo {
 
 export function RentReclaimer({ onBack }: RentReclaimerProps) {
   const { connection } = useConnection();
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const { publicKey, signTransaction, sendTransaction } = useActiveWallet();
   const { network } = useNetwork();
   const [accountAddress, setAccountAddress] = useState('');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);

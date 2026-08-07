@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { 
   Lock, 
   Unlock, 
@@ -14,7 +15,7 @@ import { PublicKey } from '@solana/web3.js';
 
 export function TokenManager() {
   const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [mintAddress, setMintAddress] = useState('');
   const [targetAddress, setTargetAddress] = useState('');
   const [action, setAction] = useState<'freeze' | 'thaw' | 'burn' | 'mint'>('freeze');

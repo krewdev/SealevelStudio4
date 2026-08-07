@@ -3,7 +3,52 @@
  * Phantom (user-held) vs studio (server-custodied) must never silently swap.
  */
 
+import type {
+  Connection,
+  PublicKey,
+  SendOptions,
+  Signer,
+  Transaction,
+  VersionedTransaction,
+} from '@solana/web3.js';
+
 export type WalletSource = 'phantom' | 'studio';
+
+export type SigningSendOptions = SendOptions & {
+  signers?: Signer[];
+};
+
+/**
+ * Minimal signer surface shared by Phantom's adapter and useActiveWallet().
+ * Executors must take this — never WalletContextState — so studio can sign
+ * legacy txs and Phantom remains required for versioned/atomic ones.
+ */
+export type SigningWallet = {
+  publicKey: PublicKey | null;
+  signTransaction?: <T extends Transaction | VersionedTransaction>(tx: T) => Promise<T>;
+  signAllTransactions?: <T extends Transaction | VersionedTransaction>(txs: T[]) => Promise<T[]>;
+  sendTransaction?: (
+    transaction: Transaction | VersionedTransaction,
+    connection: Connection,
+    options?: SigningSendOptions
+  ) => Promise<string>;
+  canSignVersioned?: boolean;
+  hotWalletSafe?: boolean;
+  source?: WalletSource | null;
+};
+
+export function requireSigningWallet(
+  wallet: SigningWallet,
+  opts?: { versioned?: boolean }
+): string | null {
+  if (!wallet.publicKey || (!wallet.sendTransaction && !wallet.signTransaction)) {
+    return 'No wallet connected. Use the header to pick Phantom or a studio wallet.';
+  }
+  if (opts?.versioned && wallet.canSignVersioned === false) {
+    return 'This transaction is versioned/atomic. Switch to Phantom in the header.';
+  }
+  return null;
+}
 
 export type ActiveSignerState = {
   source: WalletSource | null;

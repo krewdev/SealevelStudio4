@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { PublicKey, Connection } from '@solana/web3.js';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { 
   Plus, 
   Trash2, 
@@ -29,7 +30,7 @@ interface InstructionAssemblerProps {
 }
 
 export function InstructionAssembler({ onTransactionBuilt }: InstructionAssemblerProps) {
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useActiveWallet();
   const { connection } = useConnection(); // Add this
   const [transactionDraft, setTransactionDraft] = useState<TransactionDraft>({
     instructions: []

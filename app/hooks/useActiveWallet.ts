@@ -5,6 +5,7 @@ import {
   Connection,
   Keypair,
   PublicKey,
+  Signer,
   Transaction,
   VersionedTransaction,
 } from '@solana/web3.js';
@@ -17,7 +18,13 @@ import {
 } from '../lib/wallet/active-signer';
 import { signTransactionWithCustodialAndSigners } from '../lib/wallet-recovery/custodial-signer';
 
-function isVersionedTx(tx: Transaction | VersionedTransaction): boolean {
+export type SendWithActiveOptions = {
+  signers?: Signer[];
+  skipPreflight?: boolean;
+  maxRetries?: number;
+};
+
+function isVersionedTx(tx: Transaction | VersionedTransaction): tx is VersionedTransaction {
   return (
     tx instanceof VersionedTransaction ||
     (typeof tx === 'object' && tx !== null && 'message' in tx && !('instructions' in tx))
@@ -85,22 +92,28 @@ export function useActiveWallet() {
     async (
       tx: Transaction | VersionedTransaction,
       connection: Connection,
-      additionalSigners: Keypair[] = []
+      additionalSigners: Signer[] = [],
+      options?: SendWithActiveOptions
     ): Promise<string> => {
       if (!signer.source || !signer.address) {
-        throw new Error('No wallet connected');
+        throw new Error('No wallet connected. Use the header to pick Phantom or a studio wallet.');
       }
+
+      const extra = [...(options?.signers ?? []), ...additionalSigners];
 
       if (signer.source === 'phantom') {
         if (!adapter.sendTransaction || !adapter.publicKey) {
           throw new Error('Phantom/Solflare is not connected');
         }
         const toSend = tx;
-        if (additionalSigners.length) {
-          if (toSend instanceof VersionedTransaction) toSend.sign(additionalSigners);
-          else if (toSend instanceof Transaction) toSend.partialSign(...additionalSigners);
+        if (extra.length) {
+          if (toSend instanceof VersionedTransaction) toSend.sign(extra);
+          else if (toSend instanceof Transaction) toSend.partialSign(...extra);
         }
-        return adapter.sendTransaction(toSend, connection);
+        return adapter.sendTransaction(toSend, connection, {
+          skipPreflight: options?.skipPreflight,
+          maxRetries: options?.maxRetries,
+        });
       }
 
       if (isVersionedTx(tx)) {
@@ -109,7 +122,7 @@ export function useActiveWallet() {
         );
       }
 
-      const signed = await signTransactionWithCustodialAndSigners(tx, additionalSigners, {
+      const signed = await signTransactionWithCustodialAndSigners(tx, extra as Keypair[], {
         userWalletAddress: signer.address,
         connection,
       });
@@ -118,16 +131,67 @@ export function useActiveWallet() {
           ? signed.serialize()
           : signed.serialize({ requireAllSignatures: false });
       return connection.sendRawTransaction(serialized, {
-        skipPreflight: false,
-        maxRetries: 3,
+        skipPreflight: options?.skipPreflight ?? false,
+        maxRetries: options?.maxRetries ?? 3,
       });
     },
     [signer, adapter]
   );
 
+  const sendTransaction = useCallback(
+    (
+      tx: Transaction | VersionedTransaction,
+      connection: Connection,
+      options?: SendWithActiveOptions
+    ) => sendWithActive(tx, connection, options?.signers ?? [], options),
+    [sendWithActive]
+  );
+
+  const signTransaction = useCallback(
+    async <T extends Transaction | VersionedTransaction>(tx: T): Promise<T> => {
+      if (!signer.source || !signer.address) {
+        throw new Error('No wallet connected');
+      }
+
+      if (signer.source === 'phantom') {
+        if (!adapter.signTransaction) {
+          throw new Error('Phantom/Solflare cannot sign this transaction');
+        }
+        return adapter.signTransaction(tx);
+      }
+
+      if (isVersionedTx(tx)) {
+        throw new Error(
+          'Studio wallet cannot sign versioned/atomic transactions. Switch to Phantom in the header.'
+        );
+      }
+
+      const signed = await signTransactionWithCustodialAndSigners(tx, [], {
+        userWalletAddress: signer.address,
+      });
+      return signed as T;
+    },
+    [signer, adapter]
+  );
+
+  const signAllTransactions = useCallback(
+    async <T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> => {
+      const out: T[] = [];
+      for (const tx of txs) out.push(await signTransaction(tx));
+      return out;
+    },
+    [signTransaction]
+  );
+
   return {
     ...signer,
+    /** Active payer — alias so tools can drop-in replace useWallet(). */
+    publicKey: payerPublicKey,
     payerPublicKey,
+    sendTransaction,
+    signTransaction,
+    signAllTransactions,
+    sendWithActive,
     phantomConnected: Boolean(phantom),
     studioConnected: Boolean(studio),
     connecting: adapter.connecting || isLoading,
@@ -138,6 +202,14 @@ export function useActiveWallet() {
     createStudioWallet: createWallet,
     logoutStudio: logout,
     disconnectPhantom: adapter.disconnect,
-    sendWithActive,
+    disconnect: async () => {
+      if (signer.source === 'studio') {
+        logout();
+        setPreferred(phantom ? 'phantom' : null);
+        return;
+      }
+      await adapter.disconnect();
+      setPreferred(studio ? 'studio' : null);
+    },
   };
 }

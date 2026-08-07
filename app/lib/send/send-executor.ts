@@ -10,7 +10,7 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
-import { WalletContextState } from '@solana/wallet-adapter-react';
+import { requireSigningWallet, type SigningWallet } from '../wallet/active-signer';
 import { getContactManager } from '../contacts/contact-manager';
 import { Contact } from '../contacts/types';
 
@@ -103,14 +103,15 @@ async function resolveRecipient(
  */
 export async function executeSendSOL(
   connection: Connection,
-  wallet: WalletContextState,
+  wallet: SigningWallet,
   amount: number,
   recipient: string
 ): Promise<SendExecutionResult> {
-  if (!wallet.publicKey || !wallet.sendTransaction) {
+  const walletError = requireSigningWallet(wallet);
+  if (walletError || !wallet.publicKey || !wallet.sendTransaction) {
     return {
       success: false,
-      error: 'Wallet not connected',
+      error: walletError || 'Wallet not connected',
     };
   }
 

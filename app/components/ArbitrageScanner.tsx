@@ -294,6 +294,13 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
       setExecutionResult({ success: false, message: 'Please connect your wallet to execute arbitrage' });
       return;
     }
+    if (!wallet.hotWalletSafe) {
+      setExecutionResult({
+        success: false,
+        message: 'Atomic arb needs Phantom. Switch the active signer in the header.',
+      });
+      return;
+    }
 
     // Validate opportunity
     const validation = validateOpportunity(opportunity, {
@@ -316,7 +323,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
         maxRetries: 3,
       };
 
-      const result = await executeArbitrage(connection, wallet.adapter, opportunity, config);
+      const result = await executeArbitrage(connection, wallet, opportunity, config);
 
       if (result.success) {
         setExecutionResult({

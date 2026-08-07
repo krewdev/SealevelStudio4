@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { executeJupiterSwap, WSOL_MINT } from '../lib/bots/live-swap';
 import { executePumpCurveBuy, isOnPumpBondingCurve } from '../lib/pumpfun/curve-buy';
 import { isDisarmed } from '../lib/bots/kill-switch';
 import { patchDeskSession } from '../lib/session/desk-session';
 import { pushPaperTrade } from '../lib/bots/trade-store';
+import { resolveFillAmounts } from '../lib/bots/fill-from-chain';
 import { PumpFunStream, PumpFunStreamEvent, PumpFunToken } from '../lib/pumpfun/stream';
 import { PumpFunQuickNodeStream } from '../lib/pumpfun/quicknode-stream';
 import { SnipingAnalysis } from '../lib/pumpfun/ai-analysis';
@@ -47,7 +49,7 @@ interface SnipingConfig {
 
 export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
   const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, canSignVersioned } = useActiveWallet();
   
   const [stream, setStream] = useState<PumpFunStream | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -197,6 +199,10 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
       console.error('[PumpFun Sniper] Wallet not connected');
       return;
     }
+    if (!canSignVersioned) {
+      console.error('[PumpFun Sniper] Live snipe requires Phantom. Switch in the header.');
+      return;
+    }
     if (isDisarmed()) {
       console.warn('[PumpFun Sniper] Desk disarmed — skip buy');
       return;
@@ -212,6 +218,8 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
 
       let signature = '';
       let venue: 'jupiter' | 'pump-curve' = 'jupiter';
+      let quoteTokens = 0;
+      let quotePrice = 0;
       try {
         const result = await executeJupiterSwap({
           connection,
@@ -223,6 +231,8 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
           slippageBps: 150,
         });
         signature = result.signature;
+        quoteTokens = Number(result.outAmount || 0);
+        quotePrice = result.price;
       } catch (jupErr) {
         const onCurve = await isOnPumpBondingCurve(connection, mintKey);
         if (!onCurve) throw jupErr;
@@ -236,18 +246,28 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
         });
         signature = curve.signature;
         venue = 'pump-curve';
+        quoteTokens = Number(curve.tokenAmount || 0);
       }
+
+      const fill = await resolveFillAmounts(connection, signature, {
+        payer: publicKey.toBase58(),
+        mint: token.mint,
+        side: 'buy',
+        fallback: { sol: investmentSol, tokens: quoteTokens, price: quotePrice },
+      });
 
       pushPaperTrade({
         mint: token.mint,
         side: 'buy',
-        sol: investmentSol,
-        tokens: 0,
-        price: 0,
+        sol: fill.sol,
+        tokens: fill.tokens,
+        price: fill.price,
         bot: 'sniper',
-        pattern: venue,
+        pattern: `${venue}${fill.settled ? ':chain' : ':quote'}`,
         live: true,
         signature,
+        settled: fill.settled,
+        feeSol: fill.feeSol,
       });
 
       setSnipedTokens(prev => new Set(prev).add(token.mint));
@@ -255,7 +275,7 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
         ...prev,
         snipesExecuted: prev.snipesExecuted + 1,
         snipesSuccessful: prev.snipesSuccessful + 1,
-        totalInvested: prev.totalInvested + investmentSol,
+        totalInvested: prev.totalInvested + fill.sol,
       }));
 
       console.log('[PumpFun Sniper] Sniped token:', token.symbol, venue, signature);
@@ -266,7 +286,7 @@ export function PumpFunSniper({ onBack }: PumpFunSniperProps) {
         snipesExecuted: prev.snipesExecuted + 1,
       }));
     }
-  }, [publicKey, sendTransaction, connection, config]);
+  }, [publicKey, sendTransaction, canSignVersioned, connection, config]);
 
   /**
    * Analyze token with AI

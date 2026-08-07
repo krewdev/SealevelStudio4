@@ -42,7 +42,7 @@ export function AccountDiffPanel({
       {result.diffs.length === 0 ? (
         <p className="text-xs text-slate-500">No account deltas in the simulated set (static keys only).</p>
       ) : (
-        <div className={`overflow-auto ${compact ? 'max-h-40' : 'max-h-64'}`}>
+        <div className={`overflow-auto ${compact ? 'max-h-40' : 'max-h-[28rem]'}`}>
           <table className="w-full text-[11px] font-mono">
             <thead className="sticky top-0 bg-slate-950 text-slate-500">
               <tr>

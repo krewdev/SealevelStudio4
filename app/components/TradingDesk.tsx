@@ -38,8 +38,8 @@ export function TradingDesk({
 }) {
   const { connection } = useConnection();
   const active = useActiveWallet();
-  const publicKey = active.adapter.publicKey;
-  const sendTransaction = active.adapter.sendTransaction;
+  const publicKey = active.publicKey;
+  const sendTransaction = active.sendTransaction;
   const liveSignerReady = active.canSignVersioned && !!publicKey && !!sendTransaction;
   const [tab, setTab] = useState<Tab>(initialTab || 'volume');
   const [mode, setMode] = useState<Mode>('paper');
@@ -713,6 +713,11 @@ export function TradingDesk({
                       <td className={`p-2 ${t.side === 'buy' ? 'text-emerald-400' : 'text-red-400'}`}>
                         {t.live ? 'LIVE ' : ''}
                         {t.side}
+                        {t.settled ? (
+                          <span className="ml-1 text-[10px] uppercase text-cyan-400">chain</span>
+                        ) : t.live && t.signature ? (
+                          <span className="ml-1 text-[10px] uppercase text-slate-500">quote</span>
+                        ) : null}
                       </td>
                       <td className="p-2">{t.sol.toFixed(4)}</td>
                       <td className="p-2 font-mono">{t.price ? t.price.toExponential(3) : t.error || '—'}</td>

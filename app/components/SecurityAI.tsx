@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Play, Pause, RefreshCw, Settings, Lock, X } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { SecurityScanner, SecurityReport as SecurityReportType } from '../lib/security/scanner';
 import { SecurityAIBot } from './SecurityAIBot';
 import { SecurityReport } from './SecurityReport';
@@ -18,7 +18,7 @@ interface SecurityAIProps {
 
 export function SecurityAI({ onBack }: SecurityAIProps) {
   const { hasConsent, initialized, accept } = useRiskConsent('security-ai');
-  const { publicKey } = useWallet();
+  const { publicKey } = useActiveWallet();
   const [scanner] = useState(() => new SecurityScanner());
   const [validator] = useState(() => new TruthValidator());
   const [accessControl] = useState(() => new AIAccessControl());

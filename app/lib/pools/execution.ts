@@ -8,7 +8,7 @@ import {
   Transaction,
 } from '@solana/web3.js';
 import { ArbitrageOpportunity } from './types';
-import { WalletContextState } from '@solana/wallet-adapter-react';
+import { requireSigningWallet, type SigningWallet } from '../wallet/active-signer';
 import { buildAtomicArbTransaction } from '../arbitrage/atomic-build';
 
 export interface ExecutionResult {
@@ -39,16 +39,17 @@ const DEFAULT_CONFIG: ExecutionConfig = {
  */
 export async function executeArbitrage(
   connection: Connection,
-  wallet: WalletContextState,
+  wallet: SigningWallet,
   opportunity: ArbitrageOpportunity,
   config: Partial<ExecutionConfig> = {}
 ): Promise<ExecutionResult> {
   const execConfig = { ...DEFAULT_CONFIG, ...config };
 
-  if (!wallet.publicKey || !wallet.signTransaction || !wallet.sendTransaction) {
+  const walletError = requireSigningWallet(wallet, { versioned: true });
+  if (walletError || !wallet.publicKey || !wallet.sendTransaction) {
     return {
       success: false,
-      error: 'Wallet not connected or missing required methods',
+      error: walletError || 'Wallet not connected or missing required methods',
     };
   }
 

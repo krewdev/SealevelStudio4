@@ -23,7 +23,6 @@ import {
   getAccount,
 } from '@solana/spl-token';
 import { SEAL_TOKEN_ECONOMICS, SEAL_TOKEN_CONFIG, getSealMintAddress } from './config';
-import { WalletContextState } from '@solana/wallet-adapter-react';
 
 /**
  * Airdrop SEAL tokens to beta tester

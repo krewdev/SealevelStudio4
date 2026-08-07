@@ -1,8 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   resolveActiveSigner,
+  requireSigningWallet,
   shouldUseCustodialWallet,
   shortAddr,
+  type SigningWallet,
 } from '../../app/lib/wallet/active-signer';
 
 const PHANTOM = '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU';
@@ -74,5 +76,32 @@ describe('active signer', () => {
     expect(s.source).toBeNull();
     expect(s.address).toBeNull();
     expect(shouldUseCustodialWallet(null, null)).toBe(false);
+  });
+
+  it('does not silently prefer studio over phantom for estimate/send', () => {
+    // Bundler / faucet / sniper must follow this resolver, not user.walletAddress first.
+    const both = resolveActiveSigner({ phantom: PHANTOM, studio: STUDIO });
+    expect(both.address).toBe(PHANTOM);
+    expect(both.source).toBe('phantom');
+  });
+
+  it('requireSigningWallet blocks missing and studio-on-versioned', () => {
+    const empty: SigningWallet = { publicKey: null };
+    expect(requireSigningWallet(empty)).toMatch(/No wallet connected/);
+
+    const studio: SigningWallet = {
+      publicKey: { toBase58: () => STUDIO } as SigningWallet['publicKey'],
+      sendTransaction: async () => 'sig',
+      canSignVersioned: false,
+    };
+    expect(requireSigningWallet(studio)).toBeNull();
+    expect(requireSigningWallet(studio, { versioned: true })).toMatch(/versioned\/atomic/);
+
+    const phantom: SigningWallet = {
+      publicKey: { toBase58: () => PHANTOM } as SigningWallet['publicKey'],
+      sendTransaction: async () => 'sig',
+      canSignVersioned: true,
+    };
+    expect(requireSigningWallet(phantom, { versioned: true })).toBeNull();
   });
 });

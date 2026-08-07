@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useUser } from '../contexts/UserContext';
-import { useWallet } from '@solana/wallet-adapter-react';
+import React, { useState } from 'react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { Wallet, Loader2, Sparkles, ArrowRight, Shield } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 
 interface LoginGateProps {
   children: React.ReactNode;
@@ -12,24 +12,16 @@ interface LoginGateProps {
 }
 
 export function LoginGate({ children, onSkip }: LoginGateProps) {
-  const { user, isLoading, createWallet } = useUser();
-  const { publicKey, connecting } = useWallet();
+  const active = useActiveWallet();
+  const { isLoading } = useUser();
   const { setVisible } = useWalletModal();
   const [isCreating, setIsCreating] = useState(false);
   const [email, setEmail] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [vanityPrefix, setVanityPrefix] = useState('');
-  
-  // Force re-check user state after wallet creation
-  // This ensures the component updates even if there's a slight delay
-  useEffect(() => {
-    if (user && !isLoading) {
-      // User is set, component will re-render and show children
-    }
-  }, [user, isLoading]);
 
-  // Show loading state while checking for user
-  if (isLoading) {
+  // Show loading state while checking for studio session
+  if (isLoading && !active.connected) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -41,7 +33,7 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
   }
 
   // Studio session or Phantom is enough to enter.
-  if (user || publicKey) {
+  if (active.connected) {
     return <>{children}</>;
   }
 
@@ -77,10 +69,11 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
       }
 
       // Pass vanity prefix if user has entered one
-      await createWallet(
+      await active.createStudioWallet(
         showEmailInput && email ? email.trim() : undefined,
         vanityPrefix.trim() || undefined
       );
+      active.setPreferred('studio');
       
       // Wallet creation succeeded - user state should be set by createWallet
       // The LoginGate will automatically re-render and show children when user is set
@@ -124,10 +117,10 @@ export function LoginGate({ children, onSkip }: LoginGateProps) {
           <button
             type="button"
             onClick={() => setVisible(true)}
-            disabled={connecting}
+            disabled={active.connecting}
             className="w-full py-3 sm:py-3.5 mb-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-60"
           >
-            {connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+            {active.connecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
             <span>Connect Phantom / Solflare</span>
             <ArrowRight className="w-4 h-4" />
           </button>

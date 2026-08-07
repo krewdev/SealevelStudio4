@@ -28,14 +28,16 @@ import {
   Clipboard,
   ClipboardCheck,
   Info,
-  TrendingUp
+  TrendingUp,
+  Search,
 } from 'lucide-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { TransactionBuilder } from '../lib/transaction-builder';
-import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
+import { getTemplateById, getTemplatesByCategory, INSTRUCTION_TEMPLATES } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
 import { importTransaction } from '../lib/transaction-importer';
+import { exportDraftToTypeScript } from '../lib/tx/export-typescript';
 import { PublicKey } from '@solana/web3.js';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
@@ -512,7 +514,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const connecting = active.connecting;
   const payerAddress = active.address;
   const walletLabel = active.connected ? active.label : null;
-  const [viewMode, setViewMode] = useState<ViewMode>('simple');
+  const [viewMode, setViewMode] = useState<ViewMode>('advanced');
   
   // Shared transaction state
   const [transactionDraft, setTransactionDraft] = useState<TransactionDraft>({
@@ -574,7 +576,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
 
   const loadArbitrageOpportunity = async (opportunity: ArbitrageOpportunity) => {
     setArbOpportunity(opportunity);
-    setViewMode('simple');
+    setViewMode('advanced');
     const hops = opportunity.steps?.length ? opportunity.steps : opportunity.path?.steps || [];
     setSimpleWorkflow(
       hops.map((step, i) => ({
@@ -672,27 +674,84 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     }
   };
 
+  const handleExportTs = async () => {
+    const draft: TransactionDraft =
+      viewMode === 'simple'
+        ? { instructions: await convertSimpleBlocksToInstructions().catch(() => transactionDraft.instructions) }
+        : transactionDraft;
+    if (!draft.instructions.length && !arbOpportunity) {
+      addLog('Nothing to export — add instructions or Build first.', 'warning');
+      setShowLogs(true);
+      return;
+    }
+    const code = exportDraftToTypeScript({
+      draft,
+      payer: payerAddress,
+      sim: simDiff || arbDiff,
+    });
+    try {
+      await navigator.clipboard.writeText(code);
+      addLog(`Copied ${draft.instructions.length} instruction(s) as TypeScript (matches last sim if you hit Build).`, 'success');
+    } catch {
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sealevel-tx.ts';
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog('Download started: sealevel-tx.ts', 'success');
+    }
+    setShowLogs(true);
+  };
+
   const handleImport = async () => {
     if (!importSignature || !connection) return;
     setIsImporting(true);
+    const sig = importSignature.trim();
     try {
-      addLog(`Fetching transaction ${importSignature}...`, 'info');
-      const instructions = await importTransaction(connection, importSignature);
-      
-      // Merge with existing or replace? Let's replace for now as "Import" usually implies loading a specific tx.
-      // But to be safe/flexible, maybe append? No, users likely want to edit THAT tx.
-      // Let's append to avoid data loss, or offer choice. For now, append.
-      // Actually, user said "plugged into the builder", usually implies loading that tx state.
-      // Let's append to draft.
-      setTransactionDraft(prev => ({
-        ...prev,
-        instructions: [...prev.instructions, ...instructions]
-      }));
-      
-      setViewMode('advanced'); // Switch to advanced to see the instructions
+      addLog(`Fetching transaction ${sig}...`, 'info');
+      const instructions = await importTransaction(connection, sig);
+
+      setTransactionDraft({ instructions });
+      setViewMode('advanced');
       setShowImportModal(false);
       setImportSignature('');
-      addLog(`Successfully imported ${instructions.length} instructions`, 'success');
+      setSimpleWorkflow([]);
+      setArbOpportunity(null);
+      addLog(`Imported ${instructions.length} instruction card(s) from ${sig.slice(0, 8)}…`, 'success');
+
+      const payerPublicKey = active.payerPublicKey;
+      if (!payerPublicKey) {
+        addLog('Cards loaded. Connect a wallet and hit Build to simulate diffs.', 'warning');
+        setShowLogs(true);
+        return;
+      }
+
+      addLog('Rebuilding imported tx and simulating…', 'info');
+      const builder = new TransactionBuilder(connection);
+      const transaction = await builder.buildTransaction(
+        { instructions, priorityFee: 0, memo: `import ${sig.slice(0, 8)}` },
+        { skipUnsupported: true }
+      );
+      if (!transaction.instructions.length) {
+        addLog('Imported cards need edits before they can simulate (unsupported / incomplete ixs).', 'warning');
+        setBuiltTransaction(null);
+        setSimDiff(null);
+        setShowLogs(true);
+        return;
+      }
+      builder.addPlatformFee(transaction, payerPublicKey);
+      await builder.prepareTransaction(transaction, payerPublicKey);
+      const cost = await builder.estimateCost(transaction);
+      setBuiltTransaction(transaction);
+      setTransactionCost(cost);
+      const diff = await diffAnyTransaction(connection, transaction, {
+        payer: payerPublicKey.toBase58(),
+      });
+      setSimDiff(diff);
+      if (diff.err) addLog(`Simulation: ${diff.err}`, 'error');
+      else addLog(`Simulation OK · ${diff.unitsConsumed ?? '?'} CU · ${diff.diffs.length} account delta(s)`, 'success');
     } catch (e: any) {
       addLog(`Import failed: ${e.message}`, 'error');
       console.error(e);
@@ -1272,9 +1331,12 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     return icons[iconName] || <Cpu className={className} />;
   };
 
-  const filteredTemplates = getTemplatesByCategory(selectedCategory).filter(template =>
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTemplates = (
+    searchQuery.trim() ? INSTRUCTION_TEMPLATES : getTemplatesByCategory(selectedCategory)
+  ).filter(
+    (template) =>
+      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Render Simple Mode
@@ -1763,106 +1825,198 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
     </div>
   );
 
-  // Render Advanced Mode (InstructionAssembler)
+  // Render Advanced Mode: templates | instructions | pinned sim diff
   const renderAdvancedMode = () => {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-4 pt-3 pb-2 flex items-center justify-between">
-        <p className="text-xs text-slate-500">Add instructions, then Build in the top bar to simulate account diffs.</p>
-        <button
-          onClick={() => setShowTemplateSelector(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-xs font-medium"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add instruction
-        </button>
-      </div>
-      <div className="px-4">
-
-        {buildError && (
-          <div className="mb-4 p-4 bg-red-900/20 border border-red-700 rounded-lg flex items-center space-x-2">
-            <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-            <span className="text-red-400">{buildError}</span>
-          </div>
-        )}
-
-        {(arbOpportunity || arbStatus) && (
-          <div className="mb-4 p-4 bg-teal-900/20 border border-teal-700/60 rounded-lg space-y-2">
-            <div className="flex items-center gap-2 text-teal-200 font-semibold">
-              <Zap size={16} />
-              Atomic arbitrage loaded
-              {arbOpportunity?.accuracy && (
-                <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                  {arbOpportunity.accuracy}
-                </span>
-              )}
+      <div className="h-full flex overflow-hidden bg-slate-950 text-slate-200">
+        <aside className="w-64 shrink-0 border-r border-slate-800 bg-slate-900/40 flex flex-col min-h-0">
+          <div className="p-3 border-b border-slate-800 space-y-2">
+            <div className="text-[11px] uppercase tracking-wide text-slate-500">Templates</div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search instructions…"
+                className="w-full rounded-lg bg-slate-800 border border-slate-700 pl-7 pr-2.5 py-1.5 text-xs text-white placeholder:text-slate-500"
+              />
             </div>
-            {arbStatus && <p className="text-sm text-slate-300">{arbStatus}</p>}
-            {arbOpportunity && (
-              <p className="text-xs text-slate-400">
-                Est. {arbOpportunity.netProfit.toFixed(6)} {arbOpportunity.profitTokenSymbol || 'units'} ·{' '}
-                {(arbOpportunity.confidence * 100).toFixed(0)}% confidence · Execute sends one atomic versioned transaction
-              </p>
-            )}
-            {arbWarnings.slice(0, 3).map((w, i) => (
-              <p key={i} className="text-xs text-amber-300">• {w}</p>
+            <div className="flex flex-wrap gap-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    setSearchQuery('');
+                  }}
+                  className={`text-[10px] px-2 py-1 rounded ${
+                    !searchQuery.trim() && selectedCategory === cat.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+            {filteredTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => addAdvancedInstruction(t)}
+                className="w-full text-left rounded-lg border border-slate-800 bg-slate-900/80 hover:border-teal-500/50 px-3 py-2 transition-colors"
+              >
+                <div className="text-xs font-medium text-white">{t.name}</div>
+                <div className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{t.description}</div>
+              </button>
             ))}
+            {filteredTemplates.length === 0 && (
+              <p className="text-xs text-slate-500 p-2">No templates match.</p>
+            )}
           </div>
-        )}
-      </div>
+        </aside>
 
-      {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
-        {simDiff && (
-          <div className="mb-4">
-            <AccountDiffPanel result={simDiff} />
-          </div>
-        )}
-        {transactionDraft.instructions.length === 0 ? (
-          <div className="text-center py-12 border border-dashed border-gray-700 rounded-lg">
-            <Wrench className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">No instructions added yet</p>
+        <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b border-slate-800">
+            <p className="text-xs text-slate-500">
+              {transactionDraft.instructions.length} instruction
+              {transactionDraft.instructions.length === 1 ? '' : 's'} · Build to refresh the sim
+            </p>
             <button
+              type="button"
               onClick={() => setShowTemplateSelector(true)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 text-xs font-medium"
             >
-              Add Your First Instruction
+              <Plus className="h-3.5 w-3.5" />
+              Browse all
             </button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {transactionDraft.instructions.map((instruction, index) => (
-              <AdvancedInstructionCard
-                key={index}
-                instruction={instruction}
-                index={index}
-                onUpdateAccount={(accountName, value) => updateAdvancedInstructionAccount(index, accountName, value)}
-                onUpdateArg={(argName, value) => updateAdvancedInstructionArg(index, argName, value)}
-                onRemove={() => removeAdvancedInstruction(index)}
-                validationErrors={validateAdvancedInstruction(instruction)}
-                onCopyAddress={copyAddress}
-                copiedAddresses={copiedAddresses}
-                justCopied={justCopied}
-                focusedInputField={focusedInputField}
-                setFocusedInputField={setFocusedInputField}
-              />
-            ))}
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4">
+            {transactionDraft.instructions.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-700 rounded-lg">
+                <Wrench className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-500 mb-1">No instructions yet</p>
+                <p className="text-xs text-slate-600 mb-4">Pick a template on the left, then hit Build.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {transactionDraft.instructions.map((instruction, index) => (
+                  <AdvancedInstructionCard
+                    key={`${instruction.template.id}-${index}`}
+                    instruction={instruction}
+                    index={index}
+                    onUpdateAccount={(accountName, value) => updateAdvancedInstructionAccount(index, accountName, value)}
+                    onUpdateArg={(argName, value) => updateAdvancedInstructionArg(index, argName, value)}
+                    onRemove={() => removeAdvancedInstruction(index)}
+                    validationErrors={validateAdvancedInstruction(instruction)}
+                    onCopyAddress={copyAddress}
+                    copiedAddresses={copiedAddresses}
+                    justCopied={justCopied}
+                    focusedInputField={focusedInputField}
+                    setFocusedInputField={setFocusedInputField}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </main>
 
-      {showTemplateSelector && (
-        <TemplateSelectorModal
-          categories={categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          templates={filteredTemplates}
-          onSelectTemplate={addAdvancedInstruction}
-          onClose={() => setShowTemplateSelector(false)}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
-      )}
+        <aside className="w-80 shrink-0 border-l border-slate-800 bg-slate-900/50 flex flex-col min-h-0">
+          <div className="p-3 border-b border-slate-800 text-[11px] uppercase tracking-wide text-teal-300/80">
+            Live sim
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+            {buildError && (
+              <div className="p-3 bg-red-900/20 border border-red-700 rounded-lg flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <span className="text-xs text-red-400">{buildError}</span>
+              </div>
+            )}
+            {(arbOpportunity || arbStatus) && (
+              <div className="p-3 bg-teal-900/20 border border-teal-700/60 rounded-lg space-y-2">
+                <div className="flex items-center gap-2 text-teal-200 text-xs font-semibold">
+                  <Zap size={14} />
+                  Atomic arb loaded
+                  {arbOpportunity?.accuracy && (
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                      {arbOpportunity.accuracy}
+                    </span>
+                  )}
+                </div>
+                {arbStatus && <p className="text-xs text-slate-300">{arbStatus}</p>}
+                {arbOpportunity && (
+                  <p className="text-[11px] text-slate-400">
+                    Est. {arbOpportunity.netProfit.toFixed(6)} {arbOpportunity.profitTokenSymbol || 'units'} ·{' '}
+                    {(arbOpportunity.confidence * 100).toFixed(0)}% confidence
+                  </p>
+                )}
+                {arbWarnings.slice(0, 3).map((w, i) => (
+                  <p key={i} className="text-[11px] text-amber-300">• {w}</p>
+                ))}
+              </div>
+            )}
+            {simDiff ? (
+              <AccountDiffPanel result={simDiff} />
+            ) : (
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Hit Build. Account SOL/token deltas stay pinned here while you edit instructions.
+              </p>
+            )}
+          </div>
+          <div className="border-t border-slate-800 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowLogs((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] text-slate-400 hover:text-white"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Terminal size={12} />
+                Logs {logs.length ? `(${logs.length})` : ''}
+              </span>
+              <span>{showLogs ? 'Hide' : 'Show'}</span>
+            </button>
+            {showLogs && (
+              <div className="h-40 border-t border-slate-800 font-mono text-[11px] overflow-y-auto p-3 space-y-1">
+                {logs.length === 0 && <span className="text-slate-600 italic">Ready.</span>}
+                {logs.map((log, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
+                    <span
+                      className={
+                        log.type === 'error'
+                          ? 'text-red-400'
+                          : log.type === 'success'
+                            ? 'text-green-400'
+                            : log.type === 'warning'
+                              ? 'text-orange-400'
+                              : 'text-slate-300'
+                      }
+                    >
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {showTemplateSelector && (
+          <TemplateSelectorModal
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            templates={filteredTemplates}
+            onSelectTemplate={addAdvancedInstruction}
+            onClose={() => setShowTemplateSelector(false)}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        )}
       </div>
     );
   };
@@ -1874,20 +2028,20 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
         <h1 className="text-sm font-semibold text-white shrink-0">TX Builder</h1>
         <div className="flex items-center bg-slate-900 rounded-lg p-0.5">
           <button
-            onClick={() => setViewMode('simple')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
-              viewMode === 'simple' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Simple
-          </button>
-          <button
             onClick={() => setViewMode('advanced')}
             className={`px-2.5 py-1 rounded-md text-xs font-medium ${
               viewMode === 'advanced' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
             Advanced
+          </button>
+          <button
+            onClick={() => setViewMode('simple')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'simple' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Recipes
           </button>
         </div>
         <button
@@ -1914,6 +2068,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => void handleExportTs()}
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
+            title="Copy TypeScript that matches the simulated draft"
+          >
+            Export TS
+          </button>
           <button
             onClick={() => setShowImportModal(true)}
             className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700"

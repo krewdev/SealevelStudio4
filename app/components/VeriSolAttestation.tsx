@@ -6,7 +6,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Connection } from '@solana/web3.js';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import {
   Shield,
   CheckCircle,
@@ -32,7 +32,7 @@ interface VeriSolAttestationProps {
 }
 
 export function VeriSolAttestation({ connection }: VeriSolAttestationProps) {
-  const wallet = useWallet();
+  const wallet = useActiveWallet();
   const { publicKey } = wallet;
   const { getStats, getTrialStatus } = useUsageTracking();
   const [isCreating, setIsCreating] = useState(false);

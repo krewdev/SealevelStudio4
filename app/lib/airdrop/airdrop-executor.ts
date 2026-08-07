@@ -8,7 +8,7 @@ import {
   PublicKey,
   LAMPORTS_PER_SOL,
 } from '@solana/web3.js';
-import { WalletContextState } from '@solana/wallet-adapter-react';
+import type { SigningWallet } from '../wallet/active-signer';
 
 export interface AirdropExecutionResult {
   success: boolean;
@@ -24,7 +24,7 @@ export interface AirdropExecutionResult {
  */
 export async function executeAirdrop(
   connection: Connection,
-  wallet: WalletContextState,
+  wallet: SigningWallet,
   amount: number,
   recipientAddress?: string
 ): Promise<AirdropExecutionResult> {
