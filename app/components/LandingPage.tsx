@@ -246,7 +246,7 @@ export function LandingPage({ onGetStarted }: { onGetStarted: (blockchain?: Bloc
             The most powerful developer toolkit for blockchain development. Build, simulate, debug, and execute transactions across multiple chains with AI-powered assistance.
           </p>
           <p className="max-w-3xl mx-auto text-sm sm:text-base md:text-lg text-gray-400 mb-8 md:mb-10 px-4">
-            Visual transaction builder • Real-time simulation • Arbitrage scanner • AI agents • Code export • Multi-chain support
+            Visual transaction builder • Real-time simulation • Arbitrage scanner • Grok copilot • Code export • Multi-chain support
           </p>
           
           {/* Blockchain Selector */}

@@ -23,7 +23,8 @@ import {
   ArrowLeft,
   Brain,
 } from 'lucide-react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useActiveWallet } from '../hooks/useActiveWallet';
 import { PoolScanner } from '../lib/pools/scanner';
 import { ArbitrageDetector } from '../lib/pools/arbitrage';
 import {
@@ -33,7 +34,6 @@ import {
   DEFAULT_SCANNER_CONFIG,
   DEXProtocol,
 } from '../lib/pools/types';
-import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { executeArbitrage, validateOpportunity, calculateSafeSlippage, ExecutionConfig } from '../lib/pools/execution';
 import { getUserMessage } from '../lib/error-handling';
@@ -50,7 +50,7 @@ interface ArbitrageScannerProps {
 
 export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScannerProps) {
   const { connection } = useConnection();
-  const wallet = useWallet();
+  const wallet = useActiveWallet();
   const { trackFeatureUsage, checkFeatureAccess, getTrialStatus } = useUsageTracking();
   const [executing, setExecuting] = useState<string | null>(null);
   const [executionResult, setExecutionResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -316,7 +316,7 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
         maxRetries: 3,
       };
 
-      const result = await executeArbitrage(connection, wallet, opportunity, config);
+      const result = await executeArbitrage(connection, wallet.adapter, opportunity, config);
 
       if (result.success) {
         setExecutionResult({
@@ -382,13 +382,6 @@ export function ArbitrageScanner({ onBuildTransaction, onBack }: ArbitrageScanne
 
   return (
     <div className="h-full w-full flex flex-col animated-bg bg-slate-950 text-white overflow-hidden">
-      <UnifiedAIAgents
-        opportunities={opportunities}
-        pools={pools}
-        selectedOpportunity={selectedOpportunity}
-        onSelectOpportunity={setSelectedOpportunity}
-        onBuildTransaction={handleBuildTransaction}
-      />
       <div className="relative flex-1 min-h-0 flex flex-col">
       {/* Background Logo */}
       <div

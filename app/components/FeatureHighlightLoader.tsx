@@ -66,16 +66,16 @@ const FEATURES: Feature[] = [
   },
   {
     id: 'ai-agents',
-    title: 'AI Cyber Agents',
-    description: 'Autonomous AI agents for trading, analysis, and market monitoring',
+    title: 'Grok copilot',
+    description: 'Page-aware Explain · Plan · Act. Highlights live controls — never broadcasts.',
     icon: <Brain className="h-6 w-6" />,
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/10 border-purple-500/30',
     features: [
-      'Autonomous trading strategies',
-      'Real-time market analysis',
-      'Risk management protocols',
-      'Multi-exchange integration'
+      'Explain any screen in context',
+      'Plan scan → builder → replay',
+      'Drive paper bots and disarm',
+      'Never clicks Execute or Start live'
     ]
   },
   {
@@ -439,7 +439,7 @@ export function FeatureHighlightLoader({
                   {context?.description || (
                     <>
                       {currentFeature.id === 'transaction-builder' && "Sealevel Studio can handle complex multi-instruction transactions that would normally require custom scripts!"}
-                      {currentFeature.id === 'ai-agents' && "Our AI agents can autonomously trade, analyze markets, and manage risk 24/7 without human intervention!"}
+                      {currentFeature.id === 'ai-agents' && "Grok can explain this screen, plan a scan→build loop, or drive paper bots — it never clicks Execute or Start live."}
                       {currentFeature.id === 'decentralized-exchange' && "The platform integrates with Jupiter for optimal swap routing across multiple DEXs simultaneously!"}
                       {currentFeature.id === 'security-tools' && "Advanced smart contract verification can detect vulnerabilities before they cost you money!"}
                       {currentFeature.id === 'market-analytics' && "Real-time on-chain metrics provide insights that traditional exchanges can't offer!"}

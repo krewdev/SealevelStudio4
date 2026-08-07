@@ -30,20 +30,18 @@ import {
   Info,
   TrendingUp
 } from 'lucide-react';
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { TransactionBuilder } from '../lib/transaction-builder';
 import { getTemplateById, getTemplatesByCategory } from '../lib/instructions/templates';
 import { BuiltInstruction, TransactionDraft, InstructionTemplate } from '../lib/instructions/types';
 import { importTransaction } from '../lib/transaction-importer';
 import { PublicKey } from '@solana/web3.js';
-import { UnifiedAIAgents } from './UnifiedAIAgents';
 import { ArbitragePanel } from './ArbitragePanel';
 import { ArbitrageOpportunity } from '../lib/pools/types';
 import { AdvancedInstructionCard } from './AdvancedInstructionCard';
 import { TemplateSelectorModal } from './TemplateSelectorModal';
 import { useTransactionLogger } from '../hooks/useTransactionLogger';
-import { RecentTransactions } from './RecentTransactions';
 import { useActiveWallet } from '../hooks/useActiveWallet';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import { consumePendingArbOpportunity } from '../lib/arbitrage/pending-build';
@@ -508,9 +506,10 @@ interface UnifiedTransactionBuilderProps {
 
 export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialOpportunity }: UnifiedTransactionBuilderProps) {
   const { log, updateStatus } = useTransactionLogger();
-  const { connecting } = useWallet();
   const { connection } = useConnection();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
   const active = useActiveWallet();
+  const connecting = active.connecting;
   const payerAddress = active.address;
   const walletLabel = active.connected ? active.label : null;
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
@@ -556,6 +555,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [jitoTipLamports, setJitoTipLamports] = useState(0);
   const [arbDiff, setArbDiff] = useState<StateDiffResult | null>(null);
   const [simDiff, setSimDiff] = useState<StateDiffResult | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
   const arbLoadRef = useRef(false);
 
   // Import state
@@ -1091,8 +1091,10 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
           payer: payerPublicKey.toBase58(),
         });
         setSimDiff(diff);
-        if (diff.err) addLog(`Simulation: ${diff.err}`, 'error');
-        else {
+        if (diff.err) {
+          addLog(`Simulation: ${diff.err}`, 'error');
+          setShowLogs(true);
+        } else {
           addLog(
             `Simulation OK · ${diff.unitsConsumed ?? '?'} CU · ${diff.diffs.length} account delta(s)`,
             'success'
@@ -1333,29 +1335,7 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             position: 'relative',
           }}
         >
-          {/* Logo background layer - behind dot grid */}
-          <div 
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 0,
-            }}
-          >
-            <img
-              src="/transaction-builder-logo.jpeg"
-              alt="Transaction Builder Logo"
-              className="absolute inset-0 w-full h-full object-contain opacity-[0.08]"
-              style={{
-                objectPosition: 'center',
-              }}
-              onError={(e) => {
-                // Fallback if logo doesn't exist - hide it
-                console.warn('Transaction builder logo not found at /transaction-builder-logo.jpeg');
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-          {/* Dot grid overlay */}
-          <div 
+          <div
             className="absolute inset-0 pointer-events-none"
             style={{
               backgroundImage: 'radial-gradient(circle, #1e293b 1px, transparent 1px)',
@@ -1363,65 +1343,18 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               zIndex: 1,
             }}
           />
-          <div className="absolute top-4 left-4 right-4 h-12 pointer-events-none flex justify-between items-start z-20">
-            <div className="pointer-events-auto flex gap-2">
-              <button 
-                onClick={buildTransaction}
-                disabled={isBuilding || isExecuting}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                  isBuilding || isExecuting
-                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                  : 'bg-teal-500 hover:bg-teal-400 text-slate-900 hover:scale-105 active:scale-95'
-                }`}
-              >
-                {isBuilding ? <Cpu className="animate-spin" size={16} /> : <Play size={16} />}
-                {isBuilding ? 'Building...' : 'Build Transaction'}
-              </button>
-              
-              {builtTransaction && (
-                <button 
-                  onClick={executeTransaction}
-                  disabled={isExecuting || !payerAddress}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-black/50 transition-all ${
-                    isExecuting || !payerAddress
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
-                    : 'bg-green-500 hover:bg-green-400 text-slate-900 hover:scale-105 active:scale-95'
-                  }`}
-                >
-                  {isExecuting ? <Cpu className="animate-spin" size={16} /> : <Send size={16} />}
-                  {isExecuting ? 'Sending...' : 'Execute'}
-                </button>
-              )}
-              
-              {transactionCost && (
-                <div className="flex flex-col gap-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Base Cost:</span>
-                    <span className="text-green-400 font-mono">{transactionCost.sol.toFixed(9)} SOL</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Platform Fee:</span>
-                    <span className="text-yellow-400 font-mono">{transactionCost.platformFee.sol.toFixed(9)} SOL</span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-600 pt-1 mt-1">
-                    <span className="text-slate-300 font-medium">Total:</span>
-                    <span className="text-white font-mono font-bold">{transactionCost.total.sol.toFixed(9)} SOL</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="pointer-events-auto flex gap-2">
-              <button 
-                className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white hover:border-slate-600 transition-colors"
-                onClick={() => setSimpleWorkflow([])}
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
+          <div className="absolute top-3 right-3 z-20">
+            <button
+              type="button"
+              className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white"
+              onClick={() => setSimpleWorkflow([])}
+              title="Clear blocks"
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 pt-20 flex flex-col items-center gap-4 min-h-0 relative z-10">
+          <div className="flex-1 overflow-y-auto p-6 pt-12 flex flex-col items-center gap-4 min-h-0 relative z-10">
             {simDiff && (
               <div className="w-full max-w-xl relative z-20">
                 <AccountDiffPanel result={simDiff} />
@@ -1517,36 +1450,42 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             )}
           </div>
 
-          {/* Terminal */}
-          <div className="h-48 bg-slate-900 border-t border-slate-800 flex flex-col font-mono text-xs">
-            <div className="flex items-center justify-between px-4 py-2 bg-slate-950 border-b border-slate-800">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Terminal size={14} />
-                <span>Runtime Output</span>
+          <div className="border-t border-slate-800 bg-slate-950 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowLogs((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-1.5 text-[11px] text-slate-400 hover:text-white"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Terminal size={12} />
+                Logs {logs.length ? `(${logs.length})` : ''}
+              </span>
+              <span>{showLogs ? 'Hide' : 'Show'}</span>
+            </button>
+            {showLogs && (
+              <div className="h-36 border-t border-slate-800 font-mono text-xs overflow-y-auto p-3 space-y-1">
+                {logs.length === 0 && <span className="text-slate-600 italic">Ready.</span>}
+                {logs.map((log, i) => (
+                  <div key={i} className="flex gap-3">
+                    <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
+                    <span
+                      className={
+                        log.type === 'error'
+                          ? 'text-red-400'
+                          : log.type === 'success'
+                            ? 'text-green-400'
+                            : log.type === 'warning'
+                              ? 'text-orange-400'
+                              : 'text-slate-300'
+                      }
+                    >
+                      {log.msg}
+                    </span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
               </div>
-              <button onClick={() => setLogs([])} className="hover:text-white text-slate-500">Clear</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-1">
-              {logs.length === 0 && (
-                <span className="text-slate-600 italic">Ready to build transaction...</span>
-              )}
-              {logs.map((log, i) => (
-                <div key={i} className="flex gap-3">
-                  <span className="text-slate-600 shrink-0">[{log.timestamp}]</span>
-                  <span className={`
-                    ${log.type === 'error' ? 'text-red-400' : ''}
-                    ${log.type === 'success' ? 'text-green-400' : ''}
-                    ${log.type === 'warning' ? 'text-orange-400' : ''}
-                    ${log.type === 'info' ? 'text-slate-300' : ''}
-                  `}>
-                    {log.type === 'success' ? '✔ ' : ''}
-                    {log.type === 'error' ? '✖ ' : ''}
-                    {log.msg}
-                  </span>
-                </div>
-              ))}
-              <div ref={terminalEndRef} />
-            </div>
+            )}
           </div>
         </main>
 
@@ -1828,68 +1767,17 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const renderAdvancedMode = () => {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 p-6 pb-4">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Instruction Assembler</h1>
-            <p className="text-gray-400">
-              Build transactions by adding and configuring instructions
-            </p>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowTemplateSelector(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add Instruction</span>
-            </button>
-            
-            {transactionDraft.instructions.length > 0 && (
-              <button
-                onClick={buildTransaction}
-                disabled={isBuilding || isExecuting}
-                data-sealevel-target="builder-build"
-                className="flex items-center space-x-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
-              >
-                {isBuilding ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Building...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    <span>Build Transaction</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {builtTransaction && (
-              <button
-                onClick={executeTransaction}
-                disabled={isExecuting || !payerAddress}
-                data-sealevel-target="builder-execute"
-                className="flex items-center space-x-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all px-5 py-2 text-sm font-medium text-white"
-              >
-                {isExecuting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    <span>Execute</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
+      <div className="flex-shrink-0 px-4 pt-3 pb-2 flex items-center justify-between">
+        <p className="text-xs text-slate-500">Add instructions, then Build in the top bar to simulate account diffs.</p>
+        <button
+          onClick={() => setShowTemplateSelector(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-xs font-medium"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add instruction
+        </button>
+      </div>
+      <div className="px-4">
 
         {buildError && (
           <div className="mb-4 p-4 bg-red-900/20 border border-red-700 rounded-lg flex items-center space-x-2">
@@ -1919,11 +1807,6 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
             {arbWarnings.slice(0, 3).map((w, i) => (
               <p key={i} className="text-xs text-amber-300">• {w}</p>
             ))}
-            {(simDiff || arbDiff) && (
-              <div className="mt-2">
-                <AccountDiffPanel result={(simDiff || arbDiff)!} compact />
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -1987,78 +1870,63 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   // Main Transaction Builder layout
   return (
     <div className="h-full w-full flex flex-col bg-gray-900 overflow-hidden">
-      {/* Mode Toggle Header */}
-      <div className="border-b border-gray-700 bg-gray-800/50 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Logo */}
-          <img
-            src="/sea-level-logo.png"
-            alt="Sealevel Studio"
-            className="h-8 w-auto"
-            style={{ maxHeight: '32px' }}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+      <div className="shrink-0 border-b border-slate-800 bg-slate-950/90 px-3 py-2 flex items-center gap-2 sm:gap-3">
+        <h1 className="text-sm font-semibold text-white shrink-0">TX Builder</h1>
+        <div className="flex items-center bg-slate-900 rounded-lg p-0.5">
           <button
-            onClick={onBack || (() => {})}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-            title="Go back to Account Inspector"
+            onClick={() => setViewMode('simple')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'simple' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <ArrowLeft size={18} />
-            <span className="text-sm">Back</span>
+            Simple
           </button>
-          <h1 className="text-xl font-bold text-white">Transaction Builder</h1>
-          <div className="flex items-center gap-2 bg-gray-900 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('simple')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'simple'
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <Layers size={16} />
-              Simple
-            </button>
-            <button
-              onClick={() => setViewMode('advanced')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'advanced'
-                  ? 'bg-purple-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <img
-                src="/transaction-builder-logo.jpeg"
-                alt="Transaction Builder Logo"
-                className="w-4 h-4 rounded-sm"
-              />
-              Advanced
-            </button>
-          </div>
+          <button
+            onClick={() => setViewMode('advanced')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium ${
+              viewMode === 'advanced' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Advanced
+          </button>
         </div>
-
-        <div className="flex items-center gap-3">
+        <button
+          onClick={buildTransaction}
+          disabled={isBuilding || isExecuting}
+          data-sealevel-target="builder-build"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          {isBuilding ? <Cpu className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+          Build
+        </button>
+        <button
+          onClick={executeTransaction}
+          disabled={isExecuting || !builtTransaction || !payerAddress}
+          data-sealevel-target="builder-execute"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          {isExecuting ? <Cpu className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          Execute
+        </button>
+        {transactionCost && (
+          <span className="hidden md:inline text-[11px] font-mono text-slate-400">
+            ~{transactionCost.total.sol.toFixed(6)} SOL
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
-            title="Import Transaction from Signature"
+            className="rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs text-slate-300 hover:bg-slate-700"
           >
-            <span className="text-lg">📥</span>
-            Import
+            Import sig
           </button>
           <button
             onClick={() => setShowArbitragePanel(!showArbitragePanel)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-              showArbitragePanel
-                ? 'bg-teal-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`rounded-lg px-2.5 py-1.5 text-xs ${
+              showArbitragePanel ? 'bg-teal-700 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
-            title="Toggle Arbitrage Panel"
           >
-            <TrendingUp size={16} />
-            Arbitrage
+            Arb
           </button>
           {walletLabel && payerAddress ? (
             <div className="flex items-center gap-2">
@@ -2080,7 +1948,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
                 )}
               </button>
               {!active.phantomConnected && (
-                <WalletMultiButton className="!h-8 !text-xs !px-3 !rounded-lg !bg-purple-600 hover:!bg-purple-500" />
+                <button
+                  type="button"
+                  onClick={() => setWalletModalVisible(true)}
+                  className="h-8 text-xs px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white"
+                >
+                  Connect Phantom
+                </button>
               )}
               {active.source === 'studio' && active.phantomConnected && (
                 <button
@@ -2101,7 +1975,13 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               <span className="text-xs px-2 py-1 rounded bg-red-900/30 text-red-400 border border-red-700/50">
                 Wallet not connected
               </span>
-              <WalletMultiButton className="!h-8 !text-xs !px-3 !rounded-lg !bg-purple-600 hover:!bg-purple-500" />
+              <button
+                type="button"
+                onClick={() => setWalletModalVisible(true)}
+                className="h-8 text-xs px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white"
+              >
+                Connect Phantom
+              </button>
             </div>
           )}
           <button
@@ -2221,41 +2101,6 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
           />
         )}
       </div>
-
-      {/* Recent Transactions */}
-      <div className="border-t border-gray-700/50 p-6 bg-gray-800/30">
-        <RecentTransactions featureName="transaction-builder" limit={5} />
-      </div>
-
-      {/* Unified AI Agents */}
-      <UnifiedAIAgents
-        simpleWorkflow={viewMode === 'simple' ? simpleWorkflow : []}
-        transactionDraft={viewMode === 'advanced' ? transactionDraft : undefined}
-        transaction={builtTransaction}
-        onAddBlock={viewMode === 'simple' ? addSimpleBlock : undefined}
-        onUpdateBlock={viewMode === 'simple' ? (blockId, params) => {
-          const block = simpleWorkflow.find(b => b.instanceId === blockId);
-          if (block) {
-            updateSimpleBlockParams(blockId, params);
-          }
-        } : undefined}
-        errors={buildError ? [buildError] : []}
-        warnings={[]}
-        availableBlocks={viewMode === 'simple' ? Object.values(SIMPLE_BLOCK_CATEGORIES).flat() : []}
-        onExplainBlock={(blockId) => {
-          const block = simpleWorkflow.find(b => b.instanceId === blockId);
-          if (block) {
-            const templateId = BLOCK_TO_TEMPLATE[block.id];
-            const template = templateId ? getTemplateById(templateId) : null;
-            if (template) {
-              addLog(`Block: ${block.name}\n${template.description}\nAccounts: ${template.accounts.length}\nArgs: ${template.args.length}`, 'info');
-            }
-          }
-        }}
-        onOptimize={() => {
-          addLog('Analyzing transaction for optimizations...', 'info');
-        }}
-      />
 
       {/* Import Modal */}
       {showImportModal && (

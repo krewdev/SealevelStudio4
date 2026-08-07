@@ -4,8 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Connection, PublicKey, AccountInfo } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, TokenAccountNotFoundError, getAccount, getMint } from '@solana/spl-token';
 import { Search, Wrench, Play, Code, Wallet, ChevronDown, Copy, ExternalLink, AlertCircle, CheckCircle, Zap, Terminal, TrendingUp, ShieldCheck, Lock, Shield, Bot, Book, BarChart3, Brain, DollarSign, Coins, Droplet, Twitter, LineChart, MessageCircle, Layers, ArrowLeft, Rocket, Network } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { UnifiedWalletControl } from './components/UnifiedWalletControl';
+import { useActiveWallet } from './hooks/useActiveWallet';
 import { UnifiedTransactionBuilder } from './components/UnifiedTransactionBuilder';
 import { TransactionPreview } from './components/TransactionPreview';
 import { ClientOnly } from './components/ClientOnly';
@@ -14,7 +14,6 @@ import { setPendingArbOpportunity } from './lib/arbitrage/pending-build';
 import { patchDeskSession } from './lib/session/desk-session';
 import { clearDisarm, disarmAll, subscribeDisarm } from './lib/bots/kill-switch';
 import { FreeTrialBanner } from './components/FreeTrialBanner';
-import { UnifiedAIAgents } from './components/UnifiedAIAgents';
 import { useNetwork } from './contexts/NetworkContext';
 import { useTutorial } from './contexts/TutorialContext';
 import { TutorialFlow } from './components/TutorialFlow';
@@ -49,7 +48,6 @@ import { DeveloperCommunity } from './components/DeveloperCommunity';
 import { DeveloperDashboard } from './components/DeveloperDashboard';
 import { ComingSoonBanner } from './components/ui/ComingSoonBanner';
 import { SEAL_TOKEN_ECONOMICS } from './lib/seal-token/config';
-import { UserProvider, useUser } from './contexts/UserContext';
 import { UserProfileWidget } from './components/UserProfileWidget';
 import { LoginGate } from './components/LoginGate';
 import { RecentTransactions } from './components/RecentTransactions';
@@ -1497,6 +1495,10 @@ function AppContent() {
   const [activeView, setActiveView] = useState('home');
 
   useEffect(() => {
+    if (activeView === 'ai-agents') {
+      setActiveView('home');
+      return;
+    }
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem('sealevel-active-view', activeView);
@@ -1520,7 +1522,7 @@ function AppContent() {
   const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
   const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const bleedingEdgeEnabled = process.env.NEXT_PUBLIC_BLEEDING_EDGE_ENABLED === 'true';
-  const { publicKey } = useWallet();
+  const { publicKey, connected: walletConnected } = useActiveWallet();
   const { network, setNetwork } = useNetwork();
   const { shouldShowTutorial, completeTutorial } = useTutorial();
   
@@ -1665,15 +1667,12 @@ function AppContent() {
     setCurrentScreen('landing');
   };
 
-  // Check if user has wallet (for wallet-connect screen)
-  const { user } = useUser();
-
   // Effect to handle wallet connection completion (Phantom or studio)
   useEffect(() => {
-    if (currentScreen === 'wallet-connect' && (user || publicKey)) {
+    if (currentScreen === 'wallet-connect' && walletConnected) {
       enterAfterAuth();
     }
-  }, [currentScreen, user, publicKey, enterAfterAuth]);
+  }, [currentScreen, walletConnected, enterAfterAuth]);
 
   let content: React.ReactNode;
 
@@ -2152,7 +2151,7 @@ function AppContent() {
         case 'builder':
           return 'transaction-builder';
         case 'ai-agents':
-          return 'ai-agents';
+          return 'ai-agents'; // loader card only — Grok is sitewide
         case 'charts':
           return 'market-analytics';
         case 'cybersecurity':
@@ -2207,7 +2206,7 @@ function AppContent() {
             if (featureId === 'transaction-builder') {
               setActiveView('builder');
             } else if (featureId === 'ai-agents') {
-              setActiveView('ai-agents');
+              setActiveView('home');
             } else if (featureId === 'decentralized-exchange') {
               setActiveView('charts'); // DEX features in charts view
             } else if (featureId === 'security-tools') {
