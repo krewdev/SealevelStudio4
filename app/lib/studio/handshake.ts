@@ -21,6 +21,7 @@ export type HandshakeStatus =
 export type HandshakeOffer = {
   v: 1 | 2;
   id: string;
+  roomId?: string;
   note?: string;
   createdAt: number;
   tipLamports: number;
@@ -44,6 +45,7 @@ function randomId(): string {
 
 export function createHandshake(opts: {
   partyA: HandshakeParty;
+  partyB?: HandshakeParty;
   note?: string;
   tipLamports?: number;
 }): HandshakeOffer {
@@ -54,7 +56,8 @@ export function createHandshake(opts: {
     createdAt: Date.now(),
     tipLamports: opts.tipLamports ?? 10_000,
     partyA: opts.partyA,
-    status: 'open',
+    partyB: opts.partyB,
+    status: opts.partyB?.instructions?.length ? 'ready' : 'open',
   };
 }
 
@@ -128,6 +131,57 @@ export function handshakeSummary(offer: HandshakeOffer): string {
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+export async function pushHandshakeRoom(offer: HandshakeOffer): Promise<HandshakeOffer> {
+  if (typeof fetch === 'undefined') return offer;
+  if (offer.roomId) {
+    const res = await fetch(`/api/studio/handshake/${offer.roomId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offer }),
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Failed to update handshake room');
+    return json.room.offer as HandshakeOffer;
+  }
+  const res = await fetch('/api/studio/handshake', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ offer }),
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Failed to create handshake room');
+  return { ...offer, roomId: json.id, v: 2 };
+}
+
+export async function fetchHandshakeRoom(
+  id: string
+): Promise<{ offer: HandshakeOffer; stale?: boolean; staleReason?: string } | null> {
+  const res = await fetch(`/api/studio/handshake/${id}`);
+  const json = await res.json();
+  if (!json.ok || !json.room) return null;
+  return {
+    offer: json.room.offer,
+    stale: Boolean(json.blockhash?.stale),
+    staleReason: json.blockhash?.reason,
+  };
+}
+
+export function isHandshakeBlockhashStale(
+  offer: Pick<HandshakeOffer, 'blockhash' | 'lastValidBlockHeight'>,
+  currentBlockHeight: number
+): { stale: boolean; reason?: string } {
+  if (!offer.blockhash || offer.lastValidBlockHeight == null) {
+    return { stale: false, reason: 'not-prepared' };
+  }
+  if (currentBlockHeight > offer.lastValidBlockHeight) {
+    return {
+      stale: true,
+      reason: `Blockhash expired (height ${currentBlockHeight} > lastValid ${offer.lastValidBlockHeight}). Re-prepare.`,
+    };
+  }
+  return { stale: false };
 }
 
 export function combinedDraft(offer: HandshakeOffer): TransactionDraft {

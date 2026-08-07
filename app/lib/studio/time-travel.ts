@@ -9,6 +9,7 @@ import type { BuiltInstruction } from '../instructions/types';
 import { getTemplateById } from '../instructions/templates';
 import { mapParsedIxToBuilt, type ParsedMessageLike } from '../transaction-importer';
 import { diffAnyTransaction, type StateDiffResult } from '../tx/state-diff';
+import { isVersionedRpcTx } from './tx-kind';
 
 export type AccountSnapshot = {
   address: string;
@@ -206,6 +207,7 @@ export async function hydrateTimeTravelSnapshots(opts: {
   });
   if (!rpcTx?.meta) return opts.steps;
 
+  const versioned = isVersionedRpcTx(rpcTx);
   const keys = collectRpcAccountKeys(rpcTx);
   const slot = rpcTx.slot;
   const pre = snapshotsFromMeta(keys, rpcTx.meta.preBalances, rpcTx.meta.preTokenBalances as any);
@@ -232,7 +234,7 @@ export async function hydrateTimeTravelSnapshots(opts: {
 
   const steps = opts.steps.map((s) => ({ ...s }));
   let liveBlockhash: string | null = null;
-  if (opts.runLivePrefix && compiled.length && opts.payer) {
+  if (opts.runLivePrefix && compiled.length && opts.payer && !versioned) {
     liveBlockhash = (await opts.connection.getLatestBlockhash('confirmed')).blockhash;
   }
 
@@ -251,6 +253,13 @@ export async function hydrateTimeTravelSnapshots(opts: {
         slot,
         accounts: post,
         note: 'Landed meta.postBalances / postTokenBalances — bank immediately after this signature. No mid-tx historical banks exist in RPC meta.',
+      };
+    }
+    if (versioned && !step.inner) {
+      step.livePrefix = {
+        source: 'live-prefix-sim',
+        accounts: [],
+        note: 'Versioned/ALT transaction: compiled prefix sim is disabled. Historical meta pre/post below are still from the landed signature.',
       };
     }
     if (step.inner) {

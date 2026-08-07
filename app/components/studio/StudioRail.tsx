@@ -15,6 +15,8 @@ import type { StateDiffResult } from '../../lib/tx/state-diff';
 import type { TransactionDraft } from '../../lib/instructions/types';
 import {
   applyFailurePatch,
+  buildCeremonyInstructions,
+  ceremonyChecklist,
   computeTxDna,
   counterHandshake,
   createHandshake,
@@ -22,24 +24,32 @@ import {
   deriveHandshakeStatus,
   encodeHandshake,
   evaluateFirewall,
+  fetchHandshakeRoom,
   forkDraftFromStep,
   handshakeSummary,
   loadFirewallPolicy,
   matchKnownShapes,
+  noticeLanded,
   prepareHandshakeBundle,
   projectAdversarialForks,
+  pushHandshakeRoom,
+  readLastLanded,
   resimTailDraft,
   runAdversarialSims,
   saveFirewallPolicy,
   signHandshakeLeg,
   snapshotAtStep,
+  STUDIO_TAB_EVENT,
   submitHandshakeBundle,
   suggestFailurePatches,
   summarizeWriteRadar,
+  versionedLimitation,
   worstPayerDelta,
   type AdversarialFork,
+  type BuiltTxKind,
   type FirewallPolicy,
   type HandshakeOffer,
+  type LandedRecord,
   type TimeTravelStep,
   type WriteRadarReport,
 } from '../../lib/studio';
@@ -53,6 +63,7 @@ export function StudioRail({
   connection,
   timeTravelSteps,
   builtTx,
+  builtKind = 'none',
   adversaryForks,
   onAdversaryForks,
   signTransaction,
@@ -66,6 +77,7 @@ export function StudioRail({
   connection: Connection | null;
   timeTravelSteps: TimeTravelStep[];
   builtTx: Transaction | null;
+  builtKind?: BuiltTxKind;
   adversaryForks: AdversarialFork[];
   onAdversaryForks: (forks: AdversarialFork[]) => void;
   signTransaction: (tx: Transaction) => Promise<Transaction>;
@@ -84,6 +96,10 @@ export function StudioRail({
   const [offer, setOffer] = useState<HandshakeOffer | null>(null);
   const [hsBusy, setHsBusy] = useState(false);
   const [forkLiveSim, setForkLiveSim] = useState<StateDiffResult | null>(null);
+  const [ceremonyPeer, setCeremonyPeer] = useState('');
+  const [lastLanded, setLastLanded] = useState<LandedRecord | null>(null);
+  const [hsStale, setHsStale] = useState<string | null>(null);
+  const versionedNote = versionedLimitation(builtKind);
 
   const projected = useMemo(() => projectAdversarialForks(sim), [sim]);
   const forks = adversaryForks.length ? adversaryForks : projected;
@@ -120,16 +136,57 @@ export function StudioRail({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    setLastLanded(readLastLanded());
+    const onTab = (e: Event) => {
+      const t = (e as CustomEvent<string>).detail;
+      if (t === 'firewall' || t === 'adversary' || t === 'debug' || t === 'handshake') setTab(t);
+    };
+    const onLanded = (e: Event) => {
+      const rec = (e as CustomEvent<LandedRecord>).detail;
+      if (rec?.signature) {
+        setLastLanded(rec);
+        setTab('debug');
+      }
+    };
+    window.addEventListener(STUDIO_TAB_EVENT, onTab as EventListener);
+    window.addEventListener('sealevel-landed-sig', onLanded as EventListener);
+    return () => {
+      window.removeEventListener(STUDIO_TAB_EVENT, onTab as EventListener);
+      window.removeEventListener('sealevel-landed-sig', onLanded as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     const hash = window.location.hash || '';
     const m = hash.match(/handshake=([^&]+)/);
-    if (!m?.[1]) return;
-    try {
-      const decoded = decodeHandshake(decodeURIComponent(m[1]));
-      setOffer(decoded);
-      setTab('handshake');
-      onLog(`Loaded handshake ${decoded.id}`, 'info');
-    } catch (e) {
-      onLog(`Handshake blob invalid: ${e instanceof Error ? e.message : e}`, 'error');
+    if (m?.[1]) {
+      try {
+        const decoded = decodeHandshake(decodeURIComponent(m[1]));
+        setOffer(decoded);
+        setTab('handshake');
+        onLog(`Loaded handshake blob ${decoded.id}`, 'info');
+      } catch (e) {
+        onLog(`Handshake blob invalid: ${e instanceof Error ? e.message : e}`, 'error');
+      }
+    }
+    const hs = new URLSearchParams(window.location.search).get('hs');
+    if (hs) {
+      void fetchHandshakeRoom(hs).then((room) => {
+        if (!room) {
+          onLog(`Handshake room ${hs} not found or expired.`, 'error');
+          return;
+        }
+        setOffer(room.offer);
+        setTab('handshake');
+        if (room.stale) {
+          setHsStale(room.staleReason || 'Blockhash stale — re-prepare.');
+          onLog(room.staleReason || 'Room blockhash stale', 'warning');
+        } else {
+          setHsStale(null);
+        }
+        onLog(`Loaded handshake room /h/${hs}`, 'success');
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,16 +265,32 @@ export function StudioRail({
     }
   };
 
+  const persistOffer = async (next: HandshakeOffer): Promise<HandshakeOffer> => {
+    try {
+      const saved = await pushHandshakeRoom(next);
+      setOffer(saved);
+      return saved;
+    } catch (e) {
+      onLog(`Room persist failed (blob still works): ${e instanceof Error ? e.message : e}`, 'warning');
+      setOffer(next);
+      return next;
+    }
+  };
+
   const copyOffer = async (next: HandshakeOffer) => {
-    const blob = encodeHandshake(next);
+    const saved = await persistOffer(next);
+    const blob = encodeHandshake(saved);
     setHsBlob(blob);
-    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}#handshake=${blob}`;
+    const url = saved.roomId
+      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/h/${saved.roomId}`
+      : `${typeof window !== 'undefined' ? window.location.origin : ''}#handshake=${blob}`;
     try {
       await navigator.clipboard.writeText(url);
-      onLog('Handshake URL copied.', 'success');
+      onLog(saved.roomId ? `Room URL copied: /h/${saved.roomId}` : 'Handshake blob URL copied.', 'success');
     } catch {
       onLog('Copy failed — blob is in the textarea.', 'warning');
     }
+    return saved;
   };
 
   return (
@@ -259,6 +332,13 @@ export function StudioRail({
         )}
         {dna.shape === 'suspicious' && (
           <p className="text-[10px] text-amber-300">Topology looks drain-like. Do not Execute on mainnet size.</p>
+        )}
+        {lastLanded?.signature && (
+          <p className="text-[10px] text-cyan-300/90">
+            Last landed ({lastLanded.source}): {lastLanded.signature.slice(0, 8)}…
+            {lastLanded.dnaHash ? ` · DNA ${lastLanded.dnaHash}` : ''}
+            {lastLanded.fill?.settled ? ` · chain ${lastLanded.fill.sol.toFixed(4)} SOL` : ''}
+          </p>
         )}
       </div>
 
@@ -333,11 +413,14 @@ export function StudioRail({
               {adversaryForks.length ? '(live simulateTransaction)' : '(projection — run live forks)'}
             </span>
           </p>
+          {versionedNote && (
+            <p className="text-[11px] text-amber-200 border border-amber-900/50 rounded p-2">{versionedNote}</p>
+          )}
           <div className="flex flex-wrap gap-1">
             <button
               type="button"
               data-sealevel-target="adversary-run"
-              disabled={advBusy || !builtTx}
+              disabled={advBusy || !builtTx || builtKind === 'versioned'}
               onClick={() => void runAdversary(0)}
               className="rounded bg-teal-800 px-2 py-1 text-white disabled:opacity-40"
             >
@@ -345,7 +428,7 @@ export function StudioRail({
             </button>
             <button
               type="button"
-              disabled={advBusy || !builtTx}
+              disabled={advBusy || !builtTx || builtKind === 'versioned'}
               onClick={() => void runAdversary(2)}
               className="rounded bg-slate-800 px-2 py-1 text-slate-200 disabled:opacity-40"
             >
@@ -483,8 +566,53 @@ export function StudioRail({
       {tab === 'handshake' && (
         <div className="space-y-2">
           <p className="text-slate-400">
-            Two signed legs, one Jito bundle (A then B, tip on B). Same blockhash required. Not an escrow program.
+            Two signed legs, one Jito bundle (A then B, tip on B). Share <span className="font-mono">/h/id</span> — not a giant URL blob.
           </p>
+          {hsStale && <p className="text-amber-300">{hsStale}</p>}
+          <div className="rounded border border-slate-800 p-2 space-y-1">
+            <p className="text-slate-300 font-medium">0.001 SOL ceremony</p>
+            <p className="text-[10px] text-slate-500">
+              A sends 0.001 SOL to B. B acks 1 lamport + pays Jito tip. Mainnet Phantom ×2. Dogfood this twice before adding features.
+            </p>
+            <input
+              value={ceremonyPeer}
+              onChange={(e) => setCeremonyPeer(e.target.value.trim())}
+              placeholder="Counterparty address"
+              className="w-full rounded bg-slate-900 border border-slate-700 px-2 py-1 text-white font-mono"
+            />
+            <button
+              type="button"
+              disabled={!payer || !ceremonyPeer}
+              onClick={async () => {
+                if (!payer) return;
+                const { a, b } = buildCeremonyInstructions(payer, ceremonyPeer);
+                onDraftChange({ instructions: a });
+                const created = createHandshake({
+                  partyA: { address: payer, instructions: a },
+                  partyB: { address: ceremonyPeer, instructions: b },
+                  note: '0.001 SOL ceremony',
+                  tipLamports: 10_000,
+                });
+                created.status = 'ready';
+                const saved = await copyOffer(created);
+                setTab('handshake');
+                onLog(`Ceremony room ${saved.roomId || saved.id}: A=0.001 SOL → B, B=1 lamport ack.`, 'success');
+              }}
+              className="rounded bg-teal-900 px-2 py-1 text-teal-100 disabled:opacity-40"
+            >
+              Start ceremony as A
+            </button>
+            {offer && (
+              <ul className="text-[10px] text-slate-400 space-y-0.5">
+                {ceremonyChecklist(offer, payer).map((s) => (
+                  <li key={s.id} className={s.done ? 'text-emerald-400' : ''}>
+                    {s.done ? '✓' : '○'} {s.label}
+                    {s.detail ? ` · ${s.detail}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <input
             value={hsNote}
             onChange={(e) => setHsNote(e.target.value)}
@@ -619,6 +747,13 @@ export function StudioRail({
                     const next = await submitHandshakeBundle(offer);
                     setOffer(next);
                     await copyOffer(next);
+                    if (next.landedSignatures?.[0]) {
+                      noticeLanded({
+                        signature: next.landedSignatures[0],
+                        source: 'handshake',
+                        payer,
+                      });
+                    }
                     onLog(
                       next.status === 'landed'
                         ? `Bundle landed slot ${next.landedSlot}.`

@@ -42,7 +42,10 @@ import {
   evaluateFirewall,
   flattenToTimeTravelSteps,
   hydrateTimeTravelSnapshots,
+  ingestLandedSignature,
+  LANDED_EVENT,
   loadFirewallPolicy,
+  openStudioDebugTab,
   worstPayerDelta,
   type AdversarialFork,
   type TimeTravelStep,
@@ -576,6 +579,35 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
   const [isImporting, setIsImporting] = useState(false);
   const [timeTravelSteps, setTimeTravelSteps] = useState<TimeTravelStep[]>([]);
   const [adversaryForks, setAdversaryForks] = useState<AdversarialFork[]>([]);
+
+  useEffect(() => {
+    const onLanded = (e: Event) => {
+      const rec = (e as CustomEvent).detail as { signature?: string; source?: string; payer?: string; mint?: string };
+      if (!rec?.signature || rec.source === 'builder' || !connection) return;
+      void ingestLandedSignature(connection, {
+        signature: rec.signature,
+        source: (rec.source as any) || 'import',
+        payer: rec.payer || active.address,
+        mint: rec.mint,
+        runLivePrefix: false,
+      })
+        .then(({ record, instructions, steps }) => {
+          setTimeTravelSteps(steps);
+          if (instructions.length) setTransactionDraft({ instructions });
+          openStudioDebugTab();
+          addLog(
+            `Ingested ${record.source} ${record.signature.slice(0, 8)}… · DNA ${record.dnaHash || '—'}`,
+            'success'
+          );
+        })
+        .catch((err) => {
+          addLog(`Landed ingest failed: ${err instanceof Error ? err.message : err}`, 'warning');
+        });
+    };
+    window.addEventListener(LANDED_EVENT, onLanded as EventListener);
+    return () => window.removeEventListener(LANDED_EVENT, onLanded as EventListener);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, active.address]);
 
   useEffect(() => {
     if (arbLoadRef.current) return;
@@ -1341,6 +1373,27 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       if (transactionLogId) {
         await updateStatus(transactionLogId, 'success', signature);
       }
+
+      try {
+        const { record, instructions: landedIxs, steps } = await ingestLandedSignature(connection, {
+          signature,
+          source: 'builder',
+          payer: active.address,
+          runLivePrefix: txToSend instanceof Transaction,
+        });
+        setTimeTravelSteps(steps);
+        if (landedIxs.length) setTransactionDraft({ instructions: landedIxs });
+        openStudioDebugTab();
+        addLog(
+          `Loop closed · chain DNA ${record.dnaHash} · ${record.instructionCount} ixs. Pre-send sim kept above for compare.`,
+          'success'
+        );
+      } catch (ingestErr) {
+        addLog(
+          `Confirmed but loop ingest failed: ${ingestErr instanceof Error ? ingestErr.message : ingestErr}`,
+          'warning'
+        );
+      }
       
       // Log mint address if created
       if (additionalSigners.length > 0) {
@@ -1352,7 +1405,6 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
       
       setBuiltTransaction(null);
       setTransactionCost(null);
-      setSimDiff(null);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Transaction failed';
       addLog(`Error: ${errorMsg}`, 'error');
@@ -2024,6 +2076,9 @@ export function UnifiedTransactionBuilder({ onTransactionBuilt, onBack, initialO
               connection={connection}
               timeTravelSteps={timeTravelSteps}
               builtTx={builtTransaction instanceof Transaction ? builtTransaction : null}
+              builtKind={
+                !builtTransaction ? 'none' : builtTransaction instanceof Transaction ? 'legacy' : 'versioned'
+              }
               adversaryForks={adversaryForks}
               onAdversaryForks={setAdversaryForks}
               signTransaction={active.signTransaction}

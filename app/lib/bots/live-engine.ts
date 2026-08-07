@@ -3,6 +3,7 @@ import type { BotPatternId } from './patterns';
 import { pushPaperTrade } from './trade-store';
 import { resolveFillAmounts } from './fill-from-chain';
 import { counterfactualFill } from '../studio/counterfactual';
+import { noticeLanded } from '../studio/landed-loop';
 import { executeJupiterSwap, fetchJupiterQuote, WSOL_MINT, type WalletSender } from './live-swap';
 import { isDisarmed, disarmAll } from './kill-switch';
 import { addDailyLoss, getDailyLoss } from '../session/desk-session';
@@ -213,6 +214,12 @@ export function startLiveBot(
             feeSol: fill.feeSol,
           }),
         });
+        noticeLanded({
+          signature,
+          source: 'live',
+          payer: cfg.publicKey.toBase58(),
+          mint: mintStr,
+        });
         onStatus?.(
           `LIVE BUY ${fill.sol.toFixed(4)} SOL · ${venue}${fill.settled ? ' · chain' : ' · quote'} · ${signature.slice(0, 8)}…`
         );
@@ -284,6 +291,12 @@ export function startLiveBot(
             chainSol: fill.sol,
             feeSol: fill.feeSol,
           }),
+        });
+        noticeLanded({
+          signature,
+          source: 'live',
+          payer: cfg.publicKey.toBase58(),
+          mint: mintStr,
         });
         onStatus?.(
           `LIVE SELL ~${fill.sol.toFixed(4)} SOL · ${venue}${fill.settled ? ' · chain' : ' · quote'} · ${signature.slice(0, 8)}…`

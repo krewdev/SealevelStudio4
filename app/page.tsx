@@ -1519,6 +1519,15 @@ function AppContent() {
     window.addEventListener('sealevel-navigate', onNav as EventListener);
     return () => window.removeEventListener('sealevel-navigate', onNav as EventListener);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hs = new URLSearchParams(window.location.search).get('hs');
+    if (hs) {
+      setCurrentScreen('app');
+      setActiveView('builder');
+    }
+  }, []);
   const [rdConsoleMinimized, setRdConsoleMinimized] = useState(true);
   const [selectedBlockchain, setSelectedBlockchain] = useState<BlockchainType | null>('solana');
   const bleedingEdgeEnabled = process.env.NEXT_PUBLIC_BLEEDING_EDGE_ENABLED === 'true';

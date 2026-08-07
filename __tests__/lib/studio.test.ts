@@ -2,6 +2,10 @@ import { getTemplateById } from '../../app/lib/instructions/templates';
 import type { TransactionDraft } from '../../app/lib/instructions/types';
 import {
   applyFailurePatch,
+  buildCeremonyInstructions,
+  ceremonyChecklist,
+  CEREMONY_LAMPORTS,
+  classifyBuiltTx,
   combinedDraft,
   computeTxDna,
   counterfactualFill,
@@ -15,11 +19,14 @@ import {
   flattenToTimeTravelSteps,
   forkDraftFromStep,
   headerBits,
+  isHandshakeBlockhashStale,
+  isVersionedRpcTx,
   jaccard,
   matchKnownShapes,
   projectAdversarialForks,
   suggestFailurePatches,
   summarizeWriteRadar,
+  versionedLimitation,
   worstPayerDelta,
   DEFAULT_FIREWALL_POLICY,
 } from '../../app/lib/studio';
@@ -287,6 +294,33 @@ describe('time-travel + handshake + capability', () => {
     expect(headerBits(1, 4, header)).toEqual({ isSigner: false, isWritable: true });
     expect(headerBits(2, 4, header)).toEqual({ isSigner: false, isWritable: false });
     expect(headerBits(3, 4, header)).toEqual({ isSigner: false, isWritable: false });
+  });
+
+  it('classifies versioned vs legacy and explains the limit', () => {
+    expect(classifyBuiltTx(null)).toBe('none');
+    expect(versionedLimitation('versioned') || '').toMatch(/versioned/i);
+    expect(isVersionedRpcTx({ transaction: { message: { staticAccountKeys: ['a'] } } })).toBe(true);
+    expect(isVersionedRpcTx({ transaction: { message: { accountKeys: ['a'] } } })).toBe(false);
+  });
+
+  it('detects expired handshake blockhash vs lastValidBlockHeight', () => {
+    expect(isHandshakeBlockhashStale({ blockhash: 'x', lastValidBlockHeight: 100 }, 90).stale).toBe(false);
+    expect(isHandshakeBlockhashStale({ blockhash: 'x', lastValidBlockHeight: 100 }, 101).stale).toBe(true);
+    expect(isHandshakeBlockhashStale({}, 1).reason).toBe('not-prepared');
+  });
+
+  it('builds a 0.001 SOL ceremony and tracks checklist', () => {
+    const { a, b } = buildCeremonyInstructions(PAYER, DEST);
+    expect(a[0]!.args.amount).toBe(CEREMONY_LAMPORTS);
+    expect(b[0]!.args.amount).toBe(1);
+    const offer = createHandshake({
+      partyA: { address: PAYER, instructions: a },
+      partyB: { address: DEST, instructions: b },
+    });
+    const steps = ceremonyChecklist(offer, PAYER);
+    expect(steps.find((s) => s.id === 'phantom')?.done).toBe(true);
+    expect(steps.find((s) => s.id === 'counterparty')?.done).toBe(true);
+    expect(steps.find((s) => s.id === 'landed')?.done).toBe(false);
   });
 
   it('binds live to phantom + ack + replay + firewall', () => {
